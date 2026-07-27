@@ -4,6 +4,8 @@
 
 本文件只記錄目前機器的唯讀盤點結果；本階段沒有安裝依賴，也沒有執行專案 build。
 
+除非另有說明，下列命令區塊是盤點紀錄的正規化輸出：路徑只保留 `Get-Command ... | Select-Object -First 1 -ExpandProperty Source` 的結果，版本只保留辨識所需行；`MISSING` 代表對應探測命令沒有找到項目，不是工具本身輸出的文字。
+
 ## Repository baseline
 
 | 項目 | 實際結果 |
@@ -43,6 +45,38 @@ C:\Program Files\Git\cmd\git.exe
 > git --version
 git version 2.54.0.windows.1
 ```
+
+### CMake 與 Ninja（Visual Studio bundled tools）
+
+Visual Studio Build Tools 已內含 CMake 與 Ninja；兩者不在一般 PowerShell 的 `PATH`，但可由明確路徑重跑：
+
+```powershell
+> $cmake = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
+> Test-Path -LiteralPath $cmake
+True
+> & $cmake --version
+cmake version 4.2.3-msvc3
+
+> $ninja = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe'
+> Test-Path -LiteralPath $ninja
+True
+> & $ninja --version
+1.13.2
+```
+
+一般 `PATH` 探測的正規化結果仍是：
+
+```powershell
+> $cmd = Get-Command cmake -ErrorAction SilentlyContinue | Select-Object -First 1
+> if ($cmd) { $cmd.Source } else { 'MISSING' }
+MISSING
+
+> $cmd = Get-Command ninja -ErrorAction SilentlyContinue | Select-Object -First 1
+> if ($cmd) { $cmd.Source } else { 'MISSING' }
+MISSING
+```
+
+正式建置應使用上述明確路徑，或先進入 Visual Studio developer environment，然後記錄實際解析到的 CMake、Ninja 與 compiler。不要因一般 `PATH` 找不到而重複安裝。
 
 ### Visual Studio、MSBuild 與 C++ compiler
 
@@ -86,20 +120,6 @@ Python 3.13.13
 ## Missing
 
 以下工具在目前 `PATH` 或列出的常見安裝位置找不到。本階段依要求沒有安裝。
-
-### CMake
-
-```text
-> Get-Command cmake
-MISSING
-```
-
-### Ninja
-
-```text
-> Get-Command ninja
-MISSING
-```
 
 ### Qt / qmake / qtpaths
 
@@ -173,17 +193,15 @@ MSVC 已存在，所以這些替代 compiler 缺少不構成目前 baseline 的�
 
 目前不能開始可重現的 Windows configure/build，直接阻擋項如下：
 
-1. 缺少 `cmake`。
-2. 缺少 Qt 6.9+（`qmake` / `qtpaths` 亦不可用）。
-3. 缺少可執行的 vcpkg installation，且 `VCPKG_ROOT` 未設定。
-4. 上游 Windows sample 使用 Ninja，但目前缺少 `ninja`。若改採 Visual Studio generator，可在下一階段明確決策後不把 Ninja 列為硬性需求。
+1. 缺少 Qt 6.9+（`qmake` / `qtpaths` 亦不可用）。
+2. 缺少可執行的 vcpkg installation，且 `VCPKG_ROOT` 未設定。
 
-MSI packaging 另受缺少 WiX Toolset 阻擋。OCR 驗證另受缺少 Tesseract 阻擋。Visual Studio Build Tools 2026、MSBuild 與 MSVC compiler 已存在，不是立即阻擋項，但相較上游明列的 Visual Studio 2022 尚未經 build 驗證。
+CMake 4.2.3-msvc3 與 Ninja 1.13.2 已隨 Visual Studio Build Tools 安裝，不是 blocker；但它們不在一般 `PATH`，configure/build 命令必須使用明確路徑或 developer environment。MSI packaging 另受缺少 WiX Toolset 阻擋。OCR 驗證另受缺少 Tesseract 阻擋。Visual Studio Build Tools 2026、MSBuild 與 MSVC compiler 已存在，不是立即阻擋項，但相較上游明列的 Visual Studio 2022 尚未經 build 驗證。
 
 ## 下一步
 
-1. 先決定可重現的 Windows toolchain 組合：Visual Studio generator，或 Ninja + MSVC。
-2. 依專案核准版本安裝 CMake、Qt 6.9+ 與 vcpkg；若採 Ninja generator，再安裝 Ninja。
-3. 明確設定 `VCPKG_ROOT`、`CMAKE_TOOLCHAIN_FILE`、`CMAKE_PREFIX_PATH` / `PDF4QT_QT_ROOT`。
+1. 先決定可重現的 Windows generator：Visual Studio generator，或現有 bundled Ninja 1.13.2 + MSVC。
+2. 沿用 Visual Studio Build Tools 內附的 CMake 4.2.3-msvc3 與 Ninja 1.13.2；使用明確路徑或 developer environment，不重複安裝。
+3. 依專案核准版本安裝 Qt 6.9+ 與 vcpkg，並明確設定 `VCPKG_ROOT`、`CMAKE_TOOLCHAIN_FILE`、`CMAKE_PREFIX_PATH` / `PDF4QT_QT_ROOT`。
 4. 僅在 MSI 進入交付範圍後補 WiX v3 相容 toolchain；僅在 OCR 進入 Phase 0 驗證範圍後補 Tesseract。
 5. 工具到齊後再執行 configure；首次 configure/build 的命令、完整版本與結果應另寫 Phase 0 build evidence，不回寫成本文件中的既有基線。
