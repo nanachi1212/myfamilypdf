@@ -74,7 +74,10 @@ function Invoke-LoggedNative {
     $stdoutPath = "$LogPath.stdout"
     $stderrPath = "$LogPath.stderr"
     Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
-    $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -NoNewWindow -Wait -PassThru `
+    $startArguments = @($ArgumentList | ForEach-Object {
+        '"' + $_.Replace('"', '\"') + '"'
+    })
+    $process = Start-Process -FilePath $FilePath -ArgumentList $startArguments -NoNewWindow -Wait -PassThru `
         -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
     $exitCode = $process.ExitCode
     $output = @(
