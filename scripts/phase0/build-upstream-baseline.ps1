@@ -71,16 +71,19 @@ function Invoke-LoggedNative {
     Write-Host "COMMAND: $displayCommand"
     "COMMAND: $displayCommand" | Set-Content -LiteralPath $LogPath -Encoding UTF8
 
-    $previousErrorActionPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        & $FilePath @ArgumentList 2>&1 |
-            Tee-Object -FilePath $LogPath -Append
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
+    $stdoutPath = "$LogPath.stdout"
+    $stderrPath = "$LogPath.stderr"
+    Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -NoNewWindow -Wait -PassThru `
+        -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+    $exitCode = $process.ExitCode
+    $output = @(
+        if (Test-Path -LiteralPath $stdoutPath) { Get-Content -LiteralPath $stdoutPath }
+        if (Test-Path -LiteralPath $stderrPath) { Get-Content -LiteralPath $stderrPath }
+    )
+    $output | Set-Content -LiteralPath $LogPath -Encoding UTF8
+    $output | Write-Host
+    Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     if ($exitCode -ne 0) {
         throw "Command failed with exit code ${exitCode}. See $LogPath"
     }
