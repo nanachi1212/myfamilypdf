@@ -98,6 +98,28 @@ function Get-DirectorySizeBytes {
         Measure-Object -Property Length -Sum).Sum)
 }
 
+function Prepare-TestRuntime {
+    $runtimeDirectory = Join-Path $BuildDirectory 'usr\bin'
+    $windeployqt = Join-Path $QtPrefix 'bin\windeployqt.exe'
+    Assert-File -LiteralPath $windeployqt
+    New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+
+    foreach ($target in $Targets | Where-Object { $_ -like 'UnitTests*' }) {
+        $executable = Join-Path $runtimeDirectory "$target.exe"
+        Assert-File -LiteralPath $executable
+        & $windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw $executable 2>&1 |
+            Set-Content -LiteralPath (Join-Path $BuildDirectory "windeployqt-$target.log") -Encoding UTF8
+        if ($LASTEXITCODE -ne 0) {
+            throw "windeployqt failed for $target with exit code $LASTEXITCODE."
+        }
+    }
+
+    $vcpkgBin = Join-Path $BuildDirectory 'vcpkg_installed\x64-windows\bin'
+    if (Test-Path -LiteralPath $vcpkgBin -PathType Container) {
+        Get-ChildItem -LiteralPath $vcpkgBin -Filter '*.dll' -File | Copy-Item -Destination $runtimeDirectory -Force
+    }
+}
+
 Assert-File -LiteralPath (Join-Path $QtPrefix 'lib\cmake\Qt6\Qt6Config.cmake')
 Assert-File -LiteralPath $VcpkgToolchain
 $visualStudioRoot = Import-MsvcEnvironment
@@ -155,6 +177,7 @@ if ($Stage -in @('All', 'Build')) {
 
 if ($Stage -in @('All', 'Test')) {
     Assert-File -LiteralPath (Join-Path $BuildDirectory 'CTestTestfile.cmake')
+    Prepare-TestRuntime
     $stopwatch = [Diagnostics.Stopwatch]::StartNew()
     $testArguments = @(
         '--build', $BuildDirectory,
