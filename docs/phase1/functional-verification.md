@@ -23,11 +23,12 @@
 - OCR 外掛已更新為 0.3.0；驗證安裝 exit code `0`，manifest 與安裝 payload 版本一致。
 - 單頁及雙頁 PDF 均成功建立同頁數的可搜尋 PDF，`PdfTool fetch-text` 可抽取 `FamilyPDF` 文字。
 - 測試同時確認原始 PDF SHA-256 未改變，且可選擇另外輸出非空白 UTF-8 文字檔。
-- 繁體中文 `chi_tra`、簡體中文 `chi_sim`、英文 `eng` 已由封裝目錄及安裝後隔離目錄各完成端對端測試。
-- OCR 外掛隔離靜默安裝 exit code `0`；安裝後 Tesseract、PdfTool render／unite／fetch-text 完整流程通過。
+- 固定橫排圖像回歸直接以 `chi_tra`、`chi_sim`、`eng` 辨識，分別取得「傳統中文測試」、「简体中文测试」及 `FamilyPDF OCR 2026`。
+- 封裝後端對端流程確認原始 PDF SHA-256 不變、頁數不變、PDF 文字層含預期繁簡中文字元，UTF-8 sidecar 則保留完整字序。
+- OCR 外掛先前同版本的隔離靜默安裝 exit code `0`；本次重建的 Inno Setup 7.0.2 編譯成功。現行 Codex 沙盒禁止寫入 HKCU 解除安裝登錄及開始功能表，因此不能在此沙盒重做安裝步驟。
 - 語言修復腳本會自動補下載 `eng`、`chi_tra`、`chi_sim`、`chi_tra_vert`、`chi_sim_vert`；目前本機封裝內建前三種橫排模型，兩個直排模型在有網路時自動補齊。
 - OCR 主流程已直接串接缺語言修復：官方來源、最多三次重試、大小檢查、Tesseract 實際載入與原子替換。斷線回歸確認不產生結果 PDF，且沒有 `.download` 半檔。
-- 直排繁體與簡體雙欄測試 PDF 已建立、由 FamilyPDF 重新渲染並完成視覺檢查，待兩個官方直排模型下載後即可直接執行辨識斷言。
+- 橫排繁簡中回歸已接入每次 OCR 封裝建置；直排繁體與簡體雙欄圖像及自動測試亦已建立，待兩個官方直排模型下載後，建置會自動執行直排辨識斷言。
 - Viewer／Editor 已加入「使用 OCR 建立可搜尋 PDF」工具選單；未安裝外掛時會顯示明確提示。
 
 ## 可攜式包 smoke test

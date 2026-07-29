@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$OutputDirectory = '',
-    [switch]$SkipDownload
+    [switch]$SkipDownload,
+    [switch]$SkipVerification
 )
 
 $ErrorActionPreference = 'Stop'
@@ -87,6 +88,39 @@ $manifest = [ordered]@{
 }
 $manifest | ConvertTo-Json -Depth 4 |
     Set-Content -LiteralPath (Join-Path $packageRoot 'FamilyPDF-OCR-Plugin.json') -Encoding UTF8
+
+if (-not $SkipVerification) {
+    $pdfTool = Join-Path $repositoryRoot 'build\phase0-upstream-release\usr\bin\PdfTool.exe'
+    if (-not (Test-Path -LiteralPath $pdfTool -PathType Leaf)) {
+        throw "PdfTool is required for OCR verification: $pdfTool"
+    }
+
+    & (Join-Path $PSScriptRoot 'Test-FamilyPDF-OCR-Horizontal.ps1') `
+        -PdfToolPath $pdfTool `
+        -TesseractPath (Join-Path $packageOcr 'tesseract.exe') `
+        -TessdataPath $packageTessdata `
+        -OcrScriptPath (Join-Path $packageRoot 'FamilyPDF-OCR.ps1')
+
+    $requiredVerticalLanguages = @('chi_tra_vert', 'chi_sim_vert')
+    $missingVerticalLanguages = @(
+        $requiredVerticalLanguages |
+            Where-Object {
+                -not (Test-Path -LiteralPath (
+                    Join-Path $packageTessdata "$_.traineddata"
+                ) -PathType Leaf)
+            }
+    )
+    if ($missingVerticalLanguages.Count -eq 0) {
+        & (Join-Path $PSScriptRoot 'Test-FamilyPDF-OCR-Vertical.ps1') `
+            -PdfToolPath $pdfTool `
+            -TesseractPath (Join-Path $packageOcr 'tesseract.exe') `
+            -TessdataPath $packageTessdata `
+            -OcrScriptPath (Join-Path $packageRoot 'FamilyPDF-OCR.ps1')
+    }
+    else {
+        Write-Warning "Skipping vertical OCR verification because models are missing: $($missingVerticalLanguages -join ', ')"
+    }
+}
 
 $zipPath = Join-Path $OutputDirectory 'FamilyPDF-OCR-Plugin-windows-x64.zip'
 if (Test-Path -LiteralPath $zipPath -PathType Leaf) {

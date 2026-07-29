@@ -67,3 +67,10 @@ Install-FamilyPDF-OCR-Languages.cmd
 ```
 
 缺少 Tesseract 相依套件時會透過 vcpkg 安裝；缺少語言檔時會自動從官方來源下載。
+
+建置會固定執行橫排繁中、簡中、英文的實際辨識與可搜尋 PDF 回歸。當 `chi_tra_vert`、`chi_sim_vert` 都存在時，也會自動執行直排繁簡中回歸：
+
+```powershell
+.\scripts\ocr\Test-FamilyPDF-OCR-Horizontal.ps1
+.\scripts\ocr\Test-FamilyPDF-OCR-Vertical.ps1
+```
