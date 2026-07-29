@@ -2236,6 +2236,7 @@ void PDFProgramController::setDocument(pdf::PDFModifiedDocument document, std::v
 
     if (m_bookmarkManager)
     {
+        m_bookmarkManager->setProperty("familyPdfDocumentPath", document ? m_fileInfo.absoluteFilePath : QString());
         m_bookmarkManager->setDocument(document);
     }
 

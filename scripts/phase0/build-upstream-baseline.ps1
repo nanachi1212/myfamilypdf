@@ -52,7 +52,22 @@ function Import-MsvcEnvironment {
     }
     foreach ($line in $environmentLines) {
         if ($line -match '^([^=][^=]*)=(.*)$') {
-            [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+            $variableName = $Matches[1]
+            if ($variableName -ieq 'Path') {
+                # Windows environment variables are case-insensitive, but the
+                # process block can still contain both PATH and Path. .NET's
+                # Start-Process converts that block to a case-insensitive
+                # dictionary and fails when both spellings are present.
+                foreach ($existingName in [Environment]::GetEnvironmentVariables('Process').Keys) {
+                    if ([string]$existingName -ieq 'Path') {
+                        [Environment]::SetEnvironmentVariable([string]$existingName, $null, 'Process')
+                    }
+                }
+                [Environment]::SetEnvironmentVariable('Path', $Matches[2], 'Process')
+            }
+            else {
+                [Environment]::SetEnvironmentVariable($variableName, $Matches[2], 'Process')
+            }
         }
     }
     if ($env:VSCMD_ARG_TGT_ARCH -ne 'x64') {

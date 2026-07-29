@@ -909,16 +909,16 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
             }
         }
 
-        QString textValue = parser->value("render-software");
+        QString textValue = parser->value("render-hw-accel");
         bool ok = false;
         bool value = textValue.toInt(&ok);
         if (ok)
         {
-            options.renderUseSoftwareRendering = value;
+            options.renderUseSoftwareRendering = !value;
         }
         else
         {
-            PDFConsole::writeError(PDFToolTranslationContext::tr("Uknown bool value '%1'. GPU rendering is used as default.").arg(textValue), options.outputCodec);
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown bool value '%1'. GPU rendering is used as default.").arg(textValue), options.outputCodec);
         }
 
         textValue = parser->value("render-msaa-samples");

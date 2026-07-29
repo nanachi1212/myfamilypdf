@@ -106,10 +106,10 @@ E:\CodexProject\FamilyPDF-tools\vcpkg\scripts\buildsystems\vcpkg.cmake
 
 從 toolchain presence 與 package-path 驗證結果來看，可以進入後續 configure task。後續 configure 必須在該 process 明確設定 Qt prefix、`PDF4QT_QT_ROOT` 與 vcpkg toolchain path；本安裝腳本刻意不建立全域環境變數。vcpkg manifest dependencies 尚未預先安裝，會由後續 manifest-mode configure/install 階段解析。
 
-## 尚未安裝
+## 當時尚未安裝（後續狀態）
 
-- WiX Toolset：延後至 MSI packaging task。
-- Tesseract：延後至 OCR task；目前 `vcpkg.json` 也沒有 Tesseract dependency。
+- WiX Toolset：未採用；FamilyPDF 後續改用經 Authenticode 驗證的 Inno Setup 7.0.2。
+- Tesseract：後續已用獨立 `ocr-spike/vcpkg.json` 安裝 Tesseract 5.5.2，避免改動 PDF4QT 基底 manifest。
 
 ## Rollback
 
@@ -127,4 +127,4 @@ E:\CodexProject\FamilyPDF-tools
 - 初版 vcpkg clone 使用 `--no-checkout`，Git 將空 worktree 顯示為大量 deleted。保護檢查在 bootstrap 前中止；只刪除該新建、未完成的 `E:\CodexProject\FamilyPDF-tools\vcpkg` 後，腳本改為 normal clone 並成功 bootstrap。Qt 與 aqt 目錄未刪除。
 - upstream manifest 沒有 `builtin-baseline`；本 task 的 exact vcpkg commit pin 位於安裝腳本。若日後要更新 ports，必須明確更新此 commit、重新驗證依賴，再提交變更。
 - aqtinstall 本身已固定 3.3.0，但其 PyPI transitive dependencies 沒有另建 hash lock。它們只用於取得固定 Qt 6.9.1 archives；若需要離線或 byte-for-byte Python environment reproduction，應另建立 wheelhouse 與 hash-locked requirements。
-- 尚未執行 configure/build；本文件只證明 toolchain 安裝與 package discovery paths 完整，不代表 PDF4QT 已編譯通過。
+- 本文件記錄的是當時的工具鏈階段；後續 configure、build 與 3/3 測試皆已完成，請見 `upstream-build.md` 與 Phase 1 驗證文件。

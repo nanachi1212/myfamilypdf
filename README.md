@@ -1,3 +1,53 @@
+# FamilyPDF 家庭用 PDF 閱讀器
+
+FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組，供自己與家人使用。安裝與程式介面支援繁體中文、簡體中文及英文。
+
+## 已完成的主要功能
+
+- 閱讀、搜尋、列印與開啟數百頁 PDF。
+- 多色反白、底線、刪除線、波浪線、框選、自由文字與註解側欄。
+- 書籤建立、導入、自動產生，以及跨 Viewer／Editor 重啟保存。
+- PDF 合併與拆分；合併前可選單數頁、雙數頁或輸入 `1-3,8,10-12` 等頁碼範圍。
+- Tesseract OCR，內含繁體中文、簡體中文及英文語言資料；原始 PDF 不會被覆寫。
+- 免管理員權限的 Windows 安裝程式，以及免安裝可攜式 ZIP。
+
+## 直接使用
+
+本機建置產物：
+
+- `dist\FamilyPDF-Setup-x64.exe`：一般使用者建議使用。
+- `dist\FamilyPDF-windows-x64.zip`：解壓縮整個資料夾後使用。
+
+主要程式：
+
+- `Pdf4QtViewer.exe`：閱讀 PDF。
+- `Pdf4QtEditor.exe`：編輯、標記、打字與註解。
+- `Pdf4QtPageMaster.exe`：合併、拆分與頁面整理。
+- `FamilyPDF-OCR.cmd`：把掃描 PDF 辨識為 UTF-8 文字檔。
+
+詳細操作與驗證：
+
+- [可攜式包使用方式](docs/phase1/portable-package.md)
+- [Windows 安裝檔](docs/phase1/installer.md)
+- [OCR 使用方式](docs/phase1/ocr.md)
+- [功能驗證結果](docs/phase1/functional-verification.md)
+
+## 建置
+
+在 Windows PowerShell 執行：
+
+```powershell
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\phase0\build-upstream-baseline.ps1 -Stage All
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\phase0\package-windows-runtime.ps1
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\phase0\build-installer.ps1 -SkipPackage
+```
+
+建置腳本會在缺少時下載 OCR 語言資料、Tesseract 相依套件及經 Authenticode 驗證的 Inno Setup。開發工具預設放在 `E:\CodexProject\FamilyPDF-tools`。
+
+## 開源基底
+
+FamilyPDF 保留 PDF4QT 的 MIT License 與第三方授權資訊。以下是原始專案說明。
+
 [![CI](https://github.com/JakubMelka/PDF4QT/actions/workflows/ci.yml/badge.svg)](https://github.com/JakubMelka/PDF4QT/actions/workflows/ci.yml)
 
 # PDF4QT

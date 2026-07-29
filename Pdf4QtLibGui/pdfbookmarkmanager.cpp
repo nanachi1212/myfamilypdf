@@ -24,9 +24,13 @@
 #include "pdfaction.h"
 
 #include <QFile>
+#include <QFileInfo>
+#include <QDir>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QStandardPaths>
+#include <QCryptographicHash>
 
 namespace pdfviewer
 {
@@ -82,49 +86,37 @@ public:
         return bookmarks;
     }
 
-    static QJsonDocument convertBookmarksMapToJsonDocument(const std::map<QString, PDFBookmarkManager::Bookmarks>& bookmarksMap)
-    {
-        QJsonObject mainObject;
-        for (const auto& pair : bookmarksMap)
-        {
-            mainObject[pair.first] = convertBookmarksToJson(pair.second);
-        }
-        return QJsonDocument(mainObject);
-    }
-
-    static std::map<QString, PDFBookmarkManager::Bookmarks> convertBookmarksMapFromJsonDocument(const QJsonDocument &doc)
-    {
-        std::map<QString, PDFBookmarkManager::Bookmarks> container;
-        QJsonObject mainObject = doc.object();
-
-        for (auto it = mainObject.begin(); it != mainObject.end(); ++it)
-        {
-            container[it.key()] = convertBookmarksFromJson(it.value().toObject());
-        }
-
-        return container;
-    }
 };
 
 PDFBookmarkManager::PDFBookmarkManager(QObject* parent) :
     BaseClass(parent)
 {
-
 }
 
 void PDFBookmarkManager::setDocument(const pdf::PDFModifiedDocument& document)
 {
     Q_EMIT bookmarksAboutToBeChanged();
 
-    m_document = document.getDocument();
-
     if (document.hasReset())
     {
+        savePersistentBookmarks();
+        m_document = document.getDocument();
+        setProperty("familyPdfDocumentKey", getDocumentKey(m_document));
+        m_currentBookmark = -1;
+
         if (!document.hasPreserveView())
         {
-            m_bookmarks.bookmarks.clear();
-            regenerateAutoBookmarks();
+            if (!loadPersistentBookmarks())
+            {
+                m_bookmarks.bookmarks.clear();
+                regenerateAutoBookmarks();
+                savePersistentBookmarks();
+            }
         }
+    }
+    else
+    {
+        m_document = document.getDocument();
     }
 
     Q_EMIT bookmarksChanged();
@@ -153,6 +145,7 @@ bool PDFBookmarkManager::loadFromFile(QString fileName)
 
         Q_EMIT bookmarksAboutToBeChanged();
         m_bookmarks = PDFBookmarkManagerHelper::convertBookmarksFromJson(loadedDoc.object());
+        savePersistentBookmarks();
         Q_EMIT bookmarksChanged();
         return true;
     }
@@ -202,6 +195,7 @@ void PDFBookmarkManager::toggleBookmark(pdf::PDFInteger pageIndex)
         sortBookmarks();
     }
 
+    savePersistentBookmarks();
     Q_EMIT bookmarksChanged();
 }
 
@@ -212,8 +206,102 @@ void PDFBookmarkManager::setGenerateBookmarksAutomatically(bool generateBookmark
         Q_EMIT bookmarksAboutToBeChanged();
         m_generateBookmarksAutomatically = generateBookmarksAutomatically;
         regenerateAutoBookmarks();
+        savePersistentBookmarks();
         Q_EMIT bookmarksChanged();
     }
+}
+
+bool PDFBookmarkManager::loadPersistentBookmarks()
+{
+    const QString documentKey = property("familyPdfDocumentKey").toString();
+    if (documentKey.isEmpty())
+    {
+        return false;
+    }
+
+    QFile file(getPersistentBookmarksFileName());
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        return false;
+    }
+
+    const QJsonObject documents = QJsonDocument::fromJson(file.readAll()).object();
+    file.close();
+    const QJsonValue value = documents.value(documentKey);
+    if (!value.isObject())
+    {
+        return false;
+    }
+
+    m_bookmarks = PDFBookmarkManagerHelper::convertBookmarksFromJson(value.toObject());
+    return true;
+}
+
+void PDFBookmarkManager::savePersistentBookmarks() const
+{
+    const QString documentKey = property("familyPdfDocumentKey").toString();
+    if (documentKey.isEmpty())
+    {
+        return;
+    }
+
+    const QString fileName = getPersistentBookmarksFileName();
+    QDir directory;
+    if (!directory.mkpath(QFileInfo(fileName).absolutePath()))
+    {
+        return;
+    }
+
+    QJsonObject documents;
+    QFile existingFile(fileName);
+    if (existingFile.open(QIODevice::ReadOnly))
+    {
+        documents = QJsonDocument::fromJson(existingFile.readAll()).object();
+        existingFile.close();
+    }
+
+    documents[documentKey] = PDFBookmarkManagerHelper::convertBookmarksToJson(m_bookmarks);
+
+    QFile file(fileName);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    {
+        file.write(QJsonDocument(documents).toJson(QJsonDocument::Compact));
+        file.close();
+    }
+}
+
+QString PDFBookmarkManager::getDocumentKey(const pdf::PDFDocument* document) const
+{
+    if (!document)
+    {
+        return QString();
+    }
+
+    QString documentPath = QDir::cleanPath(property("familyPdfDocumentPath").toString());
+#ifdef Q_OS_WIN
+    documentPath = documentPath.toLower();
+#endif
+    if (!documentPath.isEmpty())
+    {
+        return QStringLiteral("path:") +
+               QString::fromLatin1(QCryptographicHash::hash(documentPath.toUtf8(), QCryptographicHash::Sha256).toHex());
+    }
+
+    // The source hash is populated by the document reader and does not require
+    // traversing the trailer while the document-reset notification is active.
+    const QByteArray sourceHash = document->getSourceDataHash();
+    if (!sourceHash.isEmpty())
+    {
+        return QStringLiteral("hash:") + QString::fromLatin1(sourceHash.toHex());
+    }
+
+    return QString();
+}
+
+QString PDFBookmarkManager::getPersistentBookmarksFileName() const
+{
+    const QString configDirectory = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
+    return QDir(configDirectory).filePath(QStringLiteral("FamilyPDF/bookmarks.json"));
 }
 
 void PDFBookmarkManager::goToNextBookmark()

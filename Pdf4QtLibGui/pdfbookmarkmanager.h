@@ -73,13 +73,17 @@ private:
 
     void sortBookmarks();
     void regenerateAutoBookmarks();
+    bool loadPersistentBookmarks();
+    void savePersistentBookmarks() const;
+    QString getDocumentKey(const pdf::PDFDocument* document) const;
+    QString getPersistentBookmarksFileName() const;
 
     struct Bookmarks
     {
         std::vector<Bookmark> bookmarks;
     };
 
-    pdf::PDFDocument* m_document;
+    pdf::PDFDocument* m_document = nullptr;
     Bookmarks m_bookmarks;
     int m_currentBookmark = -1;
     bool m_generateBookmarksAutomatically = true;

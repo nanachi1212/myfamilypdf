@@ -36,3 +36,17 @@ FamilyPDF 使用 Inno Setup 產生目前使用者範圍的 x64 安裝檔，不�
 - FamilyPDF OCR
 - 可選的桌面捷徑
 - 開始功能表捷徑與解除安裝項目
+
+## 已驗證產物
+
+2026-07-29 的 `dist\FamilyPDF-Setup-x64.exe`：
+
+- 大小：74,105,033 bytes（約 70.7 MiB）。
+- SHA-256：`CB0F2A396F27F63948009B607DDBD9628BA730D1844527795A1543213CCAC6DA`。
+- 使用 `/VERYSILENT` 安裝到隔離目錄，安裝程式 exit code `0`。
+- 從安裝後目錄執行三組單元測試，全部 exit code `0`。
+- 安裝後 Tesseract 5.5.2 可載入 `chi_tra`、`chi_sim`、`eng`。
+- 安裝後 OCR 成功辨識繁體中文、英文與既有 PDF 文字註解。
+- 安裝後 Viewer 與 PageMaster 成功開啟 290 頁 PDF 並保持回應。
+
+目前 FamilyPDF 安裝檔沒有商業程式碼簽章憑證，Windows SmartScreen 可能顯示「未知發行者」。建置流程下載的 Inno Setup 本身則會先驗證有效 Authenticode 簽章及發行者。
