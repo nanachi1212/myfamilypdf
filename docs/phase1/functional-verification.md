@@ -8,6 +8,7 @@
 - `UnitTests.exe`：exit code `0`。
 - `UnitTestsImageOptimizer.exe`：exit code `0`。
 - `UnitTestsFontEncoding.exe`：exit code `0`。
+- 可攜式包包含 `translations/PDF4QT_zh_TW.qm` 與 `translations/PDF4QT_zh_CN.qm`。
 
 ## 命令列 PDF 流程
 

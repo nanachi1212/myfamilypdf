@@ -72,6 +72,11 @@ New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 Get-ChildItem -LiteralPath $runtimeDirectory -Force |
     Copy-Item -Destination $packageRoot -Recurse -Force
 
+$translations = Join-Path $runtimeDirectory 'translations'
+if (Test-Path -LiteralPath $translations -PathType Container) {
+    Copy-Item -LiteralPath $translations -Destination $packageRoot -Recurse -Force
+}
+
 $zipPath = Join-Path $OutputDirectory 'FamilyPDF-windows-x64.zip'
 if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force

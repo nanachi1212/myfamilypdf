@@ -25,7 +25,8 @@ $Targets = @(
     'Pdf4QtPageMaster',
     'UnitTests',
     'UnitTestsImageOptimizer',
-    'UnitTestsFontEncoding'
+    'UnitTestsFontEncoding',
+    'release_translations'
 )
 
 function Assert-File {
