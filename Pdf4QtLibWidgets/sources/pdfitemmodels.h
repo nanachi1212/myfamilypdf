@@ -214,6 +214,7 @@ public:
     /// if no outline item is assigned to that index.
     PDFOutlineItem* getOutlineItem(const QModelIndex& index);
 
+    void setTextColor(const QModelIndex& index, const QColor& color);
     void setFontBold(const QModelIndex& index, bool value);
     void setFontItalics(const QModelIndex& index, bool value);
     void setDestination(const QModelIndex& index, const PDFDestination& destination);

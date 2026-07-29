@@ -4,6 +4,10 @@
 
 #include "pdfbookmarkmanager.h"
 #include "pdfbookmarkmodel.h"
+#include "pdfdocumentbuilder.h"
+#include "pdfdocumentreader.h"
+#include "pdfdocumentwriter.h"
+#include "pdfoutline.h"
 #include "pdfrecoverymanager.h"
 #include "pdfsafesaveservice.h"
 #include "pdfsessionmanager.h"
@@ -33,6 +37,8 @@ private slots:
     void sessionPathsAreNormalizedAndMissingFilesAreSkipped();
     void portableModeUsesApplicationDataDirectory();
     void newDestinationCommitIsValidatedAndDurable();
+    void embeddedOutlineIsWrittenWithHierarchyColorAndDestinations();
+    void standardAnnotationsAreWrittenWithColorsAndText();
 };
 
 void BookmarkManagerTest::legacyBookmarksAreMigrated()
@@ -429,6 +435,155 @@ void BookmarkManagerTest::newDestinationCommitIsValidatedAndDurable()
     QCOMPARE(validationCount, 2);
     QVERIFY(QFileInfo::exists(destinationPath));
     QVERIFY(!QFileInfo::exists(candidatePath));
+}
+
+void BookmarkManagerTest::embeddedOutlineIsWrittenWithHierarchyColorAndDestinations()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    // Use UTF-16 escapes so this interoperability fixture is deterministic
+    // even when MSVC runs under a non-UTF-8 Windows system code page.
+    const QString folderTitle =
+        QString::fromUtf16(u"\u95B1\u8B80\u8CC7\u6599\u593E");
+    const QString firstChapterTitle =
+        QString::fromUtf16(u"\u7B2C\u4E00\u7AE0");
+    const QString secondChapterTitle =
+        QString::fromUtf16(u"\u7B2C\u4E8C\u7AE0");
+
+    pdf::PDFDocumentBuilder builder;
+    const pdf::PDFObjectReference firstPage = builder.appendPage(QRectF(0, 0, 595, 842));
+    const pdf::PDFObjectReference secondPage = builder.appendPage(QRectF(0, 0, 595, 842));
+
+    pdf::PDFOutlineItem root;
+    QSharedPointer<pdf::PDFOutlineItem> folder(new pdf::PDFOutlineItem());
+    folder->setTitle(folderTitle);
+    folder->setTextColor(QColor(QStringLiteral("#3366cc")));
+    folder->setFontBold(true);
+
+    QSharedPointer<pdf::PDFOutlineItem> firstChapter(new pdf::PDFOutlineItem());
+    firstChapter->setTitle(firstChapterTitle);
+    firstChapter->setTextColor(QColor(QStringLiteral("#cc3366")));
+    firstChapter->setAction(pdf::PDFActionPtr(new pdf::PDFActionGoTo(
+        pdf::PDFDestination::createFit(firstPage),
+        pdf::PDFDestination())));
+    folder->addChild(firstChapter);
+    root.addChild(folder);
+
+    QSharedPointer<pdf::PDFOutlineItem> secondChapter(new pdf::PDFOutlineItem());
+    secondChapter->setTitle(secondChapterTitle);
+    secondChapter->setTextColor(QColor(QStringLiteral("#228833")));
+    secondChapter->setAction(pdf::PDFActionPtr(new pdf::PDFActionGoTo(
+        pdf::PDFDestination::createFit(secondPage),
+        pdf::PDFDestination())));
+    root.addChild(secondChapter);
+    builder.setOutline(&root);
+
+    pdf::PDFDocument document = builder.build();
+    QString outputPath = qEnvironmentVariable("FAMILYPDF_OUTLINE_FIXTURE");
+    if (outputPath.isEmpty())
+    {
+        outputPath = directory.filePath(QStringLiteral("outline-interop.pdf"));
+    }
+    else
+    {
+        QDir().mkpath(QFileInfo(outputPath).absolutePath());
+    }
+
+    pdf::PDFDocumentWriter writer(nullptr);
+    const pdf::PDFOperationResult writeResult = writer.write(outputPath, &document, true);
+    QVERIFY2(static_cast<bool>(writeResult), qPrintable(writeResult.getErrorMessage()));
+
+    pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+    pdf::PDFDocument restored = reader.readFromFile(outputPath);
+    QCOMPARE(reader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
+    const pdf::PDFOutlineItem* restoredRoot =
+        restored.getCatalog()->getOutlineRootPtr().data();
+    QVERIFY(restoredRoot);
+    QCOMPARE(restoredRoot->getChildCount(), std::size_t(2));
+
+    const pdf::PDFOutlineItem* restoredFolder = restoredRoot->getChild(0);
+    QCOMPARE(restoredFolder->getTitle(), folderTitle);
+    QCOMPARE(restoredFolder->getTextColor(), QColor(QStringLiteral("#3366cc")));
+    QVERIFY(restoredFolder->isFontBold());
+    QCOMPARE(restoredFolder->getChildCount(), std::size_t(1));
+
+    const pdf::PDFOutlineItem* restoredFirstChapter = restoredFolder->getChild(0);
+    QCOMPARE(restoredFirstChapter->getTitle(), firstChapterTitle);
+    QCOMPARE(restoredFirstChapter->getTextColor(), QColor(QStringLiteral("#cc3366")));
+    const auto* firstAction =
+        dynamic_cast<const pdf::PDFActionGoTo*>(restoredFirstChapter->getAction());
+    QVERIFY(firstAction);
+    QCOMPARE(firstAction->getDestination().getPageReference(), firstPage);
+
+    const pdf::PDFOutlineItem* restoredSecondChapter = restoredRoot->getChild(1);
+    QCOMPARE(restoredSecondChapter->getTitle(), secondChapterTitle);
+    QCOMPARE(restoredSecondChapter->getTextColor(), QColor(QStringLiteral("#228833")));
+    const auto* secondAction =
+        dynamic_cast<const pdf::PDFActionGoTo*>(restoredSecondChapter->getAction());
+    QVERIFY(secondAction);
+    QCOMPARE(secondAction->getDestination().getPageReference(), secondPage);
+}
+
+void BookmarkManagerTest::standardAnnotationsAreWrittenWithColorsAndText()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    pdf::PDFDocumentBuilder builder;
+    const pdf::PDFObjectReference page = builder.appendPage(QRectF(0, 0, 595, 842));
+
+    QVERIFY(builder.createAnnotationHighlight(page,
+                                              QRectF(50, 700, 180, 24),
+                                              QColor(QStringLiteral("#ffff00"))).isValid());
+    QVERIFY(builder.createAnnotationUnderline(page,
+                                              QRectF(50, 650, 180, 24),
+                                              QColor(QStringLiteral("#00aa44"))).isValid());
+    QVERIFY(builder.createAnnotationStrikeout(page,
+                                              QRectF(50, 600, 180, 24),
+                                              QColor(QStringLiteral("#dd2233"))).isValid());
+    QVERIFY(builder.createAnnotationSquare(page,
+                                           QRectF(40, 500, 220, 70),
+                                           2.0,
+                                           QColor(QStringLiteral("#ddeeff")),
+                                           QColor(QStringLiteral("#3366cc")),
+                                           QStringLiteral("FamilyPDF"),
+                                           QStringLiteral("Box"),
+                                           QStringLiteral("Box annotation")).isValid());
+    QVERIFY(builder.createAnnotationFreeText(page,
+                                             QRectF(40, 400, 260, 60),
+                                             QStringLiteral("FamilyPDF"),
+                                             QStringLiteral("Typed text"),
+                                             QStringLiteral("Editable typed annotation"),
+                                             Qt::AlignLeft).isValid());
+    QVERIFY(builder.createAnnotationText(page,
+                                         QRectF(40, 340, 24, 24),
+                                         pdf::TextAnnotationIcon::Note,
+                                         QStringLiteral("FamilyPDF"),
+                                         QStringLiteral("Note"),
+                                         QStringLiteral("Sticky note annotation"),
+                                         false).isValid());
+
+    pdf::PDFDocument document = builder.build();
+    QString outputPath = qEnvironmentVariable("FAMILYPDF_ANNOTATION_FIXTURE");
+    if (outputPath.isEmpty())
+    {
+        outputPath = directory.filePath(QStringLiteral("annotation-interop.pdf"));
+    }
+    else
+    {
+        QDir().mkpath(QFileInfo(outputPath).absolutePath());
+    }
+
+    pdf::PDFDocumentWriter writer(nullptr);
+    const pdf::PDFOperationResult writeResult = writer.write(outputPath, &document, true);
+    QVERIFY2(static_cast<bool>(writeResult), qPrintable(writeResult.getErrorMessage()));
+
+    pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+    const pdf::PDFDocument restored = reader.readFromFile(outputPath);
+    QVERIFY2(reader.getReadingResult() == pdf::PDFDocumentReader::Result::OK,
+             qPrintable(reader.getErrorMessage()));
+    QCOMPARE(restored.getCatalog()->getPageCount(), pdf::PDFInteger(1));
 }
 
 QTEST_MAIN(BookmarkManagerTest)

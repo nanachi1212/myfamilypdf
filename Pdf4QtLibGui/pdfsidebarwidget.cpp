@@ -1158,16 +1158,37 @@ void PDFSidebarWidget::onOutlineTreeViewContextMenuRequested(const QPoint& pos)
         ui->outlineTreeView->edit(proxyIndex);
     };
 
+    auto onInsertFolder = [this, proxyIndex]()
+    {
+        QAbstractItemModel* model = ui->outlineTreeView->model();
+        const QModelIndex parentIndex = proxyIndex.isValid() ? proxyIndex : QModelIndex();
+        const int row = model->rowCount(parentIndex);
+        if (model->insertRow(row, parentIndex))
+        {
+            const QModelIndex folderIndex = model->index(row, 0, parentIndex);
+            model->setData(folderIndex, tr("Folder"), Qt::EditRole);
+            if (parentIndex.isValid())
+            {
+                ui->outlineTreeView->expand(parentIndex);
+            }
+            ui->outlineTreeView->setCurrentIndex(folderIndex);
+            ui->outlineTreeView->edit(folderIndex);
+        }
+    };
+
     QAction* followAction = contextMenu.addAction(tr("Follow"), onFollow);
     followAction->setEnabled(proxyIndex.isValid());
     contextMenu.addSeparator();
 
     QAction* deleteAction = contextMenu.addAction(tr("Delete"), onDelete);
     QAction* insertAction = contextMenu.addAction(tr("Insert"), this, onInsert);
+    QAction* insertFolderAction =
+        contextMenu.addAction(tr("Insert Folder"), this, onInsertFolder);
     QAction* renameAction = contextMenu.addAction(tr("Rename"), this, onRename);
 
     deleteAction->setEnabled(proxyIndex.isValid());
     insertAction->setEnabled(true);
+    insertFolderAction->setEnabled(true);
     renameAction->setEnabled(proxyIndex.isValid());
 
     contextMenu.addSeparator();
@@ -1176,6 +1197,19 @@ void PDFSidebarWidget::onOutlineTreeViewContextMenuRequested(const QPoint& pos)
     const pdf::PDFOutlineItem* outlineItem = m_outlineTreeModel->getOutlineItem(sourceIndex);
     const bool isFontBold = outlineItem && outlineItem->isFontBold();
     const bool isFontItalics = outlineItem && outlineItem->isFontItalics();
+
+    auto onTextColor = [this, sourceIndex, outlineItem]()
+    {
+        const QColor initialColor =
+            outlineItem ? outlineItem->getTextColor() : QColor(Qt::black);
+        const QColor color = QColorDialog::getColor(initialColor,
+                                                     this,
+                                                     tr("Select bookmark text color"));
+        if (color.isValid())
+        {
+            m_outlineTreeModel->setTextColor(sourceIndex, color);
+        }
+    };
 
     auto onFontBold = [this, sourceIndex, isFontBold]()
     {
@@ -1187,8 +1221,11 @@ void PDFSidebarWidget::onOutlineTreeViewContextMenuRequested(const QPoint& pos)
         m_outlineTreeModel->setFontItalics(sourceIndex, !isFontItalics);
     };
 
+    QAction* textColorAction =
+        contextMenu.addAction(tr("Text Color..."), onTextColor);
     QAction* fontBoldAction = contextMenu.addAction(tr("Font Bold"), onFontBold);
     QAction* fontItalicAction = contextMenu.addAction(tr("Font Italic"), onFontItalic);
+    textColorAction->setEnabled(sourceIndex.isValid());
     fontBoldAction->setCheckable(true);
     fontItalicAction->setCheckable(true);
     fontBoldAction->setChecked(isFontBold);

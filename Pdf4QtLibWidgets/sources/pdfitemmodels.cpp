@@ -515,6 +515,18 @@ PDFOutlineItem* PDFOutlineTreeItemModel::getOutlineItem(const QModelIndex& index
     return nullptr;
 }
 
+void PDFOutlineTreeItemModel::setTextColor(const QModelIndex& index, const QColor& color)
+{
+    if (PDFOutlineItem* outlineItem = getOutlineItem(index))
+    {
+        if (color.isValid() && outlineItem->getTextColor() != color)
+        {
+            outlineItem->setTextColor(color);
+            Q_EMIT dataChanged(index, index, { Qt::ForegroundRole });
+        }
+    }
+}
+
 void PDFOutlineTreeItemModel::setFontBold(const QModelIndex& index, bool value)
 {
     if (PDFOutlineItem* outlineItem = getOutlineItem(index))

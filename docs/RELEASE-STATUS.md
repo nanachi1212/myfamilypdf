@@ -6,8 +6,8 @@
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Setup-x64.exe` | 33,671,717 | `782162D6718C354AAD9404DA3DC8A2D91D857EC8B1F8B5ADEE0B43BA9650B73F` |
-| `dist\FamilyPDF-windows-x64.zip` | 45,378,615 | `40E8A3412C3A13824E7ADA4DC4DABF0E0FC51751D113105A6776FD078D95595D` |
+| `dist\FamilyPDF-Setup-x64.exe` | 33,726,990 | `2CE35B194F70CCC8392350DF8E8BA3EF24F942D411C7C2864C689825CDB0FEBC` |
+| `dist\FamilyPDF-windows-x64.zip` | 45,478,777 | `61EF736D362A7D24315379C40F298E12CD95458DE08963579895B9D7EAF423F2` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 11,893,984 | `21F2ABB3B0F9B73C439E79D30353421FED2AB054FE938299C2C06F2EB4866B91` |
 | `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 12,251,407 | `9E148CAA11E082C1E005889D67C8726382C244FA1AF58C709867E05BA982E702` |
 
@@ -15,8 +15,11 @@
 
 ## 已驗證
 
-- CTest 4/4 通過。
-- Viewer／Editor 由最終基礎封裝載入 1,160 頁 PDF，15 秒後皆為 Responding。
+- CTest 4/4 通過；書籤、安全儲存、工作階段及 PDF 互通測試共 16 項通過。
+- pypdf 獨立讀回標準 PDF outline：繁體中文標題、資料夾階層、文字顏色、粗體及頁面目的地均保留。
+- 標準 Highlight、Underline、StrikeOut、Square、FreeText、Text 六種註解由 FamilyPDF 嚴格模式重開及 pypdf 交叉驗證通過。
+- 繁體及簡體中文驗證安裝各為 exit code `0`；安裝後 Viewer、Editor、PageMaster 同時載入中文檔名與 1,160 頁 PDF，15 秒後全部為 Responding。
+- 單數頁、雙數頁及 `10-20` 範圍輸出經獨立引擎驗證為 29、29、11 頁；合併 58 頁及大型 1,160 頁檔案頁數亦正確。
 - 基礎封裝不含 Tesseract、語言模型、測試 EXE 或 Qt 除錯 DLL。
 - OCR 外掛驗證安裝 exit code `0`。
 - 安裝後 OCR 單頁、雙頁流程通過：頁數不變、原檔 SHA-256 不變、輸出為 PDF、`fetch-text` 可取得文字。
@@ -25,6 +28,5 @@
 
 ## Git
 
-- 非 OCR 完成版 commit：`6429a117`
-- OCR 外掛完成版：目前分支最新 commit。
-- 若執行環境允許連線，push 目標為 `origin/codex/phase0-baseline`。
+- 分支：`codex/phase0-baseline`
+- push 目標：`origin/codex/phase0-baseline`
