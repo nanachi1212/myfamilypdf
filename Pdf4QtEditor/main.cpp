@@ -27,6 +27,8 @@
 #include "pdfviewersettings.h"
 #include "pdfapplicationtranslator.h"
 #include "pdfsettings.h"
+#include "pdfstartuprecovery.h"
+#include "pdfsessionmanager.h"
 
 #include <QSettings>
 #include <QApplication>
@@ -102,6 +104,7 @@ int main(int argc, char *argv[])
     QIcon appIcon(":/app-icon.svg");
     QApplication::setWindowIcon(appIcon);
 
+    const QStringList savedSession = pdfviewer::PDFSessionManager::loadPaths();
     pdfviewer::PDFEditorMainWindow mainWindow;
     mainWindow.show();
 
@@ -109,6 +112,11 @@ int main(int argc, char *argv[])
     if (!arguments.isEmpty())
     {
         mainWindow.getProgramController()->openDocument(arguments.front());
+    }
+    else
+    {
+        mainWindow.restoreDocumentSession(savedSession);
+        pdfviewer::scheduleStartupRecoveryPrompt(mainWindow.getProgramController(), &mainWindow);
     }
 
     return application.exec();

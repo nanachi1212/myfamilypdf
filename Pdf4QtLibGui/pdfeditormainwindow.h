@@ -53,6 +53,7 @@ class QLabel;
 class QSpinBox;
 class QSettings;
 class QDoubleSpinBox;
+class QTabBar;
 
 namespace Ui
 {
@@ -84,6 +85,7 @@ public:
     virtual void showEvent(QShowEvent* event) override;
 
     PDFProgramController* getProgramController() const { return m_programController; }
+    void restoreDocumentSession(const QStringList& paths);
 
     virtual void updateUI(bool fullUpdate) override;
     virtual QMenu* addToolMenu(QString name) override;
@@ -99,6 +101,10 @@ protected:
 
 private:
     void onActionQuitTriggered();
+    void openDocumentInNewTab(const QString& fileName);
+    void refreshDocumentTabs(bool persistSession);
+    void activateDocumentTab(int index);
+    void closeDocumentTab(int index);
 
     void onPageNumberSpinboxEditingFinished();
     void onPageZoomSpinboxEditingFinished();
@@ -122,6 +128,7 @@ private:
     QSpinBox* m_pageNumberSpinBox;
     QLabel* m_pageNumberLabel;
     QDoubleSpinBox* m_pageZoomSpinBox;
+    QTabBar* m_documentTabBar;
     bool m_isLoadingUI;
     pdf::PDFProgress* m_progress;
     PDFWinTaskBarProgress* m_progressTaskbarIndicator;

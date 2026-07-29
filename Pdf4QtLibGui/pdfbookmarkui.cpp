@@ -40,48 +40,249 @@ PDFBookmarkItemModel::PDFBookmarkItemModel(PDFBookmarkManager* bookmarkManager, 
 
 QModelIndex PDFBookmarkItemModel::index(int row, int column, const QModelIndex& parent) const
 {
-    if (parent.isValid())
+    if (!m_bookmarkManager || row < 0 || column != 0)
     {
         return QModelIndex();
     }
 
-    return createIndex(row, column, nullptr);
+    if (!parent.isValid())
+    {
+        const int folderCount = m_bookmarkManager->getFolderCount();
+        if (row < folderCount)
+        {
+            return createIndex(row, column, getNodeId(FOLDER_NODE, row));
+        }
+
+        const int bookmarkIndex = getRootBookmarkIndex(row - folderCount);
+        return bookmarkIndex >= 0 ?
+                   createIndex(row, column, getNodeId(BOOKMARK_NODE, bookmarkIndex)) : QModelIndex();
+    }
+
+    const int folderIndex = getFolderIndex(parent);
+    const int bookmarkIndex = getFolderBookmarkIndex(folderIndex, row);
+    return bookmarkIndex >= 0 ?
+               createIndex(row, column, getNodeId(BOOKMARK_NODE, bookmarkIndex)) : QModelIndex();
 }
 
 QModelIndex PDFBookmarkItemModel::parent(const QModelIndex& child) const
 {
-    Q_UNUSED(child);
+    const int bookmarkIndex = getBookmarkIndex(child);
+    if (bookmarkIndex < 0)
+    {
+        return QModelIndex();
+    }
+
+    const QString folderId = m_bookmarkManager->getBookmark(bookmarkIndex).folderId;
+    for (int i = 0; i < m_bookmarkManager->getFolderCount(); ++i)
+    {
+        if (!folderId.isEmpty() && m_bookmarkManager->getFolder(i).id == folderId)
+        {
+            return createIndex(i, 0, getNodeId(FOLDER_NODE, i));
+        }
+    }
     return QModelIndex();
 }
 
 int PDFBookmarkItemModel::rowCount(const QModelIndex& parent) const
 {
-    if (parent.isValid())
+    if (!m_bookmarkManager)
     {
         return 0;
     }
 
-    return m_bookmarkManager ? m_bookmarkManager->getBookmarkCount() : 0;
+    if (!parent.isValid())
+    {
+        int rootBookmarkCount = 0;
+        for (int i = 0; i < m_bookmarkManager->getBookmarkCount(); ++i)
+        {
+            rootBookmarkCount += m_bookmarkManager->getBookmark(i).folderId.isEmpty() ? 1 : 0;
+        }
+        return m_bookmarkManager->getFolderCount() + rootBookmarkCount;
+    }
+
+    const int folderIndex = getFolderIndex(parent);
+    if (folderIndex < 0)
+    {
+        return 0;
+    }
+
+    const QString folderId = m_bookmarkManager->getFolder(folderIndex).id;
+    int childCount = 0;
+    for (int i = 0; i < m_bookmarkManager->getBookmarkCount(); ++i)
+    {
+        childCount += m_bookmarkManager->getBookmark(i).folderId == folderId ? 1 : 0;
+    }
+    return childCount;
 }
 
 int PDFBookmarkItemModel::columnCount(const QModelIndex& parent) const
 {
-    if (parent.isValid())
-    {
-        return 0;
-    }
-
+    Q_UNUSED(parent);
     return 1;
 }
 
 QVariant PDFBookmarkItemModel::data(const QModelIndex& index, int role) const
 {
-    if (role == Qt::DisplayRole)
+    const int folderIndex = getFolderIndex(index);
+    if (folderIndex >= 0)
     {
-        return m_bookmarkManager->getBookmark(index.row()).name;
+        const PDFBookmarkManager::BookmarkFolder folder = m_bookmarkManager->getFolder(folderIndex);
+        if (role == Qt::DisplayRole)
+        {
+            return folder.name;
+        }
+        if (role == Qt::ForegroundRole)
+        {
+            return folder.color;
+        }
+    }
+
+    const int bookmarkIndex = getBookmarkIndex(index);
+    if (bookmarkIndex >= 0)
+    {
+        const PDFBookmarkManager::Bookmark bookmark = m_bookmarkManager->getBookmark(bookmarkIndex);
+        if (role == Qt::DisplayRole)
+        {
+            return bookmark.name;
+        }
+        if (role == Qt::ForegroundRole)
+        {
+            return bookmark.color;
+        }
     }
 
     return QVariant();
+}
+
+bool PDFBookmarkItemModel::isFolder(const QModelIndex& index) const
+{
+    return getFolderIndex(index) >= 0;
+}
+
+int PDFBookmarkItemModel::getFolderIndex(const QModelIndex& index) const
+{
+    const int folderIndex = getNodeSourceIndex(index, FOLDER_NODE);
+    return folderIndex >= 0 && folderIndex < m_bookmarkManager->getFolderCount() ? folderIndex : -1;
+}
+
+int PDFBookmarkItemModel::getBookmarkIndex(const QModelIndex& index) const
+{
+    const int bookmarkIndex = getNodeSourceIndex(index, BOOKMARK_NODE);
+    return bookmarkIndex >= 0 && bookmarkIndex < m_bookmarkManager->getBookmarkCount() ? bookmarkIndex : -1;
+}
+
+QModelIndex PDFBookmarkItemModel::getBookmarkModelIndex(int bookmarkIndex) const
+{
+    if (!m_bookmarkManager || bookmarkIndex < 0 || bookmarkIndex >= m_bookmarkManager->getBookmarkCount())
+    {
+        return QModelIndex();
+    }
+
+    const QString folderId = m_bookmarkManager->getBookmark(bookmarkIndex).folderId;
+    if (folderId.isEmpty())
+    {
+        const int row = getRootRowForBookmark(bookmarkIndex);
+        return row >= 0 ? createIndex(row, 0, getNodeId(BOOKMARK_NODE, bookmarkIndex)) : QModelIndex();
+    }
+
+    for (int folderIndex = 0; folderIndex < m_bookmarkManager->getFolderCount(); ++folderIndex)
+    {
+        if (m_bookmarkManager->getFolder(folderIndex).id != folderId)
+        {
+            continue;
+        }
+
+        int childRow = 0;
+        for (int i = 0; i < m_bookmarkManager->getBookmarkCount(); ++i)
+        {
+            if (m_bookmarkManager->getBookmark(i).folderId == folderId)
+            {
+                if (i == bookmarkIndex)
+                {
+                    return createIndex(childRow, 0, getNodeId(BOOKMARK_NODE, bookmarkIndex));
+                }
+                ++childRow;
+            }
+        }
+    }
+    return QModelIndex();
+}
+
+quintptr PDFBookmarkItemModel::getNodeId(quintptr type, int sourceIndex)
+{
+    return (static_cast<quintptr>(sourceIndex + 1) << 2) | type;
+}
+
+int PDFBookmarkItemModel::getNodeSourceIndex(const QModelIndex& index, quintptr type)
+{
+    if (!index.isValid() || (index.internalId() & 3) != type)
+    {
+        return -1;
+    }
+    return static_cast<int>(index.internalId() >> 2) - 1;
+}
+
+int PDFBookmarkItemModel::getRootBookmarkIndex(int rootBookmarkRow) const
+{
+    if (!m_bookmarkManager || rootBookmarkRow < 0)
+    {
+        return -1;
+    }
+
+    int currentRow = 0;
+    for (int i = 0; i < m_bookmarkManager->getBookmarkCount(); ++i)
+    {
+        if (m_bookmarkManager->getBookmark(i).folderId.isEmpty())
+        {
+            if (currentRow == rootBookmarkRow)
+            {
+                return i;
+            }
+            ++currentRow;
+        }
+    }
+    return -1;
+}
+
+int PDFBookmarkItemModel::getFolderBookmarkIndex(int folderIndex, int childRow) const
+{
+    if (!m_bookmarkManager || folderIndex < 0 ||
+        folderIndex >= m_bookmarkManager->getFolderCount() || childRow < 0)
+    {
+        return -1;
+    }
+
+    const QString folderId = m_bookmarkManager->getFolder(folderIndex).id;
+    int currentRow = 0;
+    for (int i = 0; i < m_bookmarkManager->getBookmarkCount(); ++i)
+    {
+        if (m_bookmarkManager->getBookmark(i).folderId == folderId)
+        {
+            if (currentRow == childRow)
+            {
+                return i;
+            }
+            ++currentRow;
+        }
+    }
+    return -1;
+}
+
+int PDFBookmarkItemModel::getRootRowForBookmark(int bookmarkIndex) const
+{
+    int rootRow = m_bookmarkManager ? m_bookmarkManager->getFolderCount() : 0;
+    for (int i = 0; m_bookmarkManager && i < m_bookmarkManager->getBookmarkCount(); ++i)
+    {
+        if (m_bookmarkManager->getBookmark(i).folderId.isEmpty())
+        {
+            if (i == bookmarkIndex)
+            {
+                return rootRow;
+            }
+            ++rootRow;
+        }
+    }
+    return -1;
 }
 
 PDFBookmarkItemDelegate::PDFBookmarkItemDelegate(PDFBookmarkManager* bookmarkManager, QObject* parent) :
@@ -98,7 +299,14 @@ void PDFBookmarkItemDelegate::paint(QPainter* painter,
     QStyleOptionViewItem options = option;
     initStyleOption(&options, index);
 
-    PDFBookmarkManager::Bookmark bookmark = m_bookmarkManager->getBookmark(index.row());
+    const PDFBookmarkItemModel* model = dynamic_cast<const PDFBookmarkItemModel*>(index.model());
+    const int bookmarkIndex = model ? model->getBookmarkIndex(index) : -1;
+    if (bookmarkIndex < 0)
+    {
+        BaseClass::paint(painter, option, index);
+        return;
+    }
+    PDFBookmarkManager::Bookmark bookmark = m_bookmarkManager->getBookmark(bookmarkIndex);
 
     options.text = QString();
     options.widget->style()->drawControl(QStyle::CE_ItemViewItem, &options, painter);
@@ -109,7 +317,8 @@ void PDFBookmarkItemDelegate::paint(QPainter* painter,
     QRect rect = options.rect;
     rect.marginsRemoved(QMargins(margin, margin, margin, margin));
 
-    QColor color = bookmark.isAuto ? QColor(0, 123, 255) : QColor(255, 159, 0);
+    QColor color = bookmark.color.isValid() ? bookmark.color :
+                   (bookmark.isAuto ? QColor(0, 123, 255) : QColor(255, 159, 0));
 
     if (options.state.testFlag(QStyle::State_Selected))
     {
@@ -132,6 +341,8 @@ void PDFBookmarkItemDelegate::paint(QPainter* painter,
     font.setBold(true);
 
     painter->setFont(font);
+    painter->setPen(options.state.testFlag(QStyle::State_Selected) ?
+                        options.palette.highlightedText().color() : color);
     painter->drawText(textRect, getPageText(bookmark));
 
     textRect.translate(0, textRect.height());
@@ -142,7 +353,13 @@ void PDFBookmarkItemDelegate::paint(QPainter* painter,
 
 QSize PDFBookmarkItemDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
-    PDFBookmarkManager::Bookmark bookmark = m_bookmarkManager->getBookmark(index.row());
+    const PDFBookmarkItemModel* model = dynamic_cast<const PDFBookmarkItemModel*>(index.model());
+    const int bookmarkIndex = model ? model->getBookmarkIndex(index) : -1;
+    if (bookmarkIndex < 0)
+    {
+        return BaseClass::sizeHint(option, index);
+    }
+    PDFBookmarkManager::Bookmark bookmark = m_bookmarkManager->getBookmark(bookmarkIndex);
 
     const int textWidthLine1 = option.fontMetrics.horizontalAdvance(getPageText(bookmark));
     const int textWidthLine2 = option.fontMetrics.horizontalAdvance(option.text);

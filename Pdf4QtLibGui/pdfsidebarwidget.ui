@@ -525,9 +525,22 @@
         <number>0</number>
        </property>
        <item>
-        <widget class="QListView" name="bookmarksView">
+        <widget class="QToolButton" name="addBookmarkFolderButton">
+         <property name="toolTip">
+          <string>Create a folder to organize bookmarks</string>
+         </property>
+         <property name="text">
+          <string>New bookmark folder</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTreeView" name="bookmarksView">
          <property name="editTriggers">
           <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+         </property>
+         <property name="headerHidden">
+          <bool>true</bool>
          </property>
          <property name="wordWrap">
           <bool>true</bool>

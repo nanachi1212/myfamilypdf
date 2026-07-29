@@ -68,6 +68,7 @@
 #include <QXmlStreamWriter>
 #include <QMenuBar>
 #include <QComboBox>
+#include <QTimer>
 
 #include "pdfdbgheap.h"
 
@@ -406,6 +407,10 @@ PDFProgramController::PDFProgramController(QObject* parent) :
     m_textToSpeech(nullptr),
     m_isDocumentSetInProgress(false),
     m_futureWatcher(nullptr),
+    m_recoveryTimer(new QTimer(this)),
+    m_recoveryWatcher(new QFutureWatcher<QString>(this)),
+    m_recoveryPending(false),
+    m_openedRecoverySourcePath(),
     m_CMSManager(new pdf::PDFCMSManager(this)),
     m_toolManager(nullptr),
     m_annotationManager(nullptr),
@@ -420,6 +425,27 @@ PDFProgramController::PDFProgramController(QObject* parent) :
     m_fullscreenWidget(nullptr)
 {
     connect(&m_fileWatcher, &QFileSystemWatcher::fileChanged, this, &PDFProgramController::onFileChanged);
+    m_recoveryTimer->setSingleShot(true);
+    m_recoveryTimer->setInterval(5000);
+    connect(m_recoveryTimer, &QTimer::timeout, this, &PDFProgramController::startRecoverySnapshot);
+    connect(m_recoveryWatcher, &QFutureWatcher<QString>::finished, this, [this]()
+    {
+        const QString recoveredSource = m_recoveryWatcher->result();
+        const bool currentDocumentIsSaved =
+            m_undoRedoManager && m_undoRedoManager->isCurrentSaved();
+        if (!recoveredSource.isEmpty() &&
+            (m_fileInfo.absoluteFilePath.compare(recoveredSource, Qt::CaseInsensitive) != 0 ||
+             currentDocumentIsSaved))
+        {
+            PDFRecoveryManager::removeRecord(recoveredSource);
+        }
+
+        if (m_recoveryPending)
+        {
+            m_recoveryPending = false;
+            scheduleRecoverySnapshot();
+        }
+    });
 }
 
 PDFProgramController::~PDFProgramController()
@@ -1249,6 +1275,11 @@ void PDFProgramController::performSaveAs()
 
 void PDFProgramController::performSave()
 {
+    if (!m_openedRecoverySourcePath.isEmpty())
+    {
+        performSaveAs();
+        return;
+    }
     saveDocument(m_fileInfo.originalFileName);
 }
 
@@ -1256,26 +1287,181 @@ void PDFProgramController::saveDocument(const QString& fileName)
 {
     updateFileWatcher(true);
 
+    const QString previousSourcePath = m_fileInfo.absoluteFilePath;
+    const QFileInfo destinationInfo(fileName);
+    const QString destinationPath = destinationInfo.absoluteFilePath();
+    const bool isInPlaceSave =
+        !m_fileInfo.absoluteFilePath.isEmpty() &&
+        destinationPath.compare(m_fileInfo.absoluteFilePath, Qt::CaseInsensitive) == 0;
+
+    if (isInPlaceSave && !m_safeSaveBaseline.isValid)
+    {
+        updateFileWatcher();
+        QMessageBox::information(m_mainWindow,
+                                 tr("Safe save"),
+                                 tr("FamilyPDF is still establishing the safe-save baseline. "
+                                    "Please use Save As or try again after the document finishes loading."));
+        return;
+    }
+
+    QDir destinationDirectory(destinationInfo.absolutePath());
+    const QString candidatePath = destinationDirectory.filePath(
+        QStringLiteral(".%1.familypdf-%2.tmp")
+            .arg(destinationInfo.fileName(),
+                 QUuid::createUuid().toString(QUuid::WithoutBraces)));
+
     pdf::PDFDocumentWriter writer(nullptr);
-    pdf::PDFOperationResult result = writer.write(fileName, m_pdfDocument.data(), true);
-    if (result)
+    pdf::PDFOperationResult writeResult =
+        writer.write(candidatePath, m_pdfDocument.data(), true);
+    if (!writeResult)
+    {
+        updateFileWatcher();
+        QMessageBox::critical(m_mainWindow,
+                              tr("Safe save failed"),
+                              tr("%1\n\nThe original document was not changed.\n"
+                                 "Diagnostic temporary file: %2")
+                                  .arg(writeResult.getErrorMessage(), candidatePath));
+        return;
+    }
+
+    const size_t expectedPageCount = m_pdfDocument->getCatalog()->getPageCount();
+    auto validator = [expectedPageCount](const QString& path, QString* errorMessage)
+    {
+        auto queryPassword = [](bool* ok)
+        {
+            *ok = false;
+            return QString();
+        };
+        pdf::PDFDocumentReader reader(nullptr, qMove(queryPassword), true, false);
+        const pdf::PDFDocument document = reader.readFromFile(path);
+        if (reader.getReadingResult() != pdf::PDFDocumentReader::Result::OK)
+        {
+            if (errorMessage)
+            {
+                *errorMessage = reader.getErrorMessage();
+            }
+            return false;
+        }
+        if (document.getCatalog()->getPageCount() != expectedPageCount)
+        {
+            if (errorMessage)
+            {
+                *errorMessage = QObject::tr("Round-trip validation found a different page count.");
+            }
+            return false;
+        }
+        return true;
+    };
+
+    PDFSafeSaveService::Result safeSaveResult;
+    if (isInPlaceSave)
+    {
+        safeSaveResult =
+            PDFSafeSaveService::commitCandidate(destinationPath,
+                                                candidatePath,
+                                                m_safeSaveBaseline,
+                                                validator);
+    }
+    else if (QFileInfo::exists(destinationPath))
+    {
+        const PDFSafeSaveService::Baseline destinationBaseline =
+            PDFSafeSaveService::captureBaseline(destinationPath);
+        safeSaveResult =
+            PDFSafeSaveService::commitCandidate(destinationPath,
+                                                candidatePath,
+                                                destinationBaseline,
+                                                validator);
+    }
+    else
+    {
+        safeSaveResult =
+            PDFSafeSaveService::commitNewCandidate(destinationPath,
+                                                   candidatePath,
+                                                   validator);
+    }
+
+    if (safeSaveResult.status == PDFSafeSaveService::Status::Success)
     {
         if (m_undoRedoManager)
         {
             m_undoRedoManager->setIsCurrentSaved(true);
         }
 
-        updateFileInfo(fileName);
+        updateFileInfo(destinationPath);
+        m_safeSaveBaseline = PDFSafeSaveService::captureBaseline(destinationPath);
+        if (m_bookmarkManager)
+        {
+            m_bookmarkManager->setProperty("familyPdfDocumentPath", m_fileInfo.absoluteFilePath);
+        }
         updateTitle();
 
         if (m_recentFileManager)
         {
-            m_recentFileManager->addRecentFile(fileName);
+            m_recentFileManager->addRecentFile(destinationPath);
         }
+
+        if (!previousSourcePath.isEmpty())
+        {
+            PDFRecoveryManager::removeRecord(previousSourcePath);
+        }
+        if (!m_openedRecoverySourcePath.isEmpty())
+        {
+            PDFRecoveryManager::removeRecord(m_openedRecoverySourcePath);
+            m_openedRecoverySourcePath.clear();
+        }
+    }
+    else if (safeSaveResult.status == PDFSafeSaveService::Status::SourceChanged)
+    {
+        updateFileWatcher();
+
+        QMessageBox dialog(QMessageBox::Warning,
+                           tr("Source document changed"),
+                           tr("Another program changed this PDF after FamilyPDF opened it. "
+                              "The source was not overwritten."),
+                           QMessageBox::Cancel,
+                           m_mainWindow);
+        QPushButton* reloadButton = dialog.addButton(tr("Reload"), QMessageBox::AcceptRole);
+        QPushButton* saveAsButton = dialog.addButton(tr("Save As"), QMessageBox::ActionRole);
+        dialog.setInformativeText(tr("Choose Reload to discard FamilyPDF's unsaved changes, "
+                                     "or Save As to keep them in a separate PDF."));
+        dialog.exec();
+        if (dialog.clickedButton() == reloadButton)
+        {
+            openDocument(destinationPath);
+        }
+        else if (dialog.clickedButton() == saveAsButton)
+        {
+            performSaveAs();
+        }
+        return;
+    }
+    else if (safeSaveResult.status == PDFSafeSaveService::Status::UnsupportedVolume)
+    {
+        updateFileWatcher();
+        QMessageBox::information(m_mainWindow,
+                                 tr("Save As required"),
+                                 tr("%1\n\nFor safety, FamilyPDF will not replace this source in place.")
+                                     .arg(safeSaveResult.errorMessage));
+        performSaveAs();
+        return;
     }
     else
     {
-        QMessageBox::critical(m_mainWindow, tr("Error"), result.getErrorMessage());
+        QString details = safeSaveResult.errorMessage;
+        if (!safeSaveResult.backupPath.isEmpty())
+        {
+            details += tr("\nBackup: %1").arg(safeSaveResult.backupPath);
+        }
+        if (!safeSaveResult.candidatePath.isEmpty())
+        {
+            details += tr("\nDiagnostic temporary file: %1").arg(safeSaveResult.candidatePath);
+        }
+        if (safeSaveResult.status == PDFSafeSaveService::Status::PostCommitValidationFailed)
+        {
+            details += tr("\n\nThe replacement completed but final validation failed. "
+                          "Stop editing this document and recover from the backup to a new path.");
+        }
+        QMessageBox::critical(m_mainWindow, tr("Safe save failed"), details);
     }
 
     updateFileWatcher();
@@ -1926,7 +2112,8 @@ void PDFProgramController::updateActionsAvailability()
     m_actionManager->setEnabled(PDFActionManager::PageGeometry, hasValidDocument && canModify);
     m_actionManager->setEnabled(PDFActionManager::CreateBitonalDocument, hasValidDocument);
     m_actionManager->setEnabled(PDFActionManager::Encryption, hasValidDocument);
-    m_actionManager->setEnabled(PDFActionManager::Save, hasValidDocument);
+    m_actionManager->setEnabled(PDFActionManager::Save,
+                                hasValidDocument && m_safeSaveBaseline.isValid);
     m_actionManager->setEnabled(PDFActionManager::SaveAs, hasValidDocument);
     m_actionManager->setEnabled(PDFActionManager::Properties, hasDocument);
     m_actionManager->setEnabled(PDFActionManager::SendByMail, hasDocument);
@@ -2025,6 +2212,7 @@ void PDFProgramController::updateFileInfo(const QString& fileName)
     m_fileInfo.absoluteFilePath = fileInfo.absoluteFilePath();
 
     updateFileWatcher(false);
+    Q_EMIT documentPathChanged(m_fileInfo.absoluteFilePath);
 }
 
 void PDFProgramController::updateFileWatcher(bool forceDisable)
@@ -2045,8 +2233,121 @@ void PDFProgramController::updateFileWatcher(bool forceDisable)
     }
 }
 
+void PDFProgramController::scheduleRecoverySnapshot()
+{
+    if (!m_pdfDocument ||
+        m_fileInfo.absoluteFilePath.isEmpty() ||
+        !m_undoRedoManager ||
+        m_undoRedoManager->isCurrentSaved())
+    {
+        return;
+    }
+
+    if (m_recoveryWatcher->isRunning())
+    {
+        m_recoveryPending = true;
+        return;
+    }
+    m_recoveryTimer->start();
+}
+
+void PDFProgramController::startRecoverySnapshot()
+{
+    if (!m_pdfDocument ||
+        m_fileInfo.absoluteFilePath.isEmpty() ||
+        !m_undoRedoManager ||
+        m_undoRedoManager->isCurrentSaved())
+    {
+        return;
+    }
+    if (m_recoveryWatcher->isRunning())
+    {
+        m_recoveryPending = true;
+        return;
+    }
+
+    const pdf::PDFDocumentPointer documentSnapshot = m_pdfDocument;
+    const QString sourcePath = m_fileInfo.absoluteFilePath;
+    const int pageCount =
+        static_cast<int>(documentSnapshot->getCatalog()->getPageCount());
+    const QFuture<QString> future = QtConcurrent::run(
+        [documentSnapshot, sourcePath, pageCount]() -> QString
+        {
+            const QString recoveryRoot = PDFRecoveryManager::defaultRoot();
+            if (!QDir().mkpath(recoveryRoot))
+            {
+                return QString();
+            }
+
+            const QString finalSnapshot =
+                PDFRecoveryManager::snapshotPath(sourcePath, recoveryRoot);
+            const QString temporarySnapshot =
+                finalSnapshot + QStringLiteral(".tmp-") +
+                QUuid::createUuid().toString(QUuid::WithoutBraces);
+
+            pdf::PDFDocumentWriter writer(nullptr);
+            const pdf::PDFOperationResult writeResult =
+                writer.write(temporarySnapshot, documentSnapshot.data(), true);
+            if (!writeResult)
+            {
+                return QString();
+            }
+
+#ifdef Q_OS_WIN
+            const QString nativeFinal =
+                QDir::toNativeSeparators(QFileInfo(finalSnapshot).absoluteFilePath());
+            const QString nativeTemporary =
+                QDir::toNativeSeparators(QFileInfo(temporarySnapshot).absoluteFilePath());
+            bool committed = false;
+            if (QFileInfo::exists(finalSnapshot))
+            {
+                committed = ReplaceFileW(reinterpret_cast<LPCWSTR>(nativeFinal.utf16()),
+                                         reinterpret_cast<LPCWSTR>(nativeTemporary.utf16()),
+                                         nullptr,
+                                         REPLACEFILE_WRITE_THROUGH,
+                                         nullptr,
+                                         nullptr);
+            }
+            else
+            {
+                committed = MoveFileExW(reinterpret_cast<LPCWSTR>(nativeTemporary.utf16()),
+                                        reinterpret_cast<LPCWSTR>(nativeFinal.utf16()),
+                                        MOVEFILE_WRITE_THROUGH);
+            }
+            if (!committed)
+            {
+                return QString();
+            }
+#else
+            QFile::remove(finalSnapshot);
+            if (!QFile::rename(temporarySnapshot, finalSnapshot))
+            {
+                return QString();
+            }
+#endif
+
+            if (!PDFRecoveryManager::writeMetadata(sourcePath,
+                                                   finalSnapshot,
+                                                   pageCount,
+                                                   recoveryRoot))
+            {
+                return QString();
+            }
+            return sourcePath;
+        });
+    m_recoveryWatcher->setFuture(future);
+}
+
 void PDFProgramController::openDocument(const QString& fileName)
 {
+    if (m_pdfDocument &&
+        QFileInfo(fileName).absoluteFilePath().compare(
+            m_fileInfo.absoluteFilePath, Qt::CaseInsensitive) != 0)
+    {
+        Q_EMIT openDocumentInNewTabRequested(fileName);
+        return;
+    }
+
     // First close old document
     closeDocument();
 
@@ -2084,6 +2385,7 @@ void PDFProgramController::openDocument(const QString& fileName)
             pdf::PDFForm form = pdf::PDFForm::parse(&document, document.getCatalog()->getFormObject());
             result.signatures = pdf::PDFSignatureHandler::verifySignatures(form, reader.getSource(), parameters);
             result.document.reset(new pdf::PDFDocument(qMove(document)));
+            result.safeSaveBaseline = PDFSafeSaveService::captureBaseline(fileName);
         }
 
         return result;
@@ -2093,6 +2395,13 @@ void PDFProgramController::openDocument(const QString& fileName)
     connect(m_futureWatcher, &QFutureWatcher<AsyncReadingResult>::finished, this, &PDFProgramController::onDocumentReadingFinished);
     m_futureWatcher->setFuture(m_future);
     updateActionsAvailability();
+}
+
+void PDFProgramController::openRecoveryDocument(const QString& snapshotPath,
+                                                const QString& originalSourcePath)
+{
+    openDocument(snapshotPath);
+    m_openedRecoverySourcePath = QFileInfo(originalSourcePath).absoluteFilePath();
 }
 
 void PDFProgramController::onDocumentReadingFinished()
@@ -2108,6 +2417,7 @@ void PDFProgramController::onDocumentReadingFinished()
     {
         case pdf::PDFDocumentReader::Result::OK:
         {
+            m_safeSaveBaseline = result.safeSaveBaseline;
             // Mark current directory as this
             QFileInfo fileInfo(m_fileInfo.originalFileName);
             m_settings->setDirectory(fileInfo.dir().absolutePath());
@@ -2159,11 +2469,13 @@ void PDFProgramController::onDocumentReadingFinished()
 
         case pdf::PDFDocumentReader::Result::Failed:
         {
+            m_openedRecoverySourcePath.clear();
             QMessageBox::critical(m_mainWindow, QApplication::applicationDisplayName(), tr("Document read error: %1").arg(result.errorMessage));
             break;
         }
 
         case pdf::PDFDocumentReader::Result::Cancelled:
+            m_openedRecoverySourcePath.clear();
             break; // Do nothing, user cancelled the document reading
     }
     updateActionsAvailability();
@@ -2190,6 +2502,7 @@ void PDFProgramController::onDocumentModified(pdf::PDFModifiedDocument document)
     m_pdfDocument = document;
     document.setOptionalContentActivity(m_optionalContentActivity);
     setDocument(document, {}, false);
+    scheduleRecoverySnapshot();
 }
 
 void PDFProgramController::onDocumentUndoRedo(pdf::PDFModifiedDocument document)
@@ -2197,6 +2510,7 @@ void PDFProgramController::onDocumentUndoRedo(pdf::PDFModifiedDocument document)
     m_pdfDocument = document;
     document.setOptionalContentActivity(m_optionalContentActivity);
     setDocument(document, {}, false);
+    scheduleRecoverySnapshot();
 }
 
 void PDFProgramController::setDocument(pdf::PDFModifiedDocument document, std::vector<pdf::PDFSignatureVerificationResult> signatureVerificationResult, bool isCurrentSaved)
@@ -2301,6 +2615,12 @@ void PDFProgramController::setDocument(pdf::PDFModifiedDocument document, std::v
 
 void PDFProgramController::closeDocument()
 {
+    const QString closingSourcePath = m_fileInfo.absoluteFilePath;
+    const QString closingRecoverySourcePath = m_openedRecoverySourcePath;
+    m_openedRecoverySourcePath.clear();
+    m_recoveryTimer->stop();
+    m_recoveryPending = false;
+
     if (m_isFullscreenMode)
     {
         leaveFullscreenMode();
@@ -2323,11 +2643,21 @@ void PDFProgramController::closeDocument()
     }
 
     m_signatures.clear();
+    m_safeSaveBaseline = PDFSafeSaveService::Baseline();
     setDocument(pdf::PDFModifiedDocument(), {}, true);
     m_pdfDocument.reset();
     updateActionsAvailability();
     updateTitle();
     updateFileInfo(QString());
+
+    if (!closingSourcePath.isEmpty())
+    {
+        PDFRecoveryManager::removeRecord(closingSourcePath);
+    }
+    if (!closingRecoverySourcePath.isEmpty())
+    {
+        PDFRecoveryManager::removeRecord(closingRecoverySourcePath);
+    }
 }
 
 void PDFProgramController::updateRenderingOptionActions()

@@ -47,6 +47,7 @@
 #include "pdfadvancedtools.h"
 #include "pdfwidgetutils.h"
 #include "pdfactioncombobox.h"
+#include "pdfsessionmanager.h"
 
 #include <QPainter>
 #include <QSettings>
@@ -72,6 +73,10 @@
 #include <QPluginLoader>
 #include <QToolButton>
 #include <QActionGroup>
+#include <QPointer>
+#include <QTabBar>
+
+#include <algorithm>
 
 #include "pdfdbgheap.h"
 
@@ -81,6 +86,25 @@
 
 namespace pdfviewer
 {
+
+namespace
+{
+QList<QPointer<PDFViewerMainWindow>>& viewerDocumentWindows()
+{
+    static QList<QPointer<PDFViewerMainWindow>> windows;
+    return windows;
+}
+
+void removeDeletedViewerWindows()
+{
+    auto& windows = viewerDocumentWindows();
+    windows.erase(std::remove_if(windows.begin(), windows.end(),
+                                 [](const QPointer<PDFViewerMainWindow>& window)
+    {
+        return window.isNull();
+    }), windows.end());
+}
+}
 
 PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     QMainWindow(parent),
@@ -92,6 +116,7 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     m_pageNumberSpinBox(nullptr),
     m_pageNumberLabel(nullptr),
     m_pageZoomSpinBox(nullptr),
+    m_documentTabBar(new QTabBar(this)),
     m_isLoadingUI(false),
     m_progress(new pdf::PDFProgress(this)),
     m_progressTaskbarIndicator(new PDFWinTaskBarProgress(this)),
@@ -106,6 +131,17 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     // Initialize toolbar icon size
     adjustToolbar(ui->mainToolBar);
     ui->mainToolBar->setWindowTitle(tr("Standard"));
+
+    m_documentTabBar->setDocumentMode(true);
+    m_documentTabBar->setTabsClosable(true);
+    m_documentTabBar->setUsesScrollButtons(true);
+    m_documentTabBar->setExpanding(false);
+    m_documentTabBar->setElideMode(Qt::ElideMiddle);
+    m_documentTabBar->setMinimumWidth(pdf::PDFWidgetUtils::scaleDPI_x(this, 240));
+    ui->mainToolBar->insertWidget(
+        ui->mainToolBar->actions().isEmpty() ? nullptr : ui->mainToolBar->actions().front(),
+        m_documentTabBar);
+    ui->mainToolBar->addSeparator();
 
     // Initialize status bar
     m_progressBarOnStatusBar = new QProgressBar(this);
@@ -264,6 +300,24 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
 
     m_actionManager->styleActions();
     m_programController->initActionComboBox(actionComboBox);
+    connect(m_programController,
+            &PDFProgramController::openDocumentInNewTabRequested,
+            this,
+            &PDFViewerMainWindow::openDocumentInNewTab);
+    connect(m_programController,
+            &PDFProgramController::documentPathChanged,
+            this,
+            [this](const QString&)
+    {
+        refreshDocumentTabs(true);
+    });
+    connect(m_documentTabBar, &QTabBar::currentChanged,
+            this, &PDFViewerMainWindow::activateDocumentTab);
+    connect(m_documentTabBar, &QTabBar::tabCloseRequested,
+            this, &PDFViewerMainWindow::closeDocumentTab);
+
+    viewerDocumentWindows().push_back(this);
+    refreshDocumentTabs(false);
 
 #ifndef NDEBUG
     pdf::PDFWidgetUtils::checkMenuAccessibility(this);
@@ -272,6 +326,9 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
 
 PDFViewerMainWindow::~PDFViewerMainWindow()
 {
+    viewerDocumentWindows().removeAll(this);
+    removeDeletedViewerWindows();
+
     delete m_programController;
     m_programController = nullptr;
 
@@ -281,9 +338,134 @@ PDFViewerMainWindow::~PDFViewerMainWindow()
     delete ui;
 }
 
+void PDFViewerMainWindow::restoreDocumentSession(const QStringList& paths)
+{
+    const QStringList normalized = PDFSessionManager::normalizePaths(paths, true);
+    if (normalized.isEmpty())
+    {
+        return;
+    }
+
+    m_programController->openDocument(normalized.front());
+    for (int index = 1; index < normalized.size(); ++index)
+    {
+        auto* window = new PDFViewerMainWindow();
+        window->setAttribute(Qt::WA_DeleteOnClose);
+        window->show();
+        window->getProgramController()->openDocument(normalized.at(index));
+    }
+    refreshDocumentTabs(true);
+}
+
+void PDFViewerMainWindow::openDocumentInNewTab(const QString& fileName)
+{
+    const QString requestedPath = QFileInfo(fileName).absoluteFilePath();
+    removeDeletedViewerWindows();
+    for (const QPointer<PDFViewerMainWindow>& window : viewerDocumentWindows())
+    {
+        if (window &&
+            QFileInfo(window->getProgramController()->getOriginalFileName())
+                    .absoluteFilePath()
+                    .compare(requestedPath, Qt::CaseInsensitive) == 0)
+        {
+            window->showNormal();
+            window->raise();
+            window->activateWindow();
+            return;
+        }
+    }
+
+    auto* window = new PDFViewerMainWindow();
+    window->setAttribute(Qt::WA_DeleteOnClose);
+    window->show();
+    window->getProgramController()->openDocument(requestedPath);
+    window->refreshDocumentTabs(true);
+}
+
+void PDFViewerMainWindow::refreshDocumentTabs(bool persistSession)
+{
+    removeDeletedViewerWindows();
+    QStringList sessionPaths;
+    const auto& windows = viewerDocumentWindows();
+    for (const QPointer<PDFViewerMainWindow>& target : windows)
+    {
+        if (target)
+        {
+            const QString path = target->getProgramController()->getOriginalFileName();
+            if (!path.isEmpty())
+            {
+                sessionPaths.push_back(QFileInfo(path).absoluteFilePath());
+            }
+        }
+    }
+
+    for (const QPointer<PDFViewerMainWindow>& target : windows)
+    {
+        if (!target)
+        {
+            continue;
+        }
+        QSignalBlocker blocker(target->m_documentTabBar);
+        while (target->m_documentTabBar->count() > 0)
+        {
+            target->m_documentTabBar->removeTab(0);
+        }
+        int currentIndex = -1;
+        for (int index = 0; index < windows.size(); ++index)
+        {
+            const QPointer<PDFViewerMainWindow>& documentWindow = windows.at(index);
+            if (!documentWindow)
+            {
+                continue;
+            }
+            const QString path =
+                documentWindow->getProgramController()->getOriginalFileName();
+            const QString label =
+                path.isEmpty() ? tr("New document") : QFileInfo(path).fileName();
+            const int tabIndex = target->m_documentTabBar->addTab(label);
+            target->m_documentTabBar->setTabToolTip(
+                tabIndex, path.isEmpty() ? label : QDir::toNativeSeparators(path));
+            if (documentWindow == target)
+            {
+                currentIndex = tabIndex;
+            }
+        }
+        target->m_documentTabBar->setCurrentIndex(currentIndex);
+    }
+
+    if (persistSession)
+    {
+        PDFSessionManager::savePaths(sessionPaths);
+    }
+}
+
+void PDFViewerMainWindow::activateDocumentTab(int index)
+{
+    removeDeletedViewerWindows();
+    const auto& windows = viewerDocumentWindows();
+    if (index < 0 || index >= windows.size() || !windows.at(index) ||
+        windows.at(index) == this)
+    {
+        return;
+    }
+    windows.at(index)->showNormal();
+    windows.at(index)->raise();
+    windows.at(index)->activateWindow();
+}
+
+void PDFViewerMainWindow::closeDocumentTab(int index)
+{
+    removeDeletedViewerWindows();
+    const auto windows = viewerDocumentWindows();
+    if (index >= 0 && index < windows.size() && windows.at(index))
+    {
+        windows.at(index)->close();
+    }
+}
+
 void PDFViewerMainWindow::onActionQuitTriggered()
 {
-    close();
+    QApplication::closeAllWindows();
 }
 
 void PDFViewerMainWindow::onPageNumberSpinboxEditingFinished()
@@ -453,6 +635,8 @@ void PDFViewerMainWindow::closeEvent(QCloseEvent* event)
         }
 
         m_programController->closeDocument();
+        viewerDocumentWindows().removeAll(this);
+        refreshDocumentTabs(true);
         event->accept();
     }
 }

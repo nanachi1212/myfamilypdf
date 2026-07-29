@@ -25,32 +25,12 @@
 
 #include "pdfviewerglobal.h"
 #include "pdfbookmarkmanager.h"
+#include "pdfbookmarkmodel.h"
 
 #include <QStyledItemDelegate>
-#include <QAbstractItemModel>
 
 namespace pdfviewer
 {
-
-class PDFBookmarkItemModel : public QAbstractItemModel
-{
-    Q_OBJECT
-
-private:
-    using BaseClass = QAbstractItemModel;
-
-public:
-    PDFBookmarkItemModel(PDFBookmarkManager* bookmarkManager, QObject* parent);
-
-    virtual QModelIndex index(int row, int column, const QModelIndex& parent) const override;
-    virtual QModelIndex parent(const QModelIndex& child) const override;
-    virtual int rowCount(const QModelIndex& parent) const override;
-    virtual int columnCount(const QModelIndex& parent) const override;
-    virtual QVariant data(const QModelIndex& index, int role) const override;
-
-private:
-    PDFBookmarkManager* m_bookmarkManager = nullptr;
-};
 
 class PDFBookmarkItemDelegate : public QStyledItemDelegate
 {

@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [switch]$SkipPackage,
-    [switch]$SkipOcr
+    [switch]$SkipOcr,
+    [switch]$VerificationBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,12 +57,22 @@ if (-not (Test-Path -LiteralPath (Join-Path $packageRoot 'Pdf4QtViewer.exe') -Pa
     throw "FamilyPDF package was not found: $packageRoot"
 }
 
-& $iscc (Join-Path $repositoryRoot 'installer\FamilyPDF.iss')
+$compilerArguments = @()
+if ($VerificationBuild) {
+    $compilerArguments += '/DVerificationBuild'
+}
+$compilerArguments += (Join-Path $repositoryRoot 'installer\FamilyPDF.iss')
+
+& $iscc $compilerArguments
 if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compiler failed with exit code $LASTEXITCODE."
 }
 
-$setup = Join-Path $repositoryRoot 'dist\FamilyPDF-Setup-x64.exe'
+$setup = if ($VerificationBuild) {
+    Join-Path $repositoryRoot 'build\FamilyPDF-Verification-Setup-x64.exe'
+} else {
+    Join-Path $repositoryRoot 'dist\FamilyPDF-Setup-x64.exe'
+}
 if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) {
     throw "Installer output was not found: $setup"
 }

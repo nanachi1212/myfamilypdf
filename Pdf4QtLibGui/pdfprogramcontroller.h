@@ -30,6 +30,8 @@
 #include "pdfdocumentpropertiesdialog.h"
 #include "pdfplugin.h"
 #include "pdfbookmarkmanager.h"
+#include "pdfrecoverymanager.h"
+#include "pdfsafesaveservice.h"
 
 #include <QObject>
 #include <QAction>
@@ -42,6 +44,7 @@
 class QMainWindow;
 class QComboBox;
 class QToolBar;
+class QTimer;
 
 namespace pdf
 {
@@ -297,6 +300,7 @@ public:
     Q_DECLARE_FLAGS(Features, Feature)
 
     void openDocument(const QString& fileName);
+    void openRecoveryDocument(const QString& snapshotPath, const QString& originalSourcePath);
     void setDocument(pdf::PDFModifiedDocument document, std::vector<pdf::PDFSignatureVerificationResult> signatureVerificationResult, bool isCurrentSaved);
     void closeDocument();
 
@@ -344,6 +348,8 @@ public:
 
 signals:
     void queryPasswordRequest(QString* password, bool* ok);
+    void openDocumentInNewTabRequested(const QString& fileName);
+    void documentPathChanged(const QString& fileName);
 
 private:
 
@@ -353,6 +359,7 @@ private:
         QString errorMessage;
         pdf::PDFDocumentReader::Result result = pdf::PDFDocumentReader::Result::Cancelled;
         std::vector<pdf::PDFSignatureVerificationResult> signatures;
+        PDFSafeSaveService::Baseline safeSaveBaseline;
     };
 
     void initializeToolManager();
@@ -431,6 +438,8 @@ private:
     void setPageLayout(pdf::PageLayout pageLayout);
     void updateFileInfo(const QString& fileName);
     void updateFileWatcher(bool forceDisable = false);
+    void scheduleRecoverySnapshot();
+    void startRecoverySnapshot();
 
     enum SettingFlag
     {
@@ -464,6 +473,10 @@ private:
 
     QFuture<AsyncReadingResult> m_future;
     QFutureWatcher<AsyncReadingResult>* m_futureWatcher;
+    QTimer* m_recoveryTimer;
+    QFutureWatcher<QString>* m_recoveryWatcher;
+    bool m_recoveryPending;
+    QString m_openedRecoverySourcePath;
 
     pdf::PDFCMSManager* m_CMSManager;
     pdf::PDFToolManager* m_toolManager;
@@ -473,6 +486,7 @@ private:
     PDFActionComboBox* m_actionComboBox;
 
     PDFFileInfo m_fileInfo;
+    PDFSafeSaveService::Baseline m_safeSaveBaseline;
     QFileSystemWatcher m_fileWatcher;
     pdf::PDFCertificateStore m_certificateStore;
     std::vector<pdf::PDFSignatureVerificationResult> m_signatures;

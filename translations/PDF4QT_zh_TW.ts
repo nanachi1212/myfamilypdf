@@ -1539,6 +1539,10 @@
 <context>
     <name>PDFEditorMainWindow</name>
     <message>
+        <source>New document</source>
+        <translation>新文件</translation>
+    </message>
+    <message>
         <location filename="../Pdf4QtLibGui/pdfeditormainwindow.ui" line="14"/>
         <source>PDF Editor</source>
         <translation>PDF編輯器</translation>
@@ -2959,6 +2963,74 @@
         <location filename="../Pdf4QtLibGui/pdfsidebarwidget.ui" line="662"/>
         <source>Rate</source>
         <translation>速度</translation>
+    </message>
+    <message>
+        <source>Create a folder to organize bookmarks</source>
+        <translation>建立資料夾來整理書籤</translation>
+    </message>
+    <message>
+        <source>New bookmark folder</source>
+        <translation>新增書籤資料夾</translation>
+    </message>
+    <message>
+        <source>New folder</source>
+        <translation>新增資料夾</translation>
+    </message>
+    <message>
+        <source>Folder name:</source>
+        <translation>資料夾名稱：</translation>
+    </message>
+    <message>
+        <source>Rename bookmark folder</source>
+        <translation>重新命名書籤資料夾</translation>
+    </message>
+    <message>
+        <source>Rename folder</source>
+        <translation>重新命名資料夾</translation>
+    </message>
+    <message>
+        <source>Change folder color</source>
+        <translation>變更資料夾顏色</translation>
+    </message>
+    <message>
+        <source>Folder color</source>
+        <translation>資料夾顏色</translation>
+    </message>
+    <message>
+        <source>Delete folder</source>
+        <translation>刪除資料夾</translation>
+    </message>
+    <message>
+        <source>Delete bookmark folder</source>
+        <translation>刪除書籤資料夾</translation>
+    </message>
+    <message>
+        <source>Delete the folder &quot;%1&quot;? Its bookmarks will be moved outside the folder.</source>
+        <translation>要刪除資料夾「%1」嗎？其中的書籤會移到資料夾外。</translation>
+    </message>
+    <message>
+        <source>Rename bookmark</source>
+        <translation>重新命名書籤</translation>
+    </message>
+    <message>
+        <source>Bookmark text:</source>
+        <translation>書籤文字：</translation>
+    </message>
+    <message>
+        <source>Change text color</source>
+        <translation>變更文字顏色</translation>
+    </message>
+    <message>
+        <source>Bookmark text color</source>
+        <translation>書籤文字顏色</translation>
+    </message>
+    <message>
+        <source>Move to folder</source>
+        <translation>移到資料夾</translation>
+    </message>
+    <message>
+        <source>No folder</source>
+        <translation>不放入資料夾</translation>
     </message>
 </context>
 <context>
@@ -5211,6 +5283,10 @@
 </context>
 <context>
     <name>PDFViewerMainWindow</name>
+    <message>
+        <source>New document</source>
+        <translation>新文件</translation>
+    </message>
     <message>
         <location filename="../Pdf4QtLibGui/pdfviewermainwindow.ui" line="14"/>
         <source>PDF Viewer</source>
@@ -15158,5 +15234,40 @@ Do you want to perform this action?</source>
         <source>Select color profile directory</source>
         <translation>選擇色彩設定檔目錄</translation>
     </message>
+</context>
+<context>
+    <name>PDFProgramController</name>
+    <message><source>Safe save</source><translation>安全儲存</translation></message>
+    <message><source>Safe save failed</source><translation>安全儲存失敗</translation></message>
+    <message><source>FamilyPDF is still establishing the safe-save baseline. Please use Save As or try again after the document finishes loading.</source><translation>FamilyPDF 正在建立安全儲存基準。請使用「另存新檔」，或等待文件載入完成後再試一次。</translation></message>
+    <message><source>Source document changed</source><translation>來源文件已變更</translation></message>
+    <message><source>Another program changed this PDF after FamilyPDF opened it. The source was not overwritten.</source><translation>FamilyPDF 開啟後，另一個程式已變更此 PDF。來源文件未被覆寫。</translation></message>
+    <message><source>Reload</source><translation>重新載入</translation></message>
+    <message><source>Choose Reload to discard FamilyPDF&apos;s unsaved changes, or Save As to keep them in a separate PDF.</source><translation>選擇「重新載入」可放棄 FamilyPDF 尚未儲存的變更；選擇「另存新檔」則可保留為另一份 PDF。</translation></message>
+    <message><source>Save As required</source><translation>必須另存新檔</translation></message>
+    <message><source>The validated temporary file could not be moved into place.</source><translation>已驗證的暫存檔無法移至目的位置。</translation></message>
+    <message><source>
+Backup: %1</source><translation>
+備份：%1</translation></message>
+    <message><source>
+Diagnostic temporary file: %1</source><translation>
+診斷暫存檔：%1</translation></message>
+</context>
+<context>
+    <name>StartupRecovery</name>
+    <message><source>Unsaved PDF recovery found</source><translation>發現尚未儲存的 PDF 復原檔</translation></message>
+    <message><source>FamilyPDF found an unsaved recovery copy for:
+%1</source><translation>FamilyPDF 發現此文件有尚未儲存的復原副本：
+%1</translation></message>
+    <message><source>Recovery time: %1
+Pages: %2
+
+Opening the recovery copy never overwrites the original PDF. Use Save As after checking it.</source><translation>復原時間：%1
+頁數：%2
+
+開啟復原副本不會覆寫原始 PDF。確認內容後請使用「另存新檔」。</translation></message>
+    <message><source>Open recovery copy</source><translation>開啟復原副本</translation></message>
+    <message><source>Keep for later</source><translation>保留稍後處理</translation></message>
+    <message><source>Discard recovery</source><translation>捨棄復原檔</translation></message>
 </context>
 </TS>

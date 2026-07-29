@@ -24,13 +24,16 @@
 #define PDFBOOKMARKMANAGER_H
 
 #include "pdfdocument.h"
+#include "pdfviewerglobal.h"
 
+#include <QColor>
+#include <QJsonObject>
 #include <QObject>
 
 namespace pdfviewer
 {
 
-class PDFBookmarkManager : public QObject
+class PDF4QTLIBGUILIBSHARED_EXPORT PDFBookmarkManager : public QObject
 {
     Q_OBJECT
 
@@ -47,14 +50,42 @@ public:
 
     struct Bookmark
     {
+        QString id;
         bool isAuto = false;
         QString name;
         pdf::PDFInteger pageIndex = -1;
+        QColor color;
+        QString folderId;
     };
+
+    struct BookmarkFolder
+    {
+        QString id;
+        QString name;
+        QColor color;
+    };
+
+    struct Bookmarks
+    {
+        std::vector<BookmarkFolder> folders;
+        std::vector<Bookmark> bookmarks;
+    };
+
+    static QJsonObject bookmarksToJson(const Bookmarks& bookmarks);
+    static Bookmarks bookmarksFromJson(const QJsonObject& object);
 
     bool isEmpty() const;
     int getBookmarkCount() const;
     Bookmark getBookmark(int index) const;
+    int getFolderCount() const;
+    BookmarkFolder getFolder(int index) const;
+    QString addFolder(const QString& name, const QColor& color);
+    bool updateFolder(const QString& id, const QString& name, const QColor& color);
+    bool removeFolder(const QString& id);
+    bool updateBookmark(const QString& id,
+                        const QString& name,
+                        const QColor& color,
+                        const QString& folderId);
     void toggleBookmark(pdf::PDFInteger pageIndex);
     void setGenerateBookmarksAutomatically(bool generateBookmarksAutomatically);
 
@@ -77,11 +108,6 @@ private:
     void savePersistentBookmarks() const;
     QString getDocumentKey(const pdf::PDFDocument* document) const;
     QString getPersistentBookmarksFileName() const;
-
-    struct Bookmarks
-    {
-        std::vector<Bookmark> bookmarks;
-    };
 
     pdf::PDFDocument* m_document = nullptr;
     Bookmarks m_bookmarks;

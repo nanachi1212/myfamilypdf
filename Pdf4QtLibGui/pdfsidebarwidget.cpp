@@ -46,6 +46,9 @@
 #include <QStandardPaths>
 #include <QDesktopServices>
 #include <QMessageBox>
+#include <QColorDialog>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QPainter>
 #include <QTextToSpeech>
 #include <QVBoxLayout>
@@ -157,9 +160,12 @@ PDFSidebarWidget::PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
     m_bookmarkItemModel = new PDFBookmarkItemModel(bookmarkManager, this);
     ui->bookmarksView->setModel(m_bookmarkItemModel);
     ui->bookmarksView->setItemDelegate(new PDFBookmarkItemDelegate(bookmarkManager, this));
+    ui->bookmarksView->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_bookmarkManager, &PDFBookmarkManager::bookmarkActivated, this, &PDFSidebarWidget::onBookmarkActivated);
     connect(ui->bookmarksView->selectionModel(), &QItemSelectionModel::currentChanged, this, &PDFSidebarWidget::onBookmarsCurrentIndexChanged);
-    connect(ui->bookmarksView, &QListView::clicked, this, &PDFSidebarWidget::onBookmarkClicked);
+    connect(ui->bookmarksView, &QTreeView::clicked, this, &PDFSidebarWidget::onBookmarkClicked);
+    connect(ui->bookmarksView, &QTreeView::customContextMenuRequested, this, &PDFSidebarWidget::onBookmarkCustomContextMenuRequested);
+    connect(ui->addBookmarkFolderButton, &QToolButton::clicked, this, &PDFSidebarWidget::createBookmarkFolder);
 
     // Notes
     m_notesTreeModel = new QStandardItemModel(this);
@@ -1465,8 +1471,13 @@ void PDFSidebarWidget::onBookmarkActivated(int index, PDFBookmarkManager::Bookma
     }
 
     pdf::PDFTemporaryValueChange<bool> guard(&m_bookmarkChangeInProgress, true);
-    QModelIndex currentIndex = m_bookmarkItemModel->index(index, 0, QModelIndex());
-    ui->bookmarksView->selectionModel()->select(currentIndex, QItemSelectionModel::SelectCurrent);
+    QModelIndex currentIndex = m_bookmarkItemModel->getBookmarkModelIndex(index);
+    if (!currentIndex.isValid())
+    {
+        return;
+    }
+    ui->bookmarksView->expand(currentIndex.parent());
+    ui->bookmarksView->selectionModel()->select(currentIndex, QItemSelectionModel::ClearAndSelect);
     ui->bookmarksView->setCurrentIndex(currentIndex);
 }
 
@@ -1479,8 +1490,12 @@ void PDFSidebarWidget::onBookmarsCurrentIndexChanged(const QModelIndex& current,
         return;
     }
 
-    pdf::PDFTemporaryValueChange<bool> guard(&m_bookmarkChangeInProgress, true);
-    m_bookmarkManager->goToBookmark(current.row(), false);
+    const int bookmarkIndex = m_bookmarkItemModel->getBookmarkIndex(current);
+    if (bookmarkIndex >= 0)
+    {
+        pdf::PDFTemporaryValueChange<bool> guard(&m_bookmarkChangeInProgress, true);
+        m_bookmarkManager->goToBookmark(bookmarkIndex, false);
+    }
 }
 
 void PDFSidebarWidget::onBookmarkClicked(const QModelIndex& index)
@@ -1490,11 +1505,135 @@ void PDFSidebarWidget::onBookmarkClicked(const QModelIndex& index)
         return;
     }
 
-    if (index == ui->bookmarksView->currentIndex())
+    if (m_bookmarkItemModel->getBookmarkIndex(index) >= 0 &&
+        index == ui->bookmarksView->currentIndex())
     {
         pdf::PDFTemporaryValueChange<bool> guard(&m_bookmarkChangeInProgress, true);
         m_bookmarkManager->goToCurrentBookmark();
     }
+}
+
+void PDFSidebarWidget::createBookmarkFolder()
+{
+    bool accepted = false;
+    const QString name = QInputDialog::getText(this,
+                                               tr("New bookmark folder"),
+                                               tr("Folder name:"),
+                                               QLineEdit::Normal,
+                                               tr("New folder"),
+                                               &accepted).trimmed();
+    if (accepted && !name.isEmpty())
+    {
+        m_bookmarkManager->addFolder(name, QColor(80, 130, 200));
+    }
+}
+
+void PDFSidebarWidget::onBookmarkCustomContextMenuRequested(const QPoint& pos)
+{
+    const QModelIndex modelIndex = ui->bookmarksView->indexAt(pos);
+    QMenu menu(this);
+    QAction* newFolderAction = menu.addAction(tr("New folder"));
+    connect(newFolderAction, &QAction::triggered, this, &PDFSidebarWidget::createBookmarkFolder);
+
+    const int folderIndex = m_bookmarkItemModel->getFolderIndex(modelIndex);
+    const int bookmarkIndex = m_bookmarkItemModel->getBookmarkIndex(modelIndex);
+
+    if (folderIndex >= 0)
+    {
+        const PDFBookmarkManager::BookmarkFolder folder = m_bookmarkManager->getFolder(folderIndex);
+        menu.addSeparator();
+
+        QAction* renameAction = menu.addAction(tr("Rename folder"));
+        connect(renameAction, &QAction::triggered, this, [this, folder]()
+        {
+            bool accepted = false;
+            const QString name = QInputDialog::getText(this,
+                                                       tr("Rename bookmark folder"),
+                                                       tr("Folder name:"),
+                                                       QLineEdit::Normal,
+                                                       folder.name,
+                                                       &accepted).trimmed();
+            if (accepted && !name.isEmpty())
+            {
+                m_bookmarkManager->updateFolder(folder.id, name, folder.color);
+            }
+        });
+
+        QAction* colorAction = menu.addAction(tr("Change folder color"));
+        connect(colorAction, &QAction::triggered, this, [this, folder]()
+        {
+            const QColor color = QColorDialog::getColor(folder.color, this, tr("Folder color"));
+            if (color.isValid())
+            {
+                m_bookmarkManager->updateFolder(folder.id, folder.name, color);
+            }
+        });
+
+        QAction* deleteAction = menu.addAction(tr("Delete folder"));
+        connect(deleteAction, &QAction::triggered, this, [this, folder]()
+        {
+            const QMessageBox::StandardButton result =
+                QMessageBox::question(this,
+                                      tr("Delete bookmark folder"),
+                                      tr("Delete the folder \"%1\"? Its bookmarks will be moved outside the folder.")
+                                          .arg(folder.name));
+            if (result == QMessageBox::Yes)
+            {
+                m_bookmarkManager->removeFolder(folder.id);
+            }
+        });
+    }
+    else if (bookmarkIndex >= 0)
+    {
+        const PDFBookmarkManager::Bookmark bookmark = m_bookmarkManager->getBookmark(bookmarkIndex);
+        menu.addSeparator();
+
+        QAction* renameAction = menu.addAction(tr("Rename bookmark"));
+        connect(renameAction, &QAction::triggered, this, [this, bookmark]()
+        {
+            bool accepted = false;
+            const QString name = QInputDialog::getText(this,
+                                                       tr("Rename bookmark"),
+                                                       tr("Bookmark text:"),
+                                                       QLineEdit::Normal,
+                                                       bookmark.name,
+                                                       &accepted).trimmed();
+            if (accepted && !name.isEmpty())
+            {
+                m_bookmarkManager->updateBookmark(bookmark.id, name, bookmark.color, bookmark.folderId);
+            }
+        });
+
+        QAction* colorAction = menu.addAction(tr("Change text color"));
+        connect(colorAction, &QAction::triggered, this, [this, bookmark]()
+        {
+            const QColor color = QColorDialog::getColor(bookmark.color, this, tr("Bookmark text color"));
+            if (color.isValid())
+            {
+                m_bookmarkManager->updateBookmark(bookmark.id, bookmark.name, color, bookmark.folderId);
+            }
+        });
+
+        QMenu* moveMenu = menu.addMenu(tr("Move to folder"));
+        QAction* rootAction = moveMenu->addAction(tr("No folder"));
+        connect(rootAction, &QAction::triggered, this, [this, bookmark]()
+        {
+            m_bookmarkManager->updateBookmark(bookmark.id, bookmark.name, bookmark.color, QString());
+        });
+        for (int i = 0; i < m_bookmarkManager->getFolderCount(); ++i)
+        {
+            const PDFBookmarkManager::BookmarkFolder folder = m_bookmarkManager->getFolder(i);
+            QAction* folderAction = moveMenu->addAction(folder.name);
+            folderAction->setCheckable(true);
+            folderAction->setChecked(folder.id == bookmark.folderId);
+            connect(folderAction, &QAction::triggered, this, [this, bookmark, folder]()
+            {
+                m_bookmarkManager->updateBookmark(bookmark.id, bookmark.name, bookmark.color, folder.id);
+            });
+        }
+    }
+
+    menu.exec(ui->bookmarksView->viewport()->mapToGlobal(pos));
 }
 
 void PDFSidebarWidget::onNotesItemClicked(const QModelIndex& index)

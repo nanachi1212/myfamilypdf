@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdfbookmarkmanager.h"
+#include "pdffamilypdfpaths.h"
 #include "pdfaction.h"
 
 #include <QFile>
@@ -29,8 +30,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QStandardPaths>
 #include <QCryptographicHash>
+#include <QUuid>
 
 namespace pdfviewer
 {
@@ -40,35 +41,88 @@ class PDFBookmarkManagerHelper
 public:
     constexpr PDFBookmarkManagerHelper() = delete;
 
+    static QColor getDefaultBookmarkColor(bool isAuto)
+    {
+        return isAuto ? QColor(0, 123, 255) : QColor(255, 159, 0);
+    }
+
     static QJsonObject convertBookmarkToJson(const PDFBookmarkManager::Bookmark& bookmark)
     {
         QJsonObject json;
+        json["id"] = bookmark.id;
         json["isAuto"] = bookmark.isAuto;
         json["name"] = bookmark.name;
         json["pageIndex"] = static_cast<qint64>(bookmark.pageIndex);
+        json["color"] = bookmark.color.name(QColor::HexArgb);
+        json["folderId"] = bookmark.folderId;
         return json;
     }
 
     static PDFBookmarkManager::Bookmark convertJsonToBookmark(const QJsonObject& json)
     {
         PDFBookmarkManager::Bookmark bookmark;
+        bookmark.id = json["id"].toString();
+        if (bookmark.id.isEmpty())
+        {
+            bookmark.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        }
         bookmark.isAuto = json["isAuto"].toBool();
         bookmark.name = json["name"].toString();
         bookmark.pageIndex = json["pageIndex"].toInteger();
+        bookmark.color = QColor(json["color"].toString());
+        if (!bookmark.color.isValid())
+        {
+            bookmark.color = getDefaultBookmarkColor(bookmark.isAuto);
+        }
+        bookmark.folderId = json["folderId"].toString();
         return bookmark;
+    }
+
+    static QJsonObject convertFolderToJson(const PDFBookmarkManager::BookmarkFolder& folder)
+    {
+        QJsonObject json;
+        json["id"] = folder.id;
+        json["name"] = folder.name;
+        json["color"] = folder.color.name(QColor::HexArgb);
+        return json;
+    }
+
+    static PDFBookmarkManager::BookmarkFolder convertJsonToFolder(const QJsonObject& json)
+    {
+        PDFBookmarkManager::BookmarkFolder folder;
+        folder.id = json["id"].toString();
+        if (folder.id.isEmpty())
+        {
+            folder.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        }
+        folder.name = json["name"].toString();
+        folder.color = QColor(json["color"].toString());
+        if (!folder.color.isValid())
+        {
+            folder.color = QColor(80, 130, 200);
+        }
+        return folder;
     }
 
     static QJsonObject convertBookmarksToJson(const PDFBookmarkManager::Bookmarks& bookmarks)
     {
-        QJsonArray jsonArray;
+        QJsonArray bookmarkArray;
 
         for (const auto& bookmark : bookmarks.bookmarks)
         {
-            jsonArray.append(convertBookmarkToJson(bookmark));
+            bookmarkArray.append(convertBookmarkToJson(bookmark));
+        }
+
+        QJsonArray folderArray;
+        for (const auto& folder : bookmarks.folders)
+        {
+            folderArray.append(convertFolderToJson(folder));
         }
 
         QJsonObject jsonObject;
-        jsonObject["bookmarks"] = jsonArray;
+        jsonObject["version"] = 2;
+        jsonObject["folders"] = folderArray;
+        jsonObject["bookmarks"] = bookmarkArray;
         return jsonObject;
     }
 
@@ -76,9 +130,14 @@ public:
     {
         PDFBookmarkManager::Bookmarks bookmarks;
 
-        QJsonArray jsonArray = object["bookmarks"].toArray();
+        const QJsonArray folderArray = object["folders"].toArray();
+        for (const auto& jsonValue : folderArray)
+        {
+            bookmarks.folders.push_back(convertJsonToFolder(jsonValue.toObject()));
+        }
 
-        for (const auto& jsonValue : jsonArray)
+        const QJsonArray bookmarkArray = object["bookmarks"].toArray();
+        for (const auto& jsonValue : bookmarkArray)
         {
             bookmarks.bookmarks.push_back(convertJsonToBookmark(jsonValue.toObject()));
         }
@@ -91,6 +150,16 @@ public:
 PDFBookmarkManager::PDFBookmarkManager(QObject* parent) :
     BaseClass(parent)
 {
+}
+
+QJsonObject PDFBookmarkManager::bookmarksToJson(const Bookmarks& bookmarks)
+{
+    return PDFBookmarkManagerHelper::convertBookmarksToJson(bookmarks);
+}
+
+PDFBookmarkManager::Bookmarks PDFBookmarkManager::bookmarksFromJson(const QJsonObject& object)
+{
+    return PDFBookmarkManagerHelper::convertBookmarksFromJson(object);
 }
 
 void PDFBookmarkManager::setDocument(const pdf::PDFModifiedDocument& document)
@@ -168,6 +237,107 @@ PDFBookmarkManager::Bookmark PDFBookmarkManager::getBookmark(int index) const
     return m_bookmarks.bookmarks.at(index);
 }
 
+int PDFBookmarkManager::getFolderCount() const
+{
+    return static_cast<int>(m_bookmarks.folders.size());
+}
+
+PDFBookmarkManager::BookmarkFolder PDFBookmarkManager::getFolder(int index) const
+{
+    return m_bookmarks.folders.at(index);
+}
+
+QString PDFBookmarkManager::addFolder(const QString& name, const QColor& color)
+{
+    BookmarkFolder folder;
+    folder.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    folder.name = name.trimmed().isEmpty() ? tr("New folder") : name.trimmed();
+    folder.color = color.isValid() ? color : QColor(80, 130, 200);
+
+    Q_EMIT bookmarksAboutToBeChanged();
+    m_bookmarks.folders.push_back(folder);
+    savePersistentBookmarks();
+    Q_EMIT bookmarksChanged();
+    return folder.id;
+}
+
+bool PDFBookmarkManager::updateFolder(const QString& id, const QString& name, const QColor& color)
+{
+    auto it = std::find_if(m_bookmarks.folders.begin(), m_bookmarks.folders.end(),
+                           [&id](const auto& folder) { return folder.id == id; });
+    if (it == m_bookmarks.folders.end())
+    {
+        return false;
+    }
+
+    Q_EMIT bookmarksAboutToBeChanged();
+    it->name = name.trimmed().isEmpty() ? it->name : name.trimmed();
+    if (color.isValid())
+    {
+        it->color = color;
+    }
+    savePersistentBookmarks();
+    Q_EMIT bookmarksChanged();
+    return true;
+}
+
+bool PDFBookmarkManager::removeFolder(const QString& id)
+{
+    auto it = std::find_if(m_bookmarks.folders.begin(), m_bookmarks.folders.end(),
+                           [&id](const auto& folder) { return folder.id == id; });
+    if (it == m_bookmarks.folders.end())
+    {
+        return false;
+    }
+
+    Q_EMIT bookmarksAboutToBeChanged();
+    for (Bookmark& bookmark : m_bookmarks.bookmarks)
+    {
+        if (bookmark.folderId == id)
+        {
+            bookmark.folderId.clear();
+        }
+    }
+    m_bookmarks.folders.erase(it);
+    savePersistentBookmarks();
+    Q_EMIT bookmarksChanged();
+    return true;
+}
+
+bool PDFBookmarkManager::updateBookmark(const QString& id,
+                                        const QString& name,
+                                        const QColor& color,
+                                        const QString& folderId)
+{
+    auto it = std::find_if(m_bookmarks.bookmarks.begin(), m_bookmarks.bookmarks.end(),
+                           [&id](const auto& bookmark) { return bookmark.id == id; });
+    if (it == m_bookmarks.bookmarks.end())
+    {
+        return false;
+    }
+
+    if (!folderId.isEmpty())
+    {
+        const auto folderIt = std::find_if(m_bookmarks.folders.begin(), m_bookmarks.folders.end(),
+                                           [&folderId](const auto& folder) { return folder.id == folderId; });
+        if (folderIt == m_bookmarks.folders.end())
+        {
+            return false;
+        }
+    }
+
+    Q_EMIT bookmarksAboutToBeChanged();
+    it->name = name.trimmed().isEmpty() ? it->name : name.trimmed();
+    if (color.isValid())
+    {
+        it->color = color;
+    }
+    it->folderId = folderId;
+    savePersistentBookmarks();
+    Q_EMIT bookmarksChanged();
+    return true;
+}
+
 void PDFBookmarkManager::toggleBookmark(pdf::PDFInteger pageIndex)
 {
     Q_EMIT bookmarksAboutToBeChanged();
@@ -188,9 +358,11 @@ void PDFBookmarkManager::toggleBookmark(pdf::PDFInteger pageIndex)
     else
     {
         Bookmark bookmark;
+        bookmark.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
         bookmark.isAuto = false;
         bookmark.name = tr("User bookmark for page %1").arg(pageIndex + 1);
         bookmark.pageIndex = pageIndex;
+        bookmark.color = PDFBookmarkManagerHelper::getDefaultBookmarkColor(false);
         m_bookmarks.bookmarks.push_back(bookmark);
         sortBookmarks();
     }
@@ -300,8 +472,7 @@ QString PDFBookmarkManager::getDocumentKey(const pdf::PDFDocument* document) con
 
 QString PDFBookmarkManager::getPersistentBookmarksFileName() const
 {
-    const QString configDirectory = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
-    return QDir(configDirectory).filePath(QStringLiteral("FamilyPDF/bookmarks.json"));
+    return QDir(PDFFamilyPDFPaths::dataRoot()).filePath(QStringLiteral("bookmarks.json"));
 }
 
 void PDFBookmarkManager::goToNextBookmark()
@@ -398,8 +569,10 @@ void PDFBookmarkManager::regenerateAutoBookmarks()
         for (size_t i = 0; i < childCount; ++i)
         {
             Bookmark bookmark;
+            bookmark.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
             bookmark.isAuto = true;
             bookmark.pageIndex = pdf::PDFCatalog::INVALID_PAGE_INDEX;
+            bookmark.color = PDFBookmarkManagerHelper::getDefaultBookmarkColor(true);
 
             const pdf::PDFOutlineItem* child = outlineRoot->getChild(i);
             const pdf::PDFAction* action = child->getAction();

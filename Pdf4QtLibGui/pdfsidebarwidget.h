@@ -133,6 +133,8 @@ private:
     void onBookmarkActivated(int index, PDFBookmarkManager::Bookmark bookmark);
     void onBookmarsCurrentIndexChanged(const QModelIndex& current, const QModelIndex& previous);
     void onBookmarkClicked(const QModelIndex& index);
+    void createBookmarkFolder();
+    void onBookmarkCustomContextMenuRequested(const QPoint& pos);
     void onNotesItemClicked(const QModelIndex& index);
 
     struct PageInfo

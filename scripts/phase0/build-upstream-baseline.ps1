@@ -26,8 +26,26 @@ $Targets = @(
     'UnitTests',
     'UnitTestsImageOptimizer',
     'UnitTestsFontEncoding',
+    'UnitTestsBookmarks',
     'release_translations'
 )
+
+$toolchainBootstrap = Join-Path $PSScriptRoot 'install-build-toolchain.ps1'
+$requiredToolchainFiles = @(
+    (Join-Path $QtPrefix 'lib\cmake\Qt6\Qt6Config.cmake'),
+    $VcpkgToolchain
+)
+if ($requiredToolchainFiles |
+        Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }) {
+    if (-not (Test-Path -LiteralPath $toolchainBootstrap -PathType Leaf)) {
+        throw "Toolchain files are missing and the bootstrap script was not found: $toolchainBootstrap"
+    }
+    Write-Host 'Required Qt/vcpkg files are missing. Running the verified local toolchain bootstrap...'
+    & $toolchainBootstrap
+    if ($LASTEXITCODE -ne 0) {
+        throw "Toolchain bootstrap failed with exit code $LASTEXITCODE."
+    }
+}
 
 function Assert-File {
     param([Parameter(Mandatory)][string]$LiteralPath)
@@ -127,7 +145,13 @@ function Prepare-TestRuntime {
         & $windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw $executable 2>&1 |
             Set-Content -LiteralPath (Join-Path $BuildDirectory "windeployqt-$target.log") -Encoding UTF8
         if ($LASTEXITCODE -ne 0) {
-            throw "windeployqt failed for $target with exit code $LASTEXITCODE."
+            $qtCoreRuntime = Join-Path $runtimeDirectory 'Qt6Core.dll'
+            if (Test-Path -LiteralPath $qtCoreRuntime -PathType Leaf) {
+                Write-Warning "windeployqt failed for $target with exit code $LASTEXITCODE; using the already deployed Qt runtime."
+            }
+            else {
+                throw "windeployqt failed for $target with exit code $LASTEXITCODE and Qt6Core.dll is missing."
+            }
         }
     }
 
