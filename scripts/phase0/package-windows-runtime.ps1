@@ -21,7 +21,7 @@ $QtPrefix = 'E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
 $runtimeDirectory = Join-Path $BuildDirectory 'usr\bin'
 $windeployqt = Join-Path $QtPrefix 'bin\windeployqt.exe'
 $vcpkgBin = Join-Path $BuildDirectory 'vcpkg_installed\x64-windows\bin'
-$targets = @('Pdf4QtViewer', 'Pdf4QtEditor', 'Pdf4QtPageMaster')
+$targets = @('PdfTool', 'Pdf4QtViewer', 'Pdf4QtEditor', 'Pdf4QtPageMaster')
 
 foreach ($path in @($windeployqt, $runtimeDirectory)) {
     if (-not (Test-Path -LiteralPath $path)) {

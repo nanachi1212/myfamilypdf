@@ -19,6 +19,7 @@ $VcpkgRoot = 'E:\CodexProject\FamilyPDF-tools\vcpkg'
 $VcpkgToolchain = Join-Path $VcpkgRoot 'scripts\buildsystems\vcpkg.cmake'
 $VsWhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
 $Targets = @(
+    'PdfTool',
     'Pdf4QtViewer',
     'Pdf4QtEditor',
     'Pdf4QtPageMaster',
