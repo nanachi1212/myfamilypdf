@@ -24,7 +24,7 @@ $vcpkg = 'E:\CodexProject\FamilyPDF-tools\vcpkg\vcpkg.exe'
 
 if (-not $SkipDownload) {
     try {
-        & $downloader
+        & $downloader -TesseractPath $tesseractExe
     }
     catch {
         Write-Warning "Some OCR languages could not be downloaded in this environment: $($_.Exception.Message)"
@@ -79,7 +79,7 @@ $presentLanguages = @(Get-ChildItem -LiteralPath $packageTessdata -Filter '*.tra
     ForEach-Object { $_.BaseName })
 $manifest = [ordered]@{
     name = 'FamilyPDF OCR Plugin'
-    version = '0.2.0'
+    version = '0.3.0'
     engine = 'Tesseract 5'
     languages = $presentLanguages
     searchablePdf = $true

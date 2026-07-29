@@ -7,6 +7,7 @@ OCR 已與 FamilyPDF 基礎程式分開封裝。未使用 OCR 的家人只需安
 - Tesseract 5.5.2。
 - 橫排繁體中文 `chi_tra`、簡體中文 `chi_sim`、英文 `eng`。
 - 自動補下載直排繁體 `chi_tra_vert`、直排簡體 `chi_sim_vert`。
+- 執行 OCR 時若選用的語言缺少，會直接啟動官方下載、重試、檔案檢查與 Tesseract 載入驗證，不必先手動修復。
 - 將掃描 PDF 轉成新的可搜尋、可複製文字 PDF。
 - 保留相同頁數；原始 PDF 永遠不會被覆寫。
 - 可另外輸出 UTF-8 文字檔。

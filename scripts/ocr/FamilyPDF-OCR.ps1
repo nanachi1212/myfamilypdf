@@ -122,9 +122,36 @@ if (-not $tessdata) {
     throw 'OCR language data was not found. Reinstall the FamilyPDF OCR plugin.'
 }
 
-foreach ($language in $Languages.Split('+', [StringSplitOptions]::RemoveEmptyEntries)) {
+$requestedLanguages = @($Languages.Split('+', [StringSplitOptions]::RemoveEmptyEntries))
+$missingLanguages = @(
+    $requestedLanguages |
+        Where-Object {
+            -not (Test-Path -LiteralPath (Join-Path $tessdata "$_.traineddata") -PathType Leaf)
+        }
+)
+if ($missingLanguages.Count -gt 0) {
+    $languageInstaller = Resolve-FirstExistingFile @(
+        (Join-Path $PSScriptRoot 'ocr\Install-OCR-Languages.ps1'),
+        (Join-Path $repositoryRoot 'ocr-spike\download-tessdata.ps1')
+    )
+    if (-not $languageInstaller) {
+        throw "OCR language data is missing and the automatic repair script was not found: $($missingLanguages -join ', ')"
+    }
+
+    Write-Host "Installing missing OCR languages: $($missingLanguages -join ', ')"
+    & $languageInstaller `
+        -DataDirectory $tessdata `
+        -Languages $missingLanguages `
+        -TesseractPath $tesseract
+    if ($LASTEXITCODE -ne 0) {
+        throw "Automatic OCR language installation failed with exit code $LASTEXITCODE."
+    }
+}
+
+foreach ($language in $requestedLanguages) {
     $languageFile = Join-Path $tessdata "$language.traineddata"
-    if (-not (Test-Path -LiteralPath $languageFile -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath $languageFile -PathType Leaf) -or
+        (Get-Item -LiteralPath $languageFile).Length -le 1MB) {
         throw "OCR language data is missing: $languageFile"
     }
 }

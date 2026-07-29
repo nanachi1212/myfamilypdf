@@ -20,11 +20,14 @@
 
 ## OCR 外掛完成版回歸（2026-07-29）
 
+- OCR 外掛已更新為 0.3.0；驗證安裝 exit code `0`，manifest 與安裝 payload 版本一致。
 - 單頁及雙頁 PDF 均成功建立同頁數的可搜尋 PDF，`PdfTool fetch-text` 可抽取 `FamilyPDF` 文字。
 - 測試同時確認原始 PDF SHA-256 未改變，且可選擇另外輸出非空白 UTF-8 文字檔。
 - 繁體中文 `chi_tra`、簡體中文 `chi_sim`、英文 `eng` 已由封裝目錄及安裝後隔離目錄各完成端對端測試。
 - OCR 外掛隔離靜默安裝 exit code `0`；安裝後 Tesseract、PdfTool render／unite／fetch-text 完整流程通過。
 - 語言修復腳本會自動補下載 `eng`、`chi_tra`、`chi_sim`、`chi_tra_vert`、`chi_sim_vert`；目前本機封裝內建前三種橫排模型，兩個直排模型在有網路時自動補齊。
+- OCR 主流程已直接串接缺語言修復：官方來源、最多三次重試、大小檢查、Tesseract 實際載入與原子替換。斷線回歸確認不產生結果 PDF，且沒有 `.download` 半檔。
+- 直排繁體與簡體雙欄測試 PDF 已建立、由 FamilyPDF 重新渲染並完成視覺檢查，待兩個官方直排模型下載後即可直接執行辨識斷言。
 - Viewer／Editor 已加入「使用 OCR 建立可搜尋 PDF」工具選單；未安裝外掛時會顯示明確提示。
 
 ## 可攜式包 smoke test
