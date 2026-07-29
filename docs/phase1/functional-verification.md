@@ -9,6 +9,7 @@
 - `UnitTestsImageOptimizer.exe`：exit code `0`。
 - `UnitTestsFontEncoding.exe`：exit code `0`。
 - 可攜式包包含 `translations/PDF4QT_zh_TW.qm` 與 `translations/PDF4QT_zh_CN.qm`。
+- PageMaster 合併流程已改為：有選取頁面時只合併選取內容；無選取時合併全部內容。可先使用 `Select Even`、`Select Odd` 或 `Select Page Range...` 建立選取。
 
 ## 命令列 PDF 流程
 
