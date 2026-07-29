@@ -28,11 +28,8 @@ $targets = @(
     'Pdf4QtEditor',
     'Pdf4QtPageMaster'
 )
-$ocrManifestRoot = Join-Path $RepositoryRoot 'ocr-spike'
-$ocrInstallRoot = Join-Path $ocrManifestRoot 'vcpkg_installed'
-$ocrTripletRoot = Join-Path $ocrInstallRoot 'x64-windows'
-$ocrExecutable = Join-Path $ocrTripletRoot 'tools\tesseract\tesseract.exe'
-$ocrTessdata = Join-Path $ocrManifestRoot 'tessdata'
+# SkipOcr is retained for compatibility with older build commands. OCR is now
+# always packaged separately by scripts\ocr\build-ocr-plugin.ps1.
 
 foreach ($path in @($windeployqt, $runtimeDirectory)) {
     if (-not (Test-Path -LiteralPath $path)) {
@@ -152,35 +149,6 @@ if ($qtDeploymentFailed) {
         New-Item -ItemType Directory -Path (Split-Path $destination) -Force | Out-Null
         Copy-Item -LiteralPath $source -Destination $destination -Force
     }
-}
-
-if (-not $SkipOcr) {
-    $downloadTessdata = Join-Path $ocrManifestRoot 'download-tessdata.ps1'
-    & $downloadTessdata
-
-    if (-not (Test-Path -LiteralPath $ocrExecutable -PathType Leaf)) {
-        $vcpkgExecutable = 'E:\CodexProject\FamilyPDF-tools\vcpkg\vcpkg.exe'
-        if (-not (Test-Path -LiteralPath $vcpkgExecutable -PathType Leaf)) {
-            throw "vcpkg was not found: $vcpkgExecutable"
-        }
-        & $vcpkgExecutable install `
-            "--x-manifest-root=$ocrManifestRoot" `
-            "--x-install-root=$ocrInstallRoot" `
-            '--triplet=x64-windows' `
-            '--clean-after-build'
-        if ($LASTEXITCODE -ne 0) {
-            throw "OCR dependency installation failed with exit code $LASTEXITCODE."
-        }
-    }
-
-    $ocrPackageDirectory = Join-Path $packageRoot 'ocr'
-    New-Item -ItemType Directory -Path $ocrPackageDirectory -Force | Out-Null
-    Copy-Item -LiteralPath $ocrExecutable -Destination $ocrPackageDirectory -Force
-    Get-ChildItem -LiteralPath (Join-Path $ocrTripletRoot 'bin') -Filter '*.dll' -File |
-        Copy-Item -Destination $ocrPackageDirectory -Force
-    Copy-Item -LiteralPath $ocrTessdata -Destination $ocrPackageDirectory -Recurse -Force
-    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'scripts\ocr\FamilyPDF-OCR.ps1') -Destination $packageRoot -Force
-    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'scripts\ocr\FamilyPDF-OCR.cmd') -Destination $packageRoot -Force
 }
 
 $zipPath = Join-Path $OutputDirectory 'FamilyPDF-windows-x64.zip'

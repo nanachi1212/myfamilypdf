@@ -6,7 +6,7 @@ if "%~1"=="" (
   echo Usage:
   echo   Drag a PDF onto this file
   echo   FamilyPDF-OCR.cmd input.pdf
-  echo   FamilyPDF-OCR.cmd input.pdf output.txt -Languages chi_sim+eng -Pages 1-10
+  echo   FamilyPDF-OCR.cmd input.pdf output.ocr.pdf -Languages chi_sim+eng -Pages 1-10
   echo.
   pause
   exit /b 1

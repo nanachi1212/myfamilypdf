@@ -267,6 +267,8 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
 
     // Special tools
     m_programController->initialize(PDFProgramController::Features(PDFProgramController::TextToSpeech | PDFProgramController::Tools), this, this, m_actionManager, m_progress);
+    QAction* ocrAction = ui->menuTools->addAction(tr("Create Searchable PDF with OCR..."));
+    connect(ocrAction, &QAction::triggered, m_programController, &PDFProgramController::launchOcrPlugin);
     setCentralWidget(m_programController->getPdfWidget());
     setFocusProxy(m_programController->getPdfWidget());
 

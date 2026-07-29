@@ -1538,6 +1538,7 @@
 </context>
 <context>
     <name>PDFEditorMainWindow</name>
+    <message><source>Create Searchable PDF with OCR...</source><translation>使用 OCR 建立可搜尋 PDF...</translation></message>
     <message>
         <source>New document</source>
         <translation>新文件</translation>
@@ -5283,6 +5284,7 @@
 </context>
 <context>
     <name>PDFViewerMainWindow</name>
+    <message><source>Create Searchable PDF with OCR...</source><translation>使用 OCR 建立可搜尋 PDF...</translation></message>
     <message>
         <source>New document</source>
         <translation>新文件</translation>
@@ -15237,6 +15239,11 @@ Do you want to perform this action?</source>
 </context>
 <context>
     <name>PDFProgramController</name>
+    <message><source>FamilyPDF OCR</source><translation>FamilyPDF OCR</translation></message>
+    <message><source>Open a saved PDF before starting OCR.</source><translation>請先開啟已儲存的 PDF，再啟動 OCR。</translation></message>
+    <message><source>The optional FamilyPDF OCR plugin is not installed.</source><translation>尚未安裝選用的 FamilyPDF OCR 外掛。</translation></message>
+    <message><source>Save searchable OCR PDF</source><translation>儲存可搜尋的 OCR PDF</translation></message>
+    <message><source>Could not start the FamilyPDF OCR plugin.</source><translation>無法啟動 FamilyPDF OCR 外掛。</translation></message>
     <message><source>Safe save</source><translation>安全儲存</translation></message>
     <message><source>Safe save failed</source><translation>安全儲存失敗</translation></message>
     <message><source>FamilyPDF is still establishing the safe-save baseline. Please use Save As or try again after the document finishes loading.</source><translation>FamilyPDF 正在建立安全儲存基準。請使用「另存新檔」，或等待文件載入完成後再試一次。</translation></message>

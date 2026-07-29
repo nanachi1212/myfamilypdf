@@ -58,9 +58,13 @@
 #include <QPrinter>
 #include <QPrintDialog>
 #include <QMessageBox>
+#include <QProcess>
 #include <QDesktopServices>
 #include <QApplication>
+#include <QCoreApplication>
+#include <QDir>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QtConcurrent/QtConcurrent>
 #include <QInputDialog>
 #include <QMainWindow>
@@ -3042,6 +3046,63 @@ void PDFProgramController::onActionOpenTriggered()
     {
         openDocument(fileName);
     }
+}
+
+void PDFProgramController::launchOcrPlugin()
+{
+    const QString inputFile = getOriginalFileName();
+    if (inputFile.isEmpty() || !QFileInfo::exists(inputFile))
+    {
+        QMessageBox::information(m_mainWindow,
+                                 tr("FamilyPDF OCR"),
+                                 tr("Open a saved PDF before starting OCR."));
+        return;
+    }
+
+    const QString launcher = QDir(QCoreApplication::applicationDirPath()).filePath("FamilyPDF-OCR.cmd");
+    if (!QFileInfo::exists(launcher))
+    {
+        QMessageBox::information(m_mainWindow,
+                                 tr("FamilyPDF OCR"),
+                                 tr("The optional FamilyPDF OCR plugin is not installed."));
+        return;
+    }
+
+    const QFileInfo inputInfo(inputFile);
+    const QString suggestedOutput = inputInfo.dir().filePath(inputInfo.completeBaseName() + ".ocr.pdf");
+    const QString outputFile = QFileDialog::getSaveFileName(m_mainWindow,
+                                                            tr("Save searchable OCR PDF"),
+                                                            suggestedOutput,
+                                                            tr("PDF document (*.pdf)"));
+    if (outputFile.isEmpty())
+    {
+        return;
+    }
+
+#ifdef Q_OS_WIN
+    const QString parameters = QString("\"%1\" \"%2\"").arg(QDir::toNativeSeparators(inputFile),
+                                                              QDir::toNativeSeparators(outputFile));
+    const auto result = reinterpret_cast<qintptr>(
+        ShellExecuteW(nullptr,
+                      L"open",
+                      reinterpret_cast<LPCWSTR>(launcher.utf16()),
+                      reinterpret_cast<LPCWSTR>(parameters.utf16()),
+                      reinterpret_cast<LPCWSTR>(QCoreApplication::applicationDirPath().utf16()),
+                      SW_SHOWNORMAL));
+    if (result <= 32)
+    {
+        QMessageBox::critical(m_mainWindow,
+                              tr("FamilyPDF OCR"),
+                              tr("Could not start the FamilyPDF OCR plugin."));
+    }
+#else
+    if (!QProcess::startDetached(launcher, {inputFile, outputFile}, QCoreApplication::applicationDirPath()))
+    {
+        QMessageBox::critical(m_mainWindow,
+                              tr("FamilyPDF OCR"),
+                              tr("Could not start the FamilyPDF OCR plugin."));
+    }
+#endif
 }
 
 void PDFProgramController::onActionCloseTriggered()

@@ -25,7 +25,8 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - `Pdf4QtViewer.exe`：閱讀 PDF。
 - `Pdf4QtEditor.exe`：編輯、標記、打字與註解。
 - `Pdf4QtPageMaster.exe`：合併、拆分與頁面整理。
-- OCR 外掛完成後會另行提供獨立安裝程式與 ZIP。
+- `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe`：OCR 外掛安裝程式。
+- `dist\FamilyPDF-OCR-Plugin-windows-x64.zip`：OCR 外掛可攜式覆蓋包。
 
 詳細操作與驗證：
 
@@ -33,6 +34,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - [Windows 安裝檔](docs/phase1/installer.md)
 - [OCR 使用方式](docs/phase1/ocr.md)
 - [功能驗證結果](docs/phase1/functional-verification.md)
+- [目前交付狀態與 SHA-256](docs/RELEASE-STATUS.md)
 
 ## 建置
 
@@ -42,6 +44,8 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\phase0\build-upstream-baseline.ps1 -Stage All
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\phase0\package-windows-runtime.ps1 -SkipOcr
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\phase0\build-installer.ps1 -SkipPackage -SkipOcr
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\ocr\build-ocr-plugin.ps1
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\ocr\build-ocr-installer.ps1 -SkipPackage
 ```
 
 建置腳本會在缺少時自動安裝 Qt／vcpkg 建置工具；安裝程式腳本會下載並驗證 Inno Setup 的 Authenticode 簽章。開發工具預設放在 `E:\CodexProject\FamilyPDF-tools`。

@@ -325,6 +325,9 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     ui->mainToolBar->addAction(ui->actionExtractImage);
     ui->mainToolBar->addSeparator();
 
+    QAction* ocrAction = ui->menuTools->addAction(tr("Create Searchable PDF with OCR..."));
+    connect(ocrAction, &QAction::triggered, m_programController, &PDFProgramController::launchOcrPlugin);
+
     // Special tools
     QToolButton* insertStickyNoteButton = m_actionManager->createToolButtonForActionGroup(PDFActionManager::CreateStickyNoteGroup, ui->mainToolBar);
     ui->mainToolBar->addWidget(insertStickyNoteButton);

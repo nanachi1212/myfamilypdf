@@ -16,6 +16,15 @@
 
 以下較早的 OCR 內嵌封裝紀錄只保留作歷史比較；目前產品已改為「基礎程式與 OCR 外掛分開安裝」。
 
+## OCR 外掛完成版回歸（2026-07-29）
+
+- 單頁及雙頁 PDF 均成功建立同頁數的可搜尋 PDF，`PdfTool fetch-text` 可抽取 `FamilyPDF` 文字。
+- 測試同時確認原始 PDF SHA-256 未改變，且可選擇另外輸出非空白 UTF-8 文字檔。
+- 繁體中文 `chi_tra`、簡體中文 `chi_sim`、英文 `eng` 已由封裝目錄及安裝後隔離目錄各完成端對端測試。
+- OCR 外掛隔離靜默安裝 exit code `0`；安裝後 Tesseract、PdfTool render／unite／fetch-text 完整流程通過。
+- 語言修復腳本會自動補下載 `eng`、`chi_tra`、`chi_sim`、`chi_tra_vert`、`chi_sim_vert`；目前本機封裝內建前三種橫排模型，兩個直排模型在有網路時自動補齊。
+- Viewer／Editor 已加入「使用 OCR 建立可搜尋 PDF」工具選單；未安裝外掛時會顯示明確提示。
+
 ## 可攜式包 smoke test
 
 - `Pdf4QtViewer.exe`：開啟 290 頁 PDF 後維持執行 8 秒，仍在執行且 Windows 回報 Responding。
@@ -92,4 +101,4 @@
 - 手動書籤目前沒有使用者自訂文字顏色或可收合資料夾；自動／手動書籤只以藍色／橘色星號區分。
 - 繁體中文與簡體中文 Windows locale 的實機顯示。
 - 數百頁大型 PDF 的實際人工快速翻頁體感與長時間壓力測試。
-- OCR 第一版不建立可搜尋 PDF 隱形文字層，只輸出 UTF-8 文字檔。
+- 直排繁／簡中文模型因目前 Codex 沙盒阻擋下載，尚未在本機完成實際直排頁面辨識回歸；自動下載與缺檔檢查已實作。

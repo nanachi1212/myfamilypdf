@@ -328,6 +328,7 @@ public:
     void performPrint();
     void performSave();
     void performSaveAs();
+    void launchOcrPlugin();
 
     void onActionTriggered(const pdf::PDFAction* action);
     void onDocumentModified(pdf::PDFModifiedDocument document);

@@ -1,52 +1,68 @@
-# FamilyPDF OCR
+# FamilyPDF OCR 外掛
 
-## 已實作範圍
+OCR 已與 FamilyPDF 基礎程式分開封裝。未使用 OCR 的家人只需安裝較小的基礎程式；需要掃描辨識時再安裝外掛。
 
-- 採用 Tesseract 5 與 `tessdata_fast`。
-- 預設辨識繁體中文與英文：`chi_tra+eng`。
-- 可改用簡體中文與英文：`chi_sim+eng`。
-- 可處理整份 PDF，或用 `-Pages` 指定頁面，例如 `1-3,8,10-12`。
-- 原始 PDF 保持不變，辨識結果輸出成 UTF-8 純文字檔。
-- 封裝腳本會自動下載缺少的 OCR 語言資料與編譯相依套件。
+## 已完成
 
-第一版刻意不直接覆寫 PDF，也不把每頁點陣化後冒充原始文件。這可避免破壞向量文字、既有註解、表單與書籤。後續的可搜尋 PDF 應以「另存副本並加入隱形文字層」實作。
+- Tesseract 5.5.2。
+- 橫排繁體中文 `chi_tra`、簡體中文 `chi_sim`、英文 `eng`。
+- 自動補下載直排繁體 `chi_tra_vert`、直排簡體 `chi_sim_vert`。
+- 將掃描 PDF 轉成新的可搜尋、可複製文字 PDF。
+- 保留相同頁數；原始 PDF 永遠不會被覆寫。
+- 可另外輸出 UTF-8 文字檔。
+- 可指定 `1-3,8,10-12` 等頁面範圍、72–600 DPI 與 Tesseract 分頁模式。
+- Viewer／Editor 的「工具」選單會在外掛安裝後直接啟動 OCR。
 
-## 使用方式
+## 安裝
 
-將 PDF 拖曳到 `FamilyPDF-OCR.cmd`，會在 PDF 同一資料夾產生：
+一般使用者先安裝 `FamilyPDF-Setup-x64.exe`，再安裝：
 
 ```text
-原檔名.ocr.txt
+FamilyPDF-OCR-Plugin-Setup-x64.exe
 ```
 
-也可在 PowerShell 或命令提示字元執行：
+可攜式版本則把 `FamilyPDF-OCR-Plugin-windows-x64.zip` 的內容解壓到 FamilyPDF 主程式資料夾。
+
+外掛若發現語言資料缺失，可執行：
+
+```text
+Install-FamilyPDF-OCR-Languages.cmd
+```
+
+它只會從 Tesseract 官方 `tessdata_fast` 儲存庫下載缺少的五個語言檔。
+
+## 使用
+
+最簡單的方式是在 Viewer／Editor 開啟 PDF，選擇「工具 → 使用 OCR 建立可搜尋 PDF...」。
+
+也可把 PDF 拖曳到 `FamilyPDF-OCR.cmd`，預設在原檔旁建立：
+
+```text
+原檔名.ocr.pdf
+```
+
+命令列範例：
 
 ```powershell
 .\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf"
-.\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf" "D:\文件\結果.txt" -Languages chi_sim+eng
-.\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf" "D:\文件\結果.txt" -Pages 1-3,8,10-12
+.\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf" "D:\文件\可搜尋版本.pdf"
+.\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf" "D:\文件\可搜尋版本.pdf" -Languages chi_sim+eng
+.\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf" "D:\文件\部分頁面.pdf" -Pages 1-3,8,10-12
 ```
 
-常用參數：
+進階參數：
 
-- `-Languages chi_tra+eng`：繁體中文與英文，預設值。
-- `-Languages chi_sim+eng`：簡體中文與英文。
-- `-Pages 1-10`：只辨識第 1 到 10 頁。
-- `-Dpi 300`：渲染解析度，允許 72–600 DPI。
-- `-KeepPageImages`：保留 OCR 使用的逐頁 PNG，方便檢查辨識問題。
+- `-OutputText "結果.txt"`：另外輸出 UTF-8 純文字。
+- `-Languages chi_tra+chi_sim+eng`：橫排繁簡中文與英文，預設值。
+- `-Languages chi_tra_vert+eng`：繁體中文直排與英文。
+- `-Dpi 300`：渲染解析度。
+- `-KeepPageImages`：保留辨識用 PNG 供人工檢查。
 
-## 建置與封裝
-
-執行：
+## 建置
 
 ```powershell
-.\scripts\phase0\package-windows-runtime.ps1
+.\scripts\ocr\build-ocr-plugin.ps1
+.\scripts\ocr\build-ocr-installer.ps1 -SkipPackage
 ```
 
-腳本會在缺少時自動：
-
-1. 下載 `eng`、`chi_tra`、`chi_sim` 語言資料。
-2. 透過 vcpkg 安裝 Tesseract 與必要 DLL。
-3. 將 OCR 執行檔、DLL、語言資料及啟動腳本加入 Windows ZIP。
-
-若只想快速封裝不含 OCR 的測試版本，可使用 `-SkipOcr`。
+缺少 Tesseract 相依套件時會透過 vcpkg 安裝；缺少語言檔時會自動從官方來源下載。
