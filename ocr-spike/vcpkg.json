@@ -1,0 +1,7 @@
+{
+  "name": "familypdf-ocr-spike",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "tesseract"
+  ]
+}

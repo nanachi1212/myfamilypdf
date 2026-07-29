@@ -159,6 +159,7 @@ public:
     };
 
     std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> getAssembledPages(AssembleMode mode) const;
+    std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> getAssembledPages(AssembleMode mode, const QModelIndexList& list) const;
     std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> getSplitAssembledPagesEveryN(const QModelIndexList& list, int pageCount) const;
     std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> getSplitAssembledPagesAtPagePositions(const QModelIndexList& list, const std::vector<int>& pagePositions) const;
     std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> getSplitAssembledPagesAtDocumentPages(const QModelIndexList& list, const std::vector<pdf::PDFInteger>& pageIndices) const;

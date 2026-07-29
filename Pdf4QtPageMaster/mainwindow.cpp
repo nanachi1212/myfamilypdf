@@ -3666,7 +3666,11 @@ void MainWindow::performOperation(Operation operation)
                     break;
             }
 
-            std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> assembledDocuments = m_model->getAssembledPages(assembleMode);
+            const QModelIndexList selectedRows = getSelectedRows();
+            std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> assembledDocuments =
+                (assembleMode == PageItemModel::AssembleMode::Unite && !selectedRows.isEmpty())
+                    ? m_model->getAssembledPages(assembleMode, selectedRows)
+                    : m_model->getAssembledPages(assembleMode);
 
             // Check we have something to process
             if (assembledDocuments.empty())

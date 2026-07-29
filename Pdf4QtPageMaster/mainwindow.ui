@@ -500,6 +500,9 @@
    <property name="text">
     <string>&amp;United Document...</string>
    </property>
+   <property name="statusTip">
+    <string>Merge all pages, or only the currently selected pages (use Select Even, Select Odd, or Select Page Range first).</string>
+   </property>
    <property name="shortcut">
     <string>F5</string>
    </property>

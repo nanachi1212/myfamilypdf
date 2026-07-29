@@ -2614,6 +2614,27 @@ std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> PageItemMod
     return result;
 }
 
+std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> PageItemModel::getAssembledPages(AssembleMode mode, const QModelIndexList& list) const
+{
+    if (mode != AssembleMode::Unite || list.isEmpty())
+    {
+        return getAssembledPages(mode);
+    }
+
+    std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> result(1);
+    const std::vector<PageGroupItem::GroupItem> selectedItems = getSelectedGroupItems(list);
+    for (const PageGroupItem::GroupItem& item : selectedItems)
+    {
+        result.front().emplace_back(createAssembledPage(item));
+    }
+
+    if (result.front().empty())
+    {
+        result.clear();
+    }
+    return result;
+}
+
 void PageItemModel::clear()
 {
     beginResetModel();
