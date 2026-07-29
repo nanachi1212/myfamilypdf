@@ -18,6 +18,11 @@
 - `info merged.pdf`：exit code `0`，合併檔為 58 頁。
 - `separate merged.pdf split-%.pdf`：exit code `0`，成功產生 58 個分頁 PDF。
 
+大型檔案基準：
+
+- 以 5 份 58 頁 PDF 合併成 290 頁：exit code `0`，約 0.50 秒。
+- `info` 讀取 290 頁 PDF：exit code `0`，約 0.35 秒，檔案大小 867,678 bytes。
+
 驗證素材位於本機 `build/phase1-verification/`，未納入 Git；可重新產生，不影響原始 PDF。
 
 ## 尚未由自動測試證明的項目
