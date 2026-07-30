@@ -105,4 +105,4 @@
 
 - 繁體中文與簡體中文 Windows locale 的兩台實機長時間人工操作；目前已完成兩種中文安裝語系、翻譯 payload 與中文檔名自動回歸。
 - 1,160 頁 PDF 的長時間人工快速翻頁體感；目前已完成 15 秒 Viewer／Editor Responding smoke test。
-- 直排繁／簡中文模型因目前 Codex 沙盒阻擋下載，尚未在本機完成實際直排頁面辨識回歸；自動下載與缺檔檢查已實作。
+- 直排繁／簡中文模型已完成官方下載、Tesseract 載入、直接辨識及 FamilyPDF 可搜尋 PDF 回歸。
