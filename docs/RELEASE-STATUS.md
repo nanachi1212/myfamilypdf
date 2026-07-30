@@ -6,8 +6,8 @@
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Setup-x64.exe` | 58,730,014 | `C5B133724D7D748BA59AA81D63C09E162F73C164F219EEE54638E07534A67D69` |
-| `dist\FamilyPDF-windows-x64.zip` | 85,967,817 | `2C97B89190DC1B962B5C2D0117423BA4EDA0A990EE26A693F418AF6703E4794A` |
+| `dist\FamilyPDF-Setup-x64.exe` | 58,726,909 | `D5D4A6CC2B73E760D203EE3F35E1B4B511640218164356C89F573787B784D9B3` |
+| `dist\FamilyPDF-windows-x64.zip` | 85,969,484 | `CDBD7A6CAFCDCBA6F43EC5504C05C25A91B4423FA8AD26D549B613C0A96BD1E1` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,048,057 | `C7092441CDB7992B12A339D17047B0BF27B056CA0B7503FCEF531F2C4B2321A3` |
 | `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,657,824 | `57A33A39EFC7B1B946C49FDFAD8892E3311D0CBA3ED8EEF4A681B9284B4D4162` |
 
@@ -29,6 +29,7 @@
 - `EditorPlugin.dll`、`RedactPlugin.dll`、`SignaturePlugin.dll` 已進入 release 可攜包及正式安裝程式；專用 verification installer 安裝 exit code `0`，安裝後三個 DLL 的大小檢查通過。
 - `FormPlugin.dll`、`DocumentEditPlugin.dll`、`OfficeExportPlugin.dll` 與 Office helper 已進入可攜包及正式安裝程式；Office helper 在清除 Python PATH 後完成 DOCX／XLSX 轉換與重讀。
 - 最新主安裝程式隔離靜默安裝 exit code `0`；安裝後 Office helper 在無 Python PATH 下完成兩頁 DOCX 匯出。
+- Office Export 新增繁體與簡體中文選單、頁碼、進度、錯誤及 OCR 提示；封裝後 `.qm` 已反向轉回 TS 驗證譯文存在。
 
 ## Git
 

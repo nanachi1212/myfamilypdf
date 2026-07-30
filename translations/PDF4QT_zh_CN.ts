@@ -15280,4 +15280,28 @@ Opening the recovery copy never overwrites the original PDF. Use Save As after c
     <message><source>Keep for later</source><translation>保留稍后处理</translation></message>
     <message><source>Discard recovery</source><translation>丢弃恢复文件</translation></message>
 </context>
+<context>
+    <name>pdfplugin::OfficeExportPlugin</name>
+    <message><source>Export to &amp;Word...</source><translation>导出到 Word(&amp;W)...</translation></message>
+    <message><source>Export to &amp;Excel...</source><translation>导出到 Excel(&amp;E)...</translation></message>
+    <message><source>&amp;Office Export</source><translation>Office 导出(&amp;O)</translation></message>
+    <message><source>Office Export</source><translation>Office 导出</translation></message>
+    <message><source>Save the PDF before exporting it.</source><translation>请先保存 PDF，再进行导出。</translation></message>
+    <message><source>The optional Office export component is missing. Reinstall FamilyPDF with Office Export enabled.</source><translation>缺少 Office 导出组件。请重新安装包含 Office 导出的 FamilyPDF。</translation></message>
+    <message><source>Select Pages</source><translation>选择页面</translation></message>
+    <message><source>Uses the last saved PDF.
+Pages (leave blank for all; example: 1-3,5):</source><translation>将使用最后保存的 PDF。
+页码（全部页面请留空，例如：1-3,5）：</translation></message>
+    <message><source>Word document (*.docx)</source><translation>Word 文档 (*.docx)</translation></message>
+    <message><source>Excel workbook (*.xlsx)</source><translation>Excel 工作簿 (*.xlsx)</translation></message>
+    <message><source>Export PDF</source><translation>导出 PDF</translation></message>
+    <message><source>Converting searchable PDF content...</source><translation>正在转换可搜索的 PDF 内容...</translation></message>
+    <message><source>Cancel</source><translation>取消</translation></message>
+    <message><source>Could not start the Office export component.</source><translation>无法启动 Office 导出组件。</translation></message>
+    <message><source>Export completed:
+%1</source><translation>导出完成：
+%1</translation></message>
+    <message><source>The selected pages have no searchable text layer. Run FamilyPDF OCR, then export again.</source><translation>所选页面没有可搜索文字层。请先运行 FamilyPDF OCR，再重新导出。</translation></message>
+    <message><source>Office export failed with exit code %1.</source><translation>Office 导出失败，退出代码为 %1。</translation></message>
+</context>
 </TS>

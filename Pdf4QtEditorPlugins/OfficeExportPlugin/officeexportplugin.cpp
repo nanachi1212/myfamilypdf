@@ -213,6 +213,16 @@ void OfficeExportPlugin::exportDocument(const QString& format)
         return;
     }
 
+    if (status == QStringLiteral("needs_ocr"))
+    {
+        QMessageBox::warning(
+            parent,
+            tr("Office Export"),
+            tr("The selected pages have no searchable text layer. "
+               "Run FamilyPDF OCR, then export again."));
+        return;
+    }
+
     QString message = report.value(
         QStringLiteral("message")).toString();
     if (message.isEmpty())
