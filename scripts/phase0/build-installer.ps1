@@ -2,7 +2,8 @@
 param(
     [switch]$SkipPackage,
     [switch]$SkipOcr,
-    [switch]$VerificationBuild
+    [switch]$VerificationBuild,
+    [switch]$ShellVerificationBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +16,10 @@ $innoRoot = Join-Path $toolsRoot "inno-$innoVersion"
 $iscc = Join-Path $innoRoot 'ISCC.exe'
 $innoInstaller = Join-Path $toolsRoot "innosetup-$innoVersion-x64.exe"
 $innoUrl = "https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-$innoVersion-x64.exe"
+
+if ($VerificationBuild -and $ShellVerificationBuild) {
+    throw 'VerificationBuild and ShellVerificationBuild are mutually exclusive.'
+}
 
 New-Item -ItemType Directory -Path $toolsRoot -Force | Out-Null
 
@@ -61,6 +66,9 @@ $compilerArguments = @()
 if ($VerificationBuild) {
     $compilerArguments += '/DVerificationBuild'
 }
+if ($ShellVerificationBuild) {
+    $compilerArguments += '/DShellVerificationBuild'
+}
 $compilerArguments += (Join-Path $repositoryRoot 'installer\FamilyPDF.iss')
 
 & $iscc $compilerArguments
@@ -68,7 +76,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compiler failed with exit code $LASTEXITCODE."
 }
 
-$setup = if ($VerificationBuild) {
+$setup = if ($ShellVerificationBuild) {
+    Join-Path $repositoryRoot 'build\FamilyPDF-Shell-Verification-Setup-x64.exe'
+} elseif ($VerificationBuild) {
     Join-Path $repositoryRoot 'build\FamilyPDF-Verification-Setup-x64.exe'
 } else {
     Join-Path $repositoryRoot 'dist\FamilyPDF-Setup-x64.exe'

@@ -42,6 +42,9 @@
 - 兩種語系均預設勾選 Windows 整合；桌面捷徑仍預設不勾選。
 - 驗證安裝器不含正式 Registry 寫入段落，因此 GUI 檢查不會修改目前電腦
   的檔案關聯。
+- 另以具獨立 AppId 的 Shell 驗證安裝器完成正式 Registry 寫入 round-trip：
+  四條開啟命令均完整引用執行檔與 `%1`，Viewer／Editor 可開啟含中文及空格
+  的 PDF 路徑，解除安裝後 Registry 與安裝檔案均已清除。
 
 ## 其他自動證據
 

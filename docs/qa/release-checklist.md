@@ -19,6 +19,7 @@
 - [x] 一鍵完整安裝程式的完整／精簡元件選擇均隔離安裝成功；完整模式通過繁簡中 OCR，精簡模式不含 OCR。
 - [x] 一鍵完整安裝程式的繁中／簡中 GUI 均正確顯示三種安裝類型；完整與精簡模式切換會同步勾選／取消 OCR。
 - [x] 繁中／簡中 GUI 正確顯示 Windows PDF 整合且預設勾選；Registry 僅使用 HKCU、受單一安裝 task 控制、命令完整引用路徑及 `%1`，並具解除安裝清理旗標。
+- [x] Windows PDF 整合實際安裝與解除安裝 exit code 均為 `0`；Viewer／Editor 可透過完整引用命令開啟含中文與空格的 PDF，解除安裝後 Registry 與安裝檔案均已移除。
 
 執行：
 
@@ -51,6 +52,14 @@
 ```
 
 結果會寫入 `build\full-installer-smoke\summary.json`。
+
+Windows PDF 整合安裝／解除安裝：
+
+```powershell
+.\scripts\qa\smoke-shell-installation.ps1
+```
+
+結果會寫入 `build\shell-installer-smoke-summary.json`。
 
 ## 發佈產物
 

@@ -36,7 +36,9 @@ FamilyPDF 提供三個免管理員權限、支援繁體中文／簡體中文／�
 
 基礎程式建立 Reader、Editor、Page Master 捷徑並提供正常解除安裝。OCR 外掛使用獨立 AppId 與解除安裝資料，不會覆蓋基礎程式的解除安裝項目。
 
-Codex 沙盒無權建立使用者開始功能表與登錄；因此另有只供自動測試的 `-VerificationBuild`，停用這兩項後驗證完全相同的 payload。正式安裝器不會停用它們。
+自動 payload 測試使用 `-VerificationBuild`，停用開始功能表、登錄與解除安裝
+項目；Shell round-trip 則使用獨立 AppId 的 `-ShellVerificationBuild`。兩者都
+使用與正式版相同的程式 payload，且不會覆蓋既有 FamilyPDF 安裝。
 
 ## Windows PDF 整合
 
@@ -53,6 +55,17 @@ Codex 沙盒無權建立使用者開始功能表與登錄；因此另有只供�
 ```powershell
 .\scripts\qa\verify-installer-shell-integration.ps1
 ```
+
+實際安裝、啟動與解除安裝 round-trip 可用下列命令重跑：
+
+```powershell
+.\scripts\qa\smoke-shell-installation.ps1
+```
+
+此測試使用獨立 AppId 與 `build\shell-installer-smoke` 隔離目錄，不會覆蓋既有
+FamilyPDF 安裝。測試會確認四條 Registry 命令完整引用執行檔與 `%1`、Viewer
+與 Editor 能開啟含中文及空格的 PDF 路徑，並在解除安裝後確認 Registry 與
+安裝檔案均已移除。結果寫入 `build\shell-installer-smoke-summary.json`。
 
 ## 完整安裝程式驗證
 

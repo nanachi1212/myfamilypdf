@@ -4,7 +4,11 @@
 #define MyAppExeName "Pdf4QtViewer.exe"
 
 [Setup]
+#ifdef ShellVerificationBuild
+AppId={{D8942855-6D26-4801-908C-B8CD588A19C5}
+#else
 AppId={{3EE743F2-F10D-4D69-A4C3-01834462FBA6}
+#endif
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -14,6 +18,10 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+#ifdef ShellVerificationBuild
+OutputDir=..\build
+OutputBaseFilename=FamilyPDF-Shell-Verification-Setup-x64
+#else
 #ifdef VerificationBuild
 OutputDir=..\build
 OutputBaseFilename=FamilyPDF-Verification-Setup-x64
@@ -22,6 +30,7 @@ CreateUninstallRegKey=no
 #else
 OutputDir=..\dist
 OutputBaseFilename=FamilyPDF-Setup-x64
+#endif
 #endif
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -71,7 +80,10 @@ Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPD
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit"; ValueType: string; ValueName: ""; ValueData: "{cm:EditWithFamilyPDF}"; Flags: uninsdeletekey; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\Pdf4QtEditor.exe"; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""; Tasks: pdfshell
+#endif
 
+#ifndef VerificationBuild
+#ifndef ShellVerificationBuild
 [Icons]
 Name: "{group}\FamilyPDF 閱讀器"; Filename: "{app}\Pdf4QtViewer.exe"; WorkingDir: "{app}"
 Name: "{group}\FamilyPDF 編輯器"; Filename: "{app}\Pdf4QtEditor.exe"; WorkingDir: "{app}"
@@ -80,4 +92,5 @@ Name: "{autodesktop}\FamilyPDF"; Filename: "{app}\Pdf4QtViewer.exe"; WorkingDir:
 
 [Run]
 Filename: "{app}\Pdf4QtViewer.exe"; Description: "{cm:LaunchProgram,FamilyPDF}"; Flags: nowait postinstall skipifsilent
+#endif
 #endif
