@@ -15,7 +15,7 @@
 | 放大縮小、縮圖、跳頁 | 已完成 | Viewer／Editor 有百分比縮放、放大／縮小、符合頁面／寬／高；側欄縮圖可同步目前頁；頁碼欄可直接跳頁。 |
 | 同時開啟多份 PDF | 已完成 | Viewer／Editor 可由命令列一次載入三份 PDF；每份文件使用獨立視窗並具同步文件分頁與工作階段還原。含 1,160 頁 PDF 的三文件回歸皆為 Responding。 |
 | 缺少套件自動處理 | 已完成建置與 OCR 模型路徑 | 建置腳本會安裝／檢查工具鏈；可攜版內含 Qt、VC runtime 及必要 DLL；OCR 語言缺檔由外掛下載腳本補齊並驗證後原子替換；一鍵完整安裝程式可直接包含主程式與 OCR。 |
-| PDF 轉 Word／Excel | 已完成第一版 | `Office Export` 外掛支援全部或指定頁碼；DOCX 基本文字樣式與分頁、XLSX 表格與逐行 fallback 均有重讀測試，使用端不需 Python。 |
+| PDF 轉 Word／Excel | 已完成第一版 | `Office Export` 外掛支援全部或指定頁碼；DOCX 基本文字樣式與分頁、XLSX 表格與逐行 fallback 均有重讀測試，使用端不需 Python；Microsoft Word／Excel 本體另驗證分頁、粗斜體、UsedRange、合併儲存格、表頭樣式與欄寬。 |
 | 表單填寫與建立 | 已完成第一版 | 支援既有 AcroForm 填寫，以及文字框、核取方塊、單選群組、下拉與清單建立；Adobe Acrobat DC 實際修改另存後，由 `pypdf` 確認中文欄位名稱、值與預設值保留。 |
 | 進階編輯 | 已完成家庭常用範圍 | 包含直接頁面內容編輯、遮蔽、簽章、浮水印、背景、頁面尺寸／裁切及旋轉；固定 fixture 經 Adobe Acrobat DC 逐頁解析、另存後，獨立 parser 結構與逐頁 RGB 渲染雜湊均保留。 |
 

@@ -110,8 +110,8 @@
 ## Microsoft Office 本體互通（2026-07-30）
 
 - `scripts\qa\smoke-microsoft-office.ps1` 先以 FamilyPDF writer 產生確定性的 DOCX／XLSX 互通 fixture，再使用本機 Microsoft Office COM 引擎唯讀開啟。
-- Microsoft Word 16.0 讀得兩頁，內容包含繁體中文、簡體中文、英文及明確分頁。
-- Microsoft Excel 16.0 讀得 `Page 1`、`Page 2` 兩個工作表；表頭、數值、繁簡中文字、逐行 fallback 與 `A1:B1` 合併儲存格均保留。
+- Microsoft Word 16.0 讀得兩頁，內容包含繁體中文、簡體中文、英文及明確分頁；繁中 run 的粗體與簡中 run 的斜體亦由 Word 本體確認。
+- Microsoft Excel 16.0 讀得 `Page 1`、`Page 2` 兩個工作表；UsedRange、表頭粗體、自動欄寬、數值、繁簡中文字、逐行 fallback 與 `A1:B1` 合併儲存格均保留。
 - Word／Excel 關閉時不儲存，COM 物件釋放後沒有殘留 Office 行程。
 - 這項驗證證明 Microsoft Office 本體可以解析 FamilyPDF 產物；複雜 PDF 轉換後的視覺排版品質仍需要人工巡覽。
 

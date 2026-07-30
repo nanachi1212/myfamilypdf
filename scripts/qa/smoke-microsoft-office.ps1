@@ -58,7 +58,30 @@ $excel = $null
 $workbook = $null
 $firstSheet = $null
 $secondSheet = $null
+$traditionalRange = $null
+$simplifiedRange = $null
+$secondPageRange = $null
 $summaryPath = Join-Path $OutputDirectory 'summary.json'
+
+function ConvertFrom-CodePoints {
+    param([Parameter(Mandatory)][int[]]$Value)
+    return -join @($Value | ForEach-Object { [char]$_ })
+}
+
+$traditionalChinese = ConvertFrom-CodePoints @(0x7E41, 0x9AD4, 0x4E2D, 0x6587)
+$simplifiedChinese = ConvertFrom-CodePoints @(0x7B80, 0x4F53, 0x4E2D, 0x6587)
+$secondPageTraditional = ConvertFrom-CodePoints @(0x7B2C, 0x4E8C, 0x9801)
+$secondPageSimplified = ConvertFrom-CodePoints @(0x7B2C, 0x4E8C, 0x9875)
+$itemHeader = ConvertFrom-CodePoints @(0x9805, 0x76EE)
+$amountHeader = ConvertFrom-CodePoints @(0x91D1, 0x984D)
+$familyTest = ConvertFrom-CodePoints @(0x5BB6, 0x5EAD, 0x6E2C, 0x8A66)
+$fallbackTraditional = ConvertFrom-CodePoints @(
+    0x7121, 0x8868, 0x683C, 0x7B2C, 0x4E00, 0x884C
+)
+$fallbackSimplified = ConvertFrom-CodePoints @(
+    0x65E0, 0x8868, 0x683C, 0x7B2C, 0x4E8C, 0x884C
+)
+
 try {
     $word = New-Object -ComObject Word.Application
     $word.Visible = $false
@@ -66,11 +89,11 @@ try {
     $document = $word.Documents.Open($docxPath, $false, $true, $false)
     $wordText = [string]$document.Content.Text
     foreach ($expected in @(
-        '繁體中文',
-        '简体中文',
+        $traditionalChinese,
+        $simplifiedChinese,
         'FamilyPDF Office interoperability',
-        '第二頁',
-        '第二页'
+        $secondPageTraditional,
+        $secondPageSimplified
     )) {
         if (-not $wordText.Contains($expected)) {
             throw "Microsoft Word did not read expected text: $expected"
@@ -79,6 +102,22 @@ try {
     $wordPageCount = [int]$document.ComputeStatistics(2)
     if ($wordPageCount -lt 2) {
         throw "Microsoft Word reported $wordPageCount page instead of at least 2."
+    }
+
+    $traditionalRange = $document.Content.Duplicate
+    if (-not $traditionalRange.Find.Execute($traditionalChinese) -or
+        [int]$traditionalRange.Bold -ne -1) {
+        throw 'Microsoft Word did not preserve the expected bold run.'
+    }
+    $simplifiedRange = $document.Content.Duplicate
+    if (-not $simplifiedRange.Find.Execute($simplifiedChinese) -or
+        [int]$simplifiedRange.Italic -ne -1) {
+        throw 'Microsoft Word did not preserve the expected italic run.'
+    }
+    $secondPageRange = $document.Content.Duplicate
+    if (-not $secondPageRange.Find.Execute($secondPageTraditional) -or
+        [int]$secondPageRange.Information(3) -ne 2) {
+        throw 'Microsoft Word did not lay out the second-page text on page 2.'
     }
 
     $excel = New-Object -ComObject Excel.Application
@@ -90,9 +129,9 @@ try {
     }
     $firstSheet = $workbook.Worksheets.Item('Page 1')
     $secondSheet = $workbook.Worksheets.Item('Page 2')
-    if ($firstSheet.Range('A1').Text -ne '項目' -or
-        $firstSheet.Range('C1').Text -ne '金額' -or
-        $firstSheet.Range('A2').Text -ne '家庭測試' -or
+    if ($firstSheet.Range('A1').Text -ne $itemHeader -or
+        $firstSheet.Range('C1').Text -ne $amountHeader -or
+        $firstSheet.Range('A2').Text -ne $familyTest -or
         [int]$firstSheet.Range('B2').Value2 -ne 2 -or
         [int]$firstSheet.Range('C2').Value2 -ne 120) {
         throw 'Microsoft Excel did not read the expected table values.'
@@ -100,31 +139,31 @@ try {
     if (-not [bool]$firstSheet.Range('A1:B1').MergeCells) {
         throw 'Microsoft Excel did not preserve the expected merged cell range.'
     }
-    if ($secondSheet.Range('A1').Text -ne '無表格第一行' -or
-        $secondSheet.Range('A2').Text -ne '无表格第二行') {
+    if ($secondSheet.Range('A1').Text -ne $fallbackTraditional -or
+        $secondSheet.Range('A2').Text -ne $fallbackSimplified) {
         throw 'Microsoft Excel did not read the expected fallback text.'
     }
-
-    $summary = [ordered]@{
-        recorded_at = [DateTimeOffset]::Now.ToString('o')
-        word = [ordered]@{
-            application = [string]$word.Name
-            version = [string]$word.Version
-            pages = $wordPageCount
-            file = $docxPath
-            multilingual_text = $true
-        }
-        excel = [ordered]@{
-            application = [string]$excel.Name
-            version = [string]$excel.Version
-            worksheets = [int]$workbook.Worksheets.Count
-            file = $xlsxPath
-            table_values = $true
-            merged_cells = $true
-        }
+    if ([int]$firstSheet.UsedRange.Rows.Count -ne 2 -or
+        [int]$firstSheet.UsedRange.Columns.Count -ne 3 -or
+        [int]$secondSheet.UsedRange.Rows.Count -ne 2 -or
+        [int]$secondSheet.UsedRange.Columns.Count -ne 1) {
+        throw 'Microsoft Excel reported an unexpected used layout range.'
     }
-    $summary | ConvertTo-Json -Depth 5 |
-        Set-Content -LiteralPath $summaryPath -Encoding UTF8
+    $firstColumnWidth = [double]$firstSheet.Columns.Item(1).ColumnWidth
+    $thirdColumnWidth = [double]$firstSheet.Columns.Item(3).ColumnWidth
+    # Excel reports the openpyxl width of 8 as about 7.38 because its
+    # displayed ColumnWidth unit depends on the Normal style font metrics.
+    if (-not [bool]$firstSheet.Range('A1').Font.Bold -or
+        $firstColumnWidth -lt 7 -or
+        $thirdColumnWidth -lt 7) {
+        throw 'Microsoft Excel did not preserve header style or fitted columns.'
+    }
+
+    $wordApplicationName = [string]$word.Name
+    $wordVersion = [string]$word.Version
+    $excelApplicationName = [string]$excel.Name
+    $excelVersion = [string]$excel.Version
+    $excelWorksheetCount = [int]$workbook.Worksheets.Count
 }
 finally {
     if ($null -ne $workbook) {
@@ -140,6 +179,9 @@ finally {
         $word.Quit()
     }
     foreach ($comObject in @(
+        $secondPageRange,
+        $simplifiedRange,
+        $traditionalRange,
         $secondSheet,
         $firstSheet,
         $workbook,
@@ -154,5 +196,32 @@ finally {
     [GC]::Collect()
     [GC]::WaitForPendingFinalizers()
 }
+
+$summary = [ordered]@{
+    recorded_at = [DateTimeOffset]::Now.ToString('o')
+    word = [ordered]@{
+        application = $wordApplicationName
+        version = $wordVersion
+        pages = $wordPageCount
+        file = $docxPath
+        multilingual_text = $true
+        bold_style = $true
+        italic_style = $true
+        page_break_layout = $true
+    }
+    excel = [ordered]@{
+        application = $excelApplicationName
+        version = $excelVersion
+        worksheets = $excelWorksheetCount
+        file = $xlsxPath
+        table_values = $true
+        merged_cells = $true
+        used_ranges = $true
+        header_style = $true
+        fitted_columns = $true
+    }
+}
+$summary | ConvertTo-Json -Depth 5 |
+    Set-Content -LiteralPath $summaryPath -Encoding UTF8
 
 Write-Host "Microsoft Office smoke passed: $summaryPath"
