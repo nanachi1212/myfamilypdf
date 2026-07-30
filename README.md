@@ -14,14 +14,15 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - 文件級進階編輯：在 `Document Edit` 選單可依全部／單數／雙數／指定頁碼加入文字浮水印、純色或圖片背景、調整頁面尺寸與裁切框、縮放內容及向左／向右旋轉。
 - 標準 AcroForm 表單：可填寫既有表單，也可在 `Pdf4QtEditor.exe` 的 `Forms` 選單拖曳建立文字框、核取方塊、單選按鈕群組、下拉選單與清單；支援名稱／提示／預設值／必填／唯讀／多行／最大字數／清單多選、反白欄位及重設表單。
 - Office 匯出：在 `Pdf4QtEditor.exe` 的 `Office Export` 選單將全部或指定頁碼的可搜尋文字匯出成可編輯 DOCX／XLSX；掃描檔會提示先執行 OCR。
-- OCR 採獨立外掛封裝；基礎安裝程式不夾帶 OCR 執行環境。
+- OCR 可由完整安裝程式一次安裝，也保留獨立外掛封裝；基礎安裝程式不夾帶 OCR 執行環境。
 - 免管理員權限的 Windows 安裝程式，以及免安裝可攜式 ZIP。
 
 ## 直接使用
 
 本機建置產物：
 
-- `dist\FamilyPDF-Setup-x64.exe`：一般使用者建議使用。
+- `dist\FamilyPDF-Full-Setup-x64.exe`：自己與家人建議使用；預設一次安裝主程式與 OCR，也可取消 OCR。
+- `dist\FamilyPDF-Setup-x64.exe`：不需要 OCR 時使用的較小基礎安裝程式。
 - `dist\FamilyPDF-windows-x64.zip`：解壓縮整個資料夾後使用。
 
 主要程式：
@@ -54,8 +55,10 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\phase0\build-installer.ps1 -SkipPackage -SkipOcr
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\ocr\build-ocr-plugin.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\ocr\build-ocr-installer.ps1 -SkipPackage
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\phase0\build-full-installer.ps1 -SkipBasePackage -SkipOcrPackage
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\office\build-office-export-helper.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\run-final-regression.ps1
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\smoke-full-installer.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\smoke-large-pdf-locales.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\smoke-microsoft-office.ps1
 ```

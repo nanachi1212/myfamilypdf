@@ -6,6 +6,7 @@
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
+| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,615,169 | `D3C2D1766A6BAF2A9572598B8F4B98A6E676680DE918874B9808E8889ADA452A` |
 | `dist\FamilyPDF-Setup-x64.exe` | 58,726,062 | `62FAC4F278420C4132224A983F2B60B35F9F3AD3634C5805247ECDB24C55E504` |
 | `dist\FamilyPDF-windows-x64.zip` | 85,970,935 | `E3436FEF229D1A8F5E3B869D7EB3AFB827378C39FD7DAB7812F36003643AC5D2` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
@@ -22,6 +23,7 @@
 - 單數頁、雙數頁及 `10-20` 範圍輸出經獨立引擎驗證為 29、29、11 頁；合併 58 頁及大型 1,160 頁檔案頁數亦正確。
 - 基礎封裝不含 Tesseract、語言模型、測試 EXE 或 Qt 除錯 DLL。
 - OCR 外掛 0.3.0 最新隔離安裝 exit code `0`；安裝後 manifest、五個語言模型及橫排／直排 OCR 回歸均通過。
+- 一鍵完整安裝程式已分別以 `core,ocr` 與 `core` 元件隔離安裝：完整模式含五個模型並通過繁簡中可搜尋 PDF 回歸，精簡模式不含 OCR，兩者安裝 exit code 均為 `0`。
 - 安裝後 OCR 單頁、雙頁流程通過：頁數不變、原檔 SHA-256 不變、輸出為 PDF、`fetch-text` 可取得文字。
 - 橫排繁體中文、簡體中文及英文模型已內建；直接辨識分別取得「傳統中文測試」、「简体中文测试」與 `FamilyPDF OCR 2026`。封裝後端對端流程亦確認原檔雜湊不變、頁數不變、PDF 文字層含繁簡中文字元，且 UTF-8 文字檔保留完整字序。
 - 缺少所選語言時，OCR 主流程會自動啟動官方下載、最多三次重試、大小檢查、Tesseract 載入驗證及原子替換；斷線測試確認不產生輸出 PDF 或殘留半檔。

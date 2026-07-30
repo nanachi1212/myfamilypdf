@@ -16,6 +16,7 @@
 - [x] 主安裝程式隔離靜默安裝 exit code `0`；安裝後插件與 Office helper 回歸通過。
 - [x] Microsoft Word 16.0／Excel 16.0 實際唯讀開啟匯出產物；兩頁、多語文字、兩工作表、表格值與合併儲存格驗證通過。
 - [x] 1,160 頁 PDF 在繁中／簡中 GUI 完成頁碼欄、文件結尾及縮略圖跳轉，主畫面與縮圖同步且維持 Responding。
+- [x] 一鍵完整安裝程式的完整／精簡元件選擇均隔離安裝成功；完整模式通過繁簡中 OCR，精簡模式不含 OCR。
 
 執行：
 
@@ -41,13 +42,23 @@
 
 結果會寫入 `build\large-pdf-locale-smoke\summary.json`。
 
+完整安裝程式：
+
+```powershell
+.\scripts\qa\smoke-full-installer.ps1
+```
+
+結果會寫入 `build\full-installer-smoke\summary.json`。
+
 ## 發佈產物
 
+- [x] `dist\FamilyPDF-Full-Setup-x64.exe`
 - [x] `dist\FamilyPDF-Setup-x64.exe`
 - [x] `dist\FamilyPDF-windows-x64.zip`
 - [x] `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe`
 - [x] `dist\FamilyPDF-OCR-Plugin-windows-x64.zip`
 - [x] 主程式與 OCR 外掛分開封裝。
+- [x] 同時提供預設含 OCR、可取消 OCR 的一鍵完整安裝程式。
 - [x] SHA-256 與檔案大小更新至 `docs\RELEASE-STATUS.md`。
 
 ## 仍需人工執行的跨產品／實機驗收

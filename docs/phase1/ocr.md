@@ -16,7 +16,8 @@ OCR 已與 FamilyPDF 基礎程式分開封裝。未使用 OCR 的家人只需安
 
 ## 安裝
 
-一般使用者先安裝 `FamilyPDF-Setup-x64.exe`，再安裝：
+最省步驟的方式是直接執行 `FamilyPDF-Full-Setup-x64.exe`，預設會一次安裝
+主程式與 OCR。若已使用基礎版，則再安裝：
 
 ```text
 FamilyPDF-OCR-Plugin-Setup-x64.exe
