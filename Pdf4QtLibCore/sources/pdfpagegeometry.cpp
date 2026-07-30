@@ -496,9 +496,9 @@ PDFOperationResult PDFPageGeometry::apply(PDFDocument* document,
         return PDFTranslationContext::tr("Invalid document.");
     }
 
-    if (!settings.hasAnyTargetBoxSelected())
+    if (!settings.hasAnyOperationSelected())
     {
-        return PDFTranslationContext::tr("No target page box selected.");
+        return PDFTranslationContext::tr("No page geometry operation selected.");
     }
 
     QString pageSelectionError;
@@ -530,6 +530,27 @@ PDFOperationResult PDFPageGeometry::apply(PDFDocument* document,
         }
 
         const PDFObjectReference pageReference = page->getPageReference();
+
+        int normalizedQuarterTurns = settings.rotationQuarterTurns % 4;
+        if (normalizedQuarterTurns < 0)
+        {
+            normalizedQuarterTurns += 4;
+        }
+        PageRotation rotation = page->getPageRotation();
+        for (int turn = 0; turn < normalizedQuarterTurns; ++turn)
+        {
+            rotation = getPageRotationRotatedRight(rotation);
+        }
+        if (normalizedQuarterTurns != 0)
+        {
+            builder->setPageRotation(pageReference, rotation);
+        }
+
+        if (!settings.hasAnyTargetBoxSelected())
+        {
+            continue;
+        }
+
         const QRectF sourceRect = PDFPageGeometryHelper::getReferenceRect(page, settings.referenceBox);
         if (!sourceRect.isValid())
         {

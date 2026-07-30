@@ -113,6 +113,7 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFPageGeometrySettings
     bool scaleContent = false;                        ///< Scale page content to fit the target inner rectangle.
     bool preserveAspectRatio = true;                  ///< Preserve the original aspect ratio when scaleContent is enabled.
     bool scaleAnnotationsAndFormFields = true;        ///< Transform annotation and widget geometry together with scaled page content.
+    int rotationQuarterTurns = 0;                     ///< Relative clockwise rotation in 90-degree steps; negative values rotate left.
 
     /**
      * \brief Returns true if at least one output page box is selected.
@@ -120,6 +121,11 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFPageGeometrySettings
     bool hasAnyTargetBoxSelected() const
     {
         return applyMediaBox || applyCropBox || applyBleedBox || applyTrimBox || applyArtBox;
+    }
+
+    bool hasAnyOperationSelected() const
+    {
+        return hasAnyTargetBoxSelected() || (rotationQuarterTurns % 4) != 0;
     }
 };
 

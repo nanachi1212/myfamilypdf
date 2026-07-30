@@ -174,19 +174,40 @@ Expected: 所有既有測試與 `UnitTestsForms` 通過。
 ## Task 5：完成進階編輯常用項目
 
 **Files:**
+- Create: `Pdf4QtLibCore/sources/pdfdocumentdecoration.h`
+- Create: `Pdf4QtLibCore/sources/pdfdocumentdecoration.cpp`
 - Create: `Pdf4QtEditorPlugins/DocumentEditPlugin/CMakeLists.txt`
 - Create: `Pdf4QtEditorPlugins/DocumentEditPlugin/DocumentEditPlugin.json`
 - Create: `Pdf4QtEditorPlugins/DocumentEditPlugin/documenteditplugin.h`
 - Create: `Pdf4QtEditorPlugins/DocumentEditPlugin/documenteditplugin.cpp`
+- Create: `Pdf4QtEditorPlugins/DocumentEditPlugin/documenteditdialog.h`
+- Create: `Pdf4QtEditorPlugins/DocumentEditPlugin/documenteditdialog.cpp`
 - Create: `UnitTests/tst_documentedittest.cpp`
+- Modify: `Pdf4QtLibCore/CMakeLists.txt`
 - Modify: `Pdf4QtEditorPlugins/CMakeLists.txt`
 - Modify: `UnitTests/CMakeLists.txt`
+- Modify: `scripts/phase0/build-upstream-baseline.ps1`
+- Modify: `scripts/qa/verify-editor-plugins.ps1`
 
-- [ ] Step 1: 盤點並以 UI smoke test 驗證 EditorPlugin 的文字、圖形、SVG、刪除、undo/redo
-- [ ] Step 2: 加入全文件／頁面範圍浮水印（文字、透明度、角度、前景／背景）
-- [ ] Step 3: 加入背景色或背景圖片
-- [ ] Step 4: 整合頁面裁切、尺寸、旋轉與頁面範圍選擇
-- [ ] Step 5: 驗證修改寫入 PDF 本體，重開及其他閱讀器可見
+- [x] Step 1: 盤點 EditorPlugin 與既有頁面 API
+
+確認 `EditorPlugin` 已提供文字、圖形、SVG、刪除、undo/redo；頁面幾何直接重用 `PDFPageGeometry` 的頁碼範圍、單雙數、裁切框、頁面尺寸、內容縮放與 annotation 同步，不另建重複資料模型。
+
+- [x] Step 2: 先寫文件裝飾與頁面幾何磁碟 round-trip tests
+
+建立三頁 PDF，先驗證文字浮水印／純色背景只套用指定頁碼及單雙數子集，前景使用 `PlaceAfter`、背景使用 `PlaceBefore`；另驗證裁切框、頁面尺寸與旋轉儲存重開後保留。
+
+- [x] Step 3: 實作 `PDFDocumentDecoration`
+
+支援文字、透明度、角度、字級、顏色、前景／背景、背景色與背景圖片；輸入共用 PDF4QT 頁碼範圍及單雙數子集，成功後回傳精確 modification flags。
+
+- [x] Step 4: 建立 `DocumentEditPlugin` UI
+
+提供「加入文字浮水印」「設定頁面背景」「頁面裁切與尺寸」「向左／向右旋轉」actions；對話框包含頁碼範圍、全部／單數／雙數頁、前景／背景、顏色、圖片、透明度與角度。
+
+- [x] Step 5: 建置、封裝及互通性驗證
+
+將 `DocumentEditPlugin.dll` 加入 release target 與打包檢查；以 PDF4QT parser 及外部 `pypdf` 驗證頁面內容流、頁面框與旋轉均寫入 PDF 本體，最後執行完整 CTest。
 
 ## Task 6：Office 匯出 helper 與格式測試
 

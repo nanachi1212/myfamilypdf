@@ -11,6 +11,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - 多文件分頁、工作階段還原、縮圖、頁碼跳轉與完整縮放操作。
 - 安全儲存、外部檔案變更偵測、自動復原快照與最多三份隱藏備份。
 - 進階內容編輯外掛：直接編輯頁面內容、新增文字／圖形／SVG、刪除、復原／重做、永久遮蔽及電子／數位簽章。請在 `Pdf4QtEditor.exe` 的 `Editor`、`Redact`、`Signature` 選單使用；英文 action 名稱在繁體／簡體 Windows 相同。
+- 文件級進階編輯：在 `Document Edit` 選單可依全部／單數／雙數／指定頁碼加入文字浮水印、純色或圖片背景、調整頁面尺寸與裁切框、縮放內容及向左／向右旋轉。
 - 標準 AcroForm 表單：可填寫既有表單，也可在 `Pdf4QtEditor.exe` 的 `Forms` 選單拖曳建立文字框、核取方塊、單選按鈕群組、下拉選單與清單；支援名稱／提示／預設值／必填／唯讀／多行／最大字數／清單多選、反白欄位及重設表單。
 - OCR 採獨立外掛封裝；基礎安裝程式不夾帶 OCR 執行環境。
 - 免管理員權限的 Windows 安裝程式，以及免安裝可攜式 ZIP。
@@ -30,7 +31,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe`：OCR 外掛安裝程式。
 - `dist\FamilyPDF-OCR-Plugin-windows-x64.zip`：OCR 外掛可攜式覆蓋包。
 
-正在開發：浮水印、背景與頁面幾何工具，以及可選裝的 PDF 轉 DOCX／XLSX 外掛。五種 AcroForm 欄位建立均已完成 parser round-trip 自動測試；文字框與核取方塊另通過外部解析器檢查，全部仍需發佈前人工操作巡覽。
+正在開發：可選裝的 PDF 轉 DOCX／XLSX 外掛。五種 AcroForm 欄位建立與文件級進階編輯均已完成 parser round-trip 自動測試及外部 `pypdf` 結構檢查，仍需發佈前人工操作巡覽。
 
 詳細操作與驗證：
 

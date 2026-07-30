@@ -1,0 +1,7 @@
+{
+    "Name" : "Document Edit",
+    "Author" : "FamilyPDF Contributors",
+    "Version" : "1.0.0",
+    "License" : "MIT",
+    "Description" : "Add watermarks and backgrounds, resize or crop pages, and rotate page ranges."
+}

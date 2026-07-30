@@ -18,6 +18,7 @@ $requiredPlugins = @(
     'RedactPlugin.dll',
     'SignaturePlugin.dll'
     'FormPlugin.dll'
+    'DocumentEditPlugin.dll'
 )
 
 $missingPlugins = @(

@@ -27,11 +27,13 @@ $Targets = @(
     'RedactPlugin',
     'SignaturePlugin',
     'FormPlugin',
+    'DocumentEditPlugin',
     'UnitTests',
     'UnitTestsImageOptimizer',
     'UnitTestsFontEncoding',
     'UnitTestsBookmarks',
     'UnitTestsForms',
+    'UnitTestsDocumentEdit',
     'release_translations'
 )
 
