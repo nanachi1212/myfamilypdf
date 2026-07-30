@@ -23,6 +23,9 @@ $Targets = @(
     'Pdf4QtViewer',
     'Pdf4QtEditor',
     'Pdf4QtPageMaster',
+    'EditorPlugin',
+    'RedactPlugin',
+    'SignaturePlugin',
     'UnitTests',
     'UnitTestsImageOptimizer',
     'UnitTestsFontEncoding',
@@ -231,7 +234,14 @@ if ($Stage -in @('All', 'Test')) {
 }
 
 $metrics | Add-Member -NotePropertyName build_directory -NotePropertyValue $BuildDirectory -Force
-$metrics | Add-Member -NotePropertyName build_size_bytes -NotePropertyValue (Get-DirectorySizeBytes -LiteralPath $BuildDirectory) -Force
+$runtimeOutputDirectory = Join-Path $BuildDirectory 'usr'
+$runtimeOutputSize = if (Test-Path -LiteralPath $runtimeOutputDirectory -PathType Container) {
+    Get-DirectorySizeBytes -LiteralPath $runtimeOutputDirectory
+}
+else {
+    0
+}
+$metrics | Add-Member -NotePropertyName runtime_output_size_bytes -NotePropertyValue $runtimeOutputSize -Force
 $metrics | Add-Member -NotePropertyName recorded_at -NotePropertyValue ([DateTimeOffset]::Now.ToString('o')) -Force
 $metrics | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $metricsPath -Encoding UTF8
 

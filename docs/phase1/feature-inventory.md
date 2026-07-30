@@ -10,6 +10,10 @@
 | 彩色劃線／標記 | `Pdf4QtLibCore/sources/pdfannotation.*`、`pdfdocumentbuilder.h`；GUI 有 `highlight.svg`、`underline.svg`、`strikeout.svg`、`squiggly.svg` | 已有文字標記模型與工具 |
 | 打字／文字註解 | `Pdf4QtLibWidgets/sources/pdfadvancedtools.*` 的 free text tool；`pdfdocumentbuilder.h` 的 free text annotation | 已有基本文字註解能力 |
 | 註解側欄 | `Pdf4QtLibGui/pdfsidebarwidget.*`、`resources/sidebar-annotations.svg` | 已有註解檢視入口 |
+| 填寫既有表單 | `Pdf4QtLibWidgets/sources/pdfwidgetformmanager.*`、`Pdf4QtLibCore/sources/pdfform.*` | 已有 AcroForm 文字、按鈕及選單互動；新建欄位仍在開發 |
+| 直接內容編輯 | `Pdf4QtEditorPlugins/EditorPlugin` | 已納入 release target 與可攜包，可新增文字／圖形／SVG、刪除及復原／重做 |
+| 永久遮蔽 | `Pdf4QtEditorPlugins/RedactPlugin` | 已納入 release target 與可攜包 |
+| 電子／數位簽章 | `Pdf4QtEditorPlugins/SignaturePlugin` | 已納入 release target 與可攜包 |
 | 合併 PDF | `Pdf4QtPageMaster` 的 United Document 操作 | 已有頁面組合流程 |
 | 拆分 PDF | `Pdf4QtPageMaster/mainwindow.cpp` 的 Split 操作 | 支援每頁、每 N 頁、指定頁碼、頂層書籤與近似檔案大小 |
 
@@ -18,6 +22,7 @@
 - Viewer 與 Editor 共用 `%LOCALAPPDATA%\FamilyPDF\bookmarks.json`，書籤可跨程式及重啟保存。
 - 已加入 Tesseract 5 OCR、`chi_tra`、`chi_sim`、`eng` 語言資料與自動下載／封裝流程。
 - 已建立含繁體中文、簡體中文及英文介面的 Inno Setup 安裝程式。
+- release 建置與可攜包已包含 `EditorPlugin.dll`、`RedactPlugin.dll`、`SignaturePlugin.dll`，並有自動打包檢查。
 - 已產生完整可攜式 ZIP，內含 Viewer、Editor、PageMaster、PdfTool、Qt runtime 與 OCR。
 - 已用 290 頁 PDF 驗證 Viewer 與 PageMaster 能開啟並保持回應。
 - 已以安裝後的程式驗證三組單元測試、合併、拆分、OCR 與書籤重啟保存。
@@ -34,9 +39,9 @@
 
 ## 已知限制
 
-- OCR 第一版輸出 UTF-8 文字檔，不直接在 PDF 內加入可搜尋的隱形文字層。
-- 手動書籤是平面清單，尚未提供使用者自訂文字顏色或可收合的書籤資料夾。
-- 多 PDF 以多個獨立視窗／行程開啟，尚未提供單一視窗分頁。
+- 尚未提供新建或管理 AcroForm 文字框、核取方塊、單選與下拉選單的 UI。
+- 尚未提供 PDF 轉 DOCX／XLSX；規劃為選裝 Office Export 外掛。
+- 進階內容編輯第一階段沿用 PDF4QT 外掛介面，浮水印、背景與統一頁面幾何工具仍在開發。
 - 尚未在兩台分別使用繁體中文與簡體中文 Windows 的實機上逐頁人工巡覽；目前證據是雙語 `.qm`、雙語安裝語系與本機 Windows 執行驗證。
 - 自製安裝程式尚未使用商業程式碼簽章憑證；Windows SmartScreen 可能顯示未知發行者。
 - 數百頁測試證明可開啟與保持回應，不等同長時間人工快速翻頁壓力測試。

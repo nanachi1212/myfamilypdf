@@ -1,13 +1,13 @@
 # FamilyPDF 目前交付狀態
 
-更新日期：2026-07-29
+更新日期：2026-07-30
 
 ## 可直接使用的產物
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Setup-x64.exe` | 33,726,990 | `2CE35B194F70CCC8392350DF8E8BA3EF24F942D411C7C2864C689825CDB0FEBC` |
-| `dist\FamilyPDF-windows-x64.zip` | 45,478,777 | `61EF736D362A7D24315379C40F298E12CD95458DE08963579895B9D7EAF423F2` |
+| `dist\FamilyPDF-Setup-x64.exe` | 33,793,932 | `82549EFE94032EE401C4F2A7AA603313932A9458DBD80265A05A936917201627` |
+| `dist\FamilyPDF-windows-x64.zip` | 45,631,774 | `A0CAE0D88498765434DA255FA26CB83AF1A0E4A110DA03EDEFD69B341F465C27` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,048,057 | `C7092441CDB7992B12A339D17047B0BF27B056CA0B7503FCEF531F2C4B2321A3` |
 | `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,657,824 | `57A33A39EFC7B1B946C49FDFAD8892E3311D0CBA3ED8EEF4A681B9284B4D4162` |
 
@@ -26,6 +26,7 @@
 - 橫排繁體中文、簡體中文及英文模型已內建；直接辨識分別取得「傳統中文測試」、「简体中文测试」與 `FamilyPDF OCR 2026`。封裝後端對端流程亦確認原檔雜湊不變、頁數不變、PDF 文字層含繁簡中文字元，且 UTF-8 文字檔保留完整字序。
 - 缺少所選語言時，OCR 主流程會自動啟動官方下載、最多三次重試、大小檢查、Tesseract 載入驗證及原子替換；斷線測試確認不產生輸出 PDF 或殘留半檔。
 - 直排繁／簡中文已由官方 `tessdata_fast` 成功下載、SHA-256 與 Tesseract 載入驗證通過，並已內建於目前產物。
+- `EditorPlugin.dll`、`RedactPlugin.dll`、`SignaturePlugin.dll` 已進入 release 可攜包及正式安裝程式；專用 verification installer 安裝 exit code `0`，安裝後三個 DLL 的大小檢查通過。
 
 ## Git
 
