@@ -132,25 +132,24 @@ Expected: 所有既有測試與 `UnitTestsForms` 通過。
 - Create: `Pdf4QtEditorPlugins/FormPlugin/formplugin.cpp`
 - Create: `Pdf4QtEditorPlugins/FormPlugin/formfielddialog.h`
 - Create: `Pdf4QtEditorPlugins/FormPlugin/formfielddialog.cpp`
-- Create: `Pdf4QtEditorPlugins/FormPlugin/formfielddialog.ui`
 - Modify: `Pdf4QtEditorPlugins/CMakeLists.txt`
 - Modify: `scripts/phase0/build-upstream-baseline.ps1`
 - Modify: `scripts/qa/verify-editor-plugins.ps1`
 
-- [ ] Step 1: 建立 `FormPlugin` 可載入 smoke test
+- [x] Step 1: 建立 `FormPlugin` 可載入 smoke test
 
 將 `FormPlugin` 加入 CMake，先只回傳「建立文字欄位」「建立核取方塊」「欄位內容反白」「重設表單」四個 action；打包檢查應要求 `FormPlugin.dll`。
 
-- [ ] Step 2: 實作拖曳建立欄位
+- [x] Step 2: 實作拖曳建立欄位
 
 重用 SignaturePlugin 的 page scene／rectangle selection 模式，將畫面座標轉為 PDF page rectangle；完成拖曳後開啟欄位屬性 dialog，再由 builder 寫入文件。
 
-- [ ] Step 3: 實作欄位屬性
+- [x] Step 3: 實作欄位屬性
 
-文字欄位：名稱、提示、預設值、必填、唯讀、多行、最大字數。  
+文字欄位：名稱、提示、預設值、必填、唯讀、多行、最大字數；dialog 直接使用 Qt Widgets 建立，避免多一份 `.ui` 產生檔。  
 核取方塊：名稱、提示、預設勾選、必填、唯讀。
 
-- [ ] Step 4: 實作既有表單操作
+- [x] Step 4: 實作既有表單操作
 
 加入反白切換、重設到預設值、Tab 欄位順序，並確保修改會觸發主程式 dirty state。
 

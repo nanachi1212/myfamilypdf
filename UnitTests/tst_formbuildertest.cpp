@@ -3,8 +3,13 @@
 // Copyright (c) 2018-2026 Jakub Melka and Contributors
 
 #include "pdfdocumentbuilder.h"
+#include "pdfdocumentreader.h"
+#include "pdfdocumentwriter.h"
 #include "pdfform.h"
 
+#include <QDir>
+#include <QFileInfo>
+#include <QTemporaryDir>
 #include <QtTest>
 
 class FormBuilderTest : public QObject
@@ -17,6 +22,9 @@ private slots:
 
 void FormBuilderTest::textAndCheckBoxFieldsRoundTrip()
 {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
     pdf::PDFDocumentBuilder builder;
     const pdf::PDFObjectReference page =
         builder.appendPage(QRectF(0, 0, 595, 842));
@@ -29,6 +37,9 @@ void FormBuilderTest::textAndCheckBoxFieldsRoundTrip()
     };
     const pdf::PDFObjectReference textField =
         builder.createFormFieldText(textName, textValue, textFlags, 120);
+    const QString textTooltip =
+        QString::fromUtf16(u"\u8ACB\u8F38\u5165\u59D3\u540D");
+    builder.setFormFieldTooltip(textField, textTooltip);
     builder.createFormFieldWidget(textField,
                                   page,
                                   QRectF(50, 700, 240, 60),
@@ -46,9 +57,31 @@ void FormBuilderTest::textAndCheckBoxFieldsRoundTrip()
                                   QByteArray());
     builder.appendAcroFormField(checkBox);
 
-    const pdf::PDFDocument document = builder.build();
+    pdf::PDFDocument document = builder.build();
+    QString outputPath = qEnvironmentVariable("FAMILYPDF_FORM_FIXTURE");
+    if (outputPath.isEmpty())
+    {
+        outputPath = directory.filePath(QStringLiteral("form-interop.pdf"));
+    }
+    else
+    {
+        QDir().mkpath(QFileInfo(outputPath).absolutePath());
+    }
+
+    pdf::PDFDocumentWriter writer(nullptr);
+    const pdf::PDFOperationResult writeResult =
+        writer.write(outputPath, &document, true);
+    QVERIFY2(static_cast<bool>(writeResult),
+             qPrintable(writeResult.getErrorMessage()));
+
+    pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+    pdf::PDFDocument restoredDocument = reader.readFromFile(outputPath);
+    QVERIFY2(reader.getReadingResult() == pdf::PDFDocumentReader::Result::OK,
+             qPrintable(reader.getErrorMessage()));
+
     const pdf::PDFForm form =
-        pdf::PDFForm::parse(&document, document.getCatalog()->getFormObject());
+        pdf::PDFForm::parse(&restoredDocument,
+                            restoredDocument.getCatalog()->getFormObject());
 
     QVERIFY(form.isAcroForm());
     QCOMPARE(form.getFormFields().size(), std::size_t(2));
@@ -56,6 +89,8 @@ void FormBuilderTest::textAndCheckBoxFieldsRoundTrip()
     const pdf::PDFFormField* restoredText = form.getFormFields().at(0).data();
     QCOMPARE(restoredText->getFieldType(), pdf::PDFFormField::FieldType::Text);
     QCOMPARE(restoredText->getName(pdf::PDFFormField::Partial), textName);
+    QCOMPARE(restoredText->getName(pdf::PDFFormField::UserCaption),
+             textTooltip);
     QVERIFY(restoredText->getFlags().testFlag(pdf::PDFFormField::Required));
     QVERIFY(restoredText->getFlags().testFlag(pdf::PDFFormField::Multiline));
     QCOMPARE(restoredText->getWidgets().size(), std::size_t(1));
@@ -68,7 +103,7 @@ void FormBuilderTest::textAndCheckBoxFieldsRoundTrip()
     QCOMPARE(restoredTextDetails->getDefaultAppearance(),
              QByteArrayLiteral("/Helv 12 Tf 0 g"));
 
-    const pdf::PDFDocumentDataLoaderDecorator loader(&document);
+    const pdf::PDFDocumentDataLoaderDecorator loader(&restoredDocument);
     QCOMPARE(loader.readTextString(restoredText->getValue(), QString()),
              textValue);
     QCOMPARE(loader.readTextString(restoredText->getDefaultValue(), QString()),
@@ -93,6 +128,18 @@ void FormBuilderTest::textAndCheckBoxFieldsRoundTrip()
              QByteArrayLiteral("Yes"));
     QCOMPARE(loader.readName(restoredCheckBox->getDefaultValue()),
              QByteArrayLiteral("Yes"));
+
+    pdf::PDFFormManager formManager(nullptr);
+    formManager.setDocument(pdf::PDFModifiedDocument(
+        &restoredDocument,
+        nullptr));
+    const pdf::PDFFormField* managedCheckBox =
+        formManager.getForm()->getFormFields().at(1).data();
+    QCOMPARE(
+        pdf::PDFFormFieldButton::getOnAppearanceState(
+            &formManager,
+            &managedCheckBox->getWidgets().front()),
+        QByteArrayLiteral("Yes"));
 }
 
 QTEST_MAIN(FormBuilderTest)

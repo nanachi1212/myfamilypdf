@@ -1,0 +1,7 @@
+{
+    "Name" : "Forms",
+    "Author" : "FamilyPDF Contributors",
+    "Version" : "1.0.0",
+    "License" : "MIT",
+    "Description" : "Create, highlight, fill and reset standard AcroForm fields."
+}

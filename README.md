@@ -11,6 +11,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - 多文件分頁、工作階段還原、縮圖、頁碼跳轉與完整縮放操作。
 - 安全儲存、外部檔案變更偵測、自動復原快照與最多三份隱藏備份。
 - 進階內容編輯外掛：直接編輯頁面內容、新增文字／圖形／SVG、刪除、復原／重做、永久遮蔽及電子／數位簽章。請在 `Pdf4QtEditor.exe` 的 `Editor`、`Redact`、`Signature` 選單使用；英文 action 名稱在繁體／簡體 Windows 相同。
+- 標準 AcroForm 表單：可填寫既有表單，也可在 `Pdf4QtEditor.exe` 的 `Forms` 選單拖曳建立文字框與核取方塊、設定名稱／提示／預設值／必填／唯讀／多行／最大字數、反白欄位及重設表單。
 - OCR 採獨立外掛封裝；基礎安裝程式不夾帶 OCR 執行環境。
 - 免管理員權限的 Windows 安裝程式，以及免安裝可攜式 ZIP。
 
@@ -29,7 +30,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe`：OCR 外掛安裝程式。
 - `dist\FamilyPDF-OCR-Plugin-windows-x64.zip`：OCR 外掛可攜式覆蓋包。
 
-正在開發：標準 AcroForm 欄位建立／管理、浮水印與背景，以及可選裝的 PDF 轉 DOCX／XLSX 外掛。現階段 PDF4QT 已能填寫既有 AcroForm，但 FamilyPDF 尚未把「新建文字框／核取方塊」與 Office 匯出列為完成項目。
+正在開發：AcroForm 單選按鈕／下拉選單／清單、浮水印與背景，以及可選裝的 PDF 轉 DOCX／XLSX 外掛。文字框與核取方塊建立已完成自動測試及外部解析器檢查，仍需發佈前人工操作巡覽。
 
 詳細操作與驗證：
 

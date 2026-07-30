@@ -5335,6 +5335,18 @@ PDFObjectReference PDFDocumentBuilder::createFormFieldCheckBox(
     return addObject(objectBuilder.takeObject());
 }
 
+void PDFDocumentBuilder::setFormFieldTooltip(PDFObjectReference formField,
+                                             QString tooltip)
+{
+    PDFObjectFactory objectBuilder;
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("TU");
+    objectBuilder << tooltip;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.endDictionary();
+    mergeTo(formField, objectBuilder.takeObject());
+}
+
 PDFObjectReference PDFDocumentBuilder::appendAcroFormField(
     PDFObjectReference formField)
 {
@@ -5426,6 +5438,88 @@ void PDFDocumentBuilder::createFormFieldWidget(
     QRectF rect,
     QByteArray defaultAppearance)
 {
+    QByteArray checkBoxState;
+    if (const PDFDictionary* fieldDictionary =
+            getDictionaryFromObject(getObjectByReference(formField)))
+    {
+        PDFDocumentDataLoaderDecorator loader(&m_storage);
+        if (loader.readName(fieldDictionary->get("FT")) == "Btn")
+        {
+            checkBoxState = loader.readName(fieldDictionary->get("V"));
+        }
+    }
+
+    PDFObjectReference checkBoxOffAppearance;
+    PDFObjectReference checkBoxOnAppearance;
+    if (!checkBoxState.isEmpty())
+    {
+        const QRectF appearanceBox(0, 0, rect.width(), rect.height());
+        auto createCheckBoxAppearance =
+            [this, appearanceBox](bool checked) -> PDFObjectReference
+        {
+            QByteArray content = "q 1 1 1 rg 0 0 ";
+            content += formatPDFReal(appearanceBox.width());
+            content += ' ';
+            content += formatPDFReal(appearanceBox.height());
+            content += " re f 0 0 0 RG 1 w 0.5 0.5 ";
+            content += formatPDFReal(qMax<PDFReal>(0, appearanceBox.width() - 1));
+            content += ' ';
+            content += formatPDFReal(qMax<PDFReal>(0, appearanceBox.height() - 1));
+            content += " re S";
+
+            if (checked)
+            {
+                const PDFReal inset = qMax<PDFReal>(
+                    2.0,
+                    qMin(appearanceBox.width(), appearanceBox.height()) * 0.18);
+                content += " 2 w ";
+                content += formatPDFReal(inset);
+                content += ' ';
+                content += formatPDFReal(appearanceBox.height() * 0.5);
+                content += " m ";
+                content += formatPDFReal(appearanceBox.width() * 0.42);
+                content += ' ';
+                content += formatPDFReal(inset);
+                content += " l ";
+                content += formatPDFReal(appearanceBox.width() - inset);
+                content += ' ';
+                content += formatPDFReal(appearanceBox.height() - inset);
+                content += " l S";
+            }
+            content += " Q";
+
+            PDFObjectFactory streamDictionaryBuilder;
+            streamDictionaryBuilder.beginDictionary();
+            streamDictionaryBuilder.beginDictionaryItem("Type");
+            streamDictionaryBuilder << WrapName("XObject");
+            streamDictionaryBuilder.endDictionaryItem();
+            streamDictionaryBuilder.beginDictionaryItem("Subtype");
+            streamDictionaryBuilder << WrapName("Form");
+            streamDictionaryBuilder.endDictionaryItem();
+            streamDictionaryBuilder.beginDictionaryItem("BBox");
+            streamDictionaryBuilder << appearanceBox;
+            streamDictionaryBuilder.endDictionaryItem();
+            streamDictionaryBuilder.beginDictionaryItem("Resources");
+            streamDictionaryBuilder.beginDictionary();
+            streamDictionaryBuilder.endDictionary();
+            streamDictionaryBuilder.endDictionaryItem();
+            streamDictionaryBuilder.beginDictionaryItem("Length");
+            streamDictionaryBuilder << PDFInteger(content.size());
+            streamDictionaryBuilder.endDictionaryItem();
+            streamDictionaryBuilder.endDictionary();
+
+            PDFObject streamDictionaryObject =
+                streamDictionaryBuilder.takeObject();
+            return addObject(PDFObject::createStream(
+                std::make_shared<PDFStream>(
+                    PDFDictionary(*streamDictionaryObject.getDictionary()),
+                    qMove(content))));
+        };
+
+        checkBoxOffAppearance = createCheckBoxAppearance(false);
+        checkBoxOnAppearance = createCheckBoxAppearance(true);
+    }
+
     PDFObjectFactory objectBuilder;
 
     objectBuilder.beginDictionary();
@@ -5448,6 +5542,26 @@ void PDFDocumentBuilder::createFormFieldWidget(
     {
         objectBuilder.beginDictionaryItem("DA");
         objectBuilder << WrapString(defaultAppearance);
+        objectBuilder.endDictionaryItem();
+    }
+    if (checkBoxOffAppearance.isValid() && checkBoxOnAppearance.isValid())
+    {
+        objectBuilder.beginDictionaryItem("AP");
+        objectBuilder.beginDictionary();
+        objectBuilder.beginDictionaryItem("N");
+        objectBuilder.beginDictionary();
+        objectBuilder.beginDictionaryItem("Off");
+        objectBuilder << checkBoxOffAppearance;
+        objectBuilder.endDictionaryItem();
+        objectBuilder.beginDictionaryItem("Yes");
+        objectBuilder << checkBoxOnAppearance;
+        objectBuilder.endDictionaryItem();
+        objectBuilder.endDictionary();
+        objectBuilder.endDictionaryItem();
+        objectBuilder.endDictionary();
+        objectBuilder.endDictionaryItem();
+        objectBuilder.beginDictionaryItem("AS");
+        objectBuilder << WrapName(checkBoxState == "Yes" ? "Yes" : "Off");
         objectBuilder.endDictionaryItem();
     }
     objectBuilder.endDictionary();

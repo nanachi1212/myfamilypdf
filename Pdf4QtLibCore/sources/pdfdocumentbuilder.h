@@ -1296,6 +1296,10 @@ public:
                                                bool checked,
                                                PDFFormField::FieldFlags flags);
 
+    /// Sets the alternate field name used as a tooltip and accessibility
+    /// caption by PDF readers.
+    void setFormFieldTooltip(PDFObjectReference formField, QString tooltip);
+
     /// Appends a field to the document AcroForm, creating the AcroForm when
     /// necessary. Returns the AcroForm object reference.
     PDFObjectReference appendAcroFormField(PDFObjectReference formField);
