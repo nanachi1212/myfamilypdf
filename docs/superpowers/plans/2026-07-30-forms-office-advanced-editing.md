@@ -277,10 +277,10 @@ Expected: `dist/FamilyPDF-Office-Export/FamilyPDFOfficeExport.exe` 可在未安�
 - Modify: `docs/RELEASE-STATUS.md`
 - Create: `docs/qa/release-checklist.md`
 
-- [ ] Step 1: 執行 CTest、表單互通、Office fixture、1160 頁大檔與多分頁回歸
-- [ ] Step 2: 重建主程式、OCR、Office Export 三個安裝包與可攜包
-- [ ] Step 3: 記錄版本、大小、SHA256、已知限制及安裝順序
-- [ ] Step 4: 僅 stage 本次來源、測試與文件，排除 `dist/`
+- [x] Step 1: 執行 CTest、表單互通、Office fixture、1160 頁大檔與多分頁回歸
+- [x] Step 2: 重建主程式、OCR、Office Export 三個安裝包與可攜包
+- [x] Step 3: 記錄版本、大小、SHA256、已知限制及安裝順序
+- [x] Step 4: 僅 stage 本次來源、測試與文件，排除 `dist/`
 - [ ] Step 5: commit 並 push `codex/phase0-baseline`
 
 ## 建議交付順序與預估

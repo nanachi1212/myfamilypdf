@@ -9,6 +9,7 @@
 - 圖片背景以 QImage 寫入標準 PDF image resource，支援 Fit、Fill 及 Stretch；測試寫入磁碟後由 PDF4QT reader 重開。
 - 頁面幾何測試只修改第二頁為 148 × 210 mm、同步 `MediaBox`／`CropBox` 並順時針旋轉 90 度；第一頁維持 300 × 400 pt 與 0 度。
 - 六組 CTest 全數通過，包含新的 `UnitTestsDocumentEdit`。
+- 最終繁中可攜包 GUI 已確認 `Document Edit` 工具列由舊空白插件設定自動啟用並顯示 `Add Text Watermark` 動作。
 
 ## 外部 parser 檢查
 

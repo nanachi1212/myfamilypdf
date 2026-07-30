@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     parser.addOption(configPath);
     parser.addHelpOption();
     parser.addVersionOption();
-    parser.addPositionalArgument("file", "The PDF file to open.");
+    parser.addPositionalArgument("files", "The PDF files to open.", "[files...]");
     parser.process(application);
     pdf::PDFSettings::applyCommandLineSettingsPath(parser);
 
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
     QStringList arguments = parser.positionalArguments();
     if (!arguments.isEmpty())
     {
-        mainWindow.getProgramController()->openDocument(arguments.front());
+        mainWindow.restoreDocumentSession(arguments);
     }
     else
     {

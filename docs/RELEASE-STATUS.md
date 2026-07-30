@@ -6,10 +6,10 @@
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Setup-x64.exe` | 58,726,909 | `D5D4A6CC2B73E760D203EE3F35E1B4B511640218164356C89F573787B784D9B3` |
-| `dist\FamilyPDF-windows-x64.zip` | 85,969,484 | `CDBD7A6CAFCDCBA6F43EC5504C05C25A91B4423FA8AD26D549B613C0A96BD1E1` |
-| `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,048,057 | `C7092441CDB7992B12A339D17047B0BF27B056CA0B7503FCEF531F2C4B2321A3` |
-| `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,657,824 | `57A33A39EFC7B1B946C49FDFAD8892E3311D0CBA3ED8EEF4A681B9284B4D4162` |
+| `dist\FamilyPDF-Setup-x64.exe` | 58,726,062 | `62FAC4F278420C4132224A983F2B60B35F9F3AD3634C5805247ECDB24C55E504` |
+| `dist\FamilyPDF-windows-x64.zip` | 85,970,935 | `E3436FEF229D1A8F5E3B869D7EB3AFB827378C39FD7DAB7812F36003643AC5D2` |
+| `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
+| `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
 `dist\` 是本機建置產物，不提交到 Git。
 
@@ -30,6 +30,11 @@
 - `FormPlugin.dll`、`DocumentEditPlugin.dll`、`OfficeExportPlugin.dll` 與 Office helper 已進入可攜包及正式安裝程式；Office helper 在清除 Python PATH 後完成 DOCX／XLSX 轉換與重讀。
 - 最新主安裝程式隔離靜默安裝 exit code `0`；安裝後 Office helper 在無 Python PATH 下完成兩頁 DOCX 匯出。
 - Office Export 新增繁體與簡體中文選單、頁碼、進度、錯誤及 OCR 提示；封裝後 `.qm` 已反向轉回 TS 驗證譯文存在。
+- 修正舊 PDF4QT 設定含空白插件清單時 FamilyPDF 功能看似遺失的問題；六個正式功能插件現在會在第 2 版設定遷移時自動啟用，後續仍尊重使用者自行停用的選擇。
+- GUI 實測已確認繁中介面會顯示三個插件工具列，並可開啟「匯出至 Word」的繁中頁碼範圍對話框。
+- Viewer 與 Editor 的命令列多檔輸入已修正為載入全部檔案；兩者均以兩份一般 PDF 加一份 1,160 頁 PDF 回歸，工作階段記錄 3 份文件且維持 Responding。
+- 最終可攜包回歸摘要：`build\final-regression-20260730-121838\summary.json`（本機可重建，不提交 Git）。
+- 最新主安裝程式再次隔離靜默安裝成功；安裝後六個插件及 Office helper 的 DOCX／XLSX 產物重讀通過。
 
 ## Git
 

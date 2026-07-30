@@ -26,8 +26,10 @@
 - `Forms` 選單可拖曳建立標準 AcroForm 文字框、核取方塊、單選按鈕群組、下拉選單與清單，設定常用欄位屬性、清單多選、切換欄位反白及重設預設值。
 - `Document Edit` 選單可依頁碼範圍及單雙數加入文字浮水印、純色／圖片背景、調整頁面尺寸與裁切框、縮放內容與 annotation，以及向左／向右旋轉。
 - `Office Export` 選單可將全部或 `1-3,5` 指定頁碼匯出成 DOCX／XLSX；helper 自帶 Python runtime，使用端無須安裝 Python。
-- 已產生完整可攜式 ZIP，內含 Viewer、Editor、PageMaster、PdfTool、Qt runtime 與 OCR。
-- 已用 290 頁 PDF 驗證 Viewer 與 PageMaster 能開啟並保持回應。
+- 安裝包內六個正式功能插件（`Document Edit`、`Editor`、`Forms`、`FamilyPDF Office Export`、`Redact`、`Signature`）會在首次啟動及舊 PDF4QT 設定升級時自動啟用，使用者不必進入插件設定。
+- 已產生基礎可攜式 ZIP，內含 Viewer、Editor、PageMaster、PdfTool 與 Qt runtime；OCR 維持獨立安裝包。
+- Viewer／Editor 可一次接收多個 PDF，為每份文件建立獨立視窗，並以同步文件分頁切換；工作階段可於重啟後還原。
+- 已用 1,160 頁 PDF 與兩份一般 PDF 同時驗證 Viewer／Editor，三份文件均寫入工作階段且程式保持回應。
 - 已以安裝後的程式驗證三組單元測試、合併、拆分、OCR 與書籤重啟保存。
 
 ## 合併頁面篩選（已加入家庭版流程）

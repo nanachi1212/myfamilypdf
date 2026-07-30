@@ -2039,6 +2039,36 @@ void PDFProgramController::readSettings(Settings settingsFlags)
         settings.beginGroup("Plugins");
         m_loadAllPlugins = !settings.contains("EnabledPlugins");
         m_enabledPlugins = settings.value("EnabledPlugins").toStringList();
+
+        // FamilyPDF features are delivered as editor plugins. Existing PDF4QT
+        // profiles can contain an empty EnabledPlugins value, which otherwise
+        // makes these built-in features look as if they were missing after an
+        // upgrade. Enable each FamilyPDF plugin once while preserving the
+        // user's choices on subsequent runs.
+        constexpr int familyPdfPluginDefaultsVersion = 2;
+        const int appliedDefaultsVersion = settings.value("FamilyPDFDefaultsVersion", 0).toInt();
+        if (appliedDefaultsVersion < familyPdfPluginDefaultsVersion)
+        {
+            const QStringList familyPdfPlugins = {
+                QStringLiteral("Document Edit"),
+                QStringLiteral("Editor"),
+                QStringLiteral("Forms"),
+                QStringLiteral("FamilyPDF Office Export"),
+                QStringLiteral("Redact"),
+                QStringLiteral("Signature")
+            };
+
+            for (const QString& pluginName : familyPdfPlugins)
+            {
+                if (!m_enabledPlugins.contains(pluginName))
+                {
+                    m_enabledPlugins.append(pluginName);
+                }
+            }
+
+            settings.setValue("EnabledPlugins", m_enabledPlugins);
+            settings.setValue("FamilyPDFDefaultsVersion", familyPdfPluginDefaultsVersion);
+        }
         settings.endGroup();
     }
 

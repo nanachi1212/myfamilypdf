@@ -8,7 +8,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - 多色反白、底線、刪除線、波浪線、框選、自由文字與註解側欄。
 - 書籤建立、導入、自動產生、文字顏色與可收合資料夾，以及跨 Viewer／Editor 重啟保存。
 - PDF 合併與拆分；合併前可選單數頁、雙數頁或輸入 `1-3,8,10-12` 等頁碼範圍。
-- 多文件分頁、工作階段還原、縮圖、頁碼跳轉與完整縮放操作。
+- Viewer／Editor 可一次開啟多份 PDF；每份文件使用獨立視窗，所有視窗頂端都有同步文件分頁可快速切換，並支援工作階段還原、縮圖、頁碼跳轉與完整縮放操作。
 - 安全儲存、外部檔案變更偵測、自動復原快照與最多三份隱藏備份。
 - 進階內容編輯外掛：直接編輯頁面內容、新增文字／圖形／SVG、刪除、復原／重做、永久遮蔽及電子／數位簽章。請在 `Pdf4QtEditor.exe` 的 `Editor`、`Redact`、`Signature` 選單使用；英文 action 名稱在繁體／簡體 Windows 相同。
 - 文件級進階編輯：在 `Document Edit` 選單可依全部／單數／雙數／指定頁碼加入文字浮水印、純色或圖片背景、調整頁面尺寸與裁切框、縮放內容及向左／向右旋轉。
@@ -32,7 +32,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe`：OCR 外掛安裝程式。
 - `dist\FamilyPDF-OCR-Plugin-windows-x64.zip`：OCR 外掛可攜式覆蓋包。
 
-五種 AcroForm 欄位、文件級進階編輯與 PDF 轉 DOCX／XLSX 已完成自動測試；仍需發佈前在繁體／簡體 Windows 進行 GUI 人工操作巡覽。
+五種 AcroForm 欄位、文件級進階編輯與 PDF 轉 DOCX／XLSX 已完成自動測試；安裝包內六個正式功能插件在首次啟動或舊設定升級時會自動啟用。仍需在兩台分別使用繁體／簡體 Windows 的實機進行長時間人工操作巡覽。
 
 詳細操作與驗證：
 
@@ -53,6 +53,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\ocr\build-ocr-plugin.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\ocr\build-ocr-installer.ps1 -SkipPackage
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\office\build-office-export-helper.ps1
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\run-final-regression.ps1
 ```
 
 建置腳本會在缺少時自動安裝 Qt／vcpkg 建置工具；安裝程式腳本會下載並驗證 Inno Setup 的 Authenticode 簽章。開發工具預設放在 `E:\CodexProject\FamilyPDF-tools`。
