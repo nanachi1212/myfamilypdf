@@ -77,18 +77,18 @@ Expected: 三個外掛全部存在，檢查 exit 0。
 - Modify: `UnitTests/CMakeLists.txt`
 - Modify: `scripts/phase0/build-upstream-baseline.ps1`
 
-- [ ] Step 1: 先寫表單物件結構測試
+- [x] Step 1: 先寫表單物件結構測試
 
 測試建立空白 PDF，加入文字欄位與核取方塊後，驗證 Catalog 的 `AcroForm`、`Fields`，以及欄位的 `FT`、`T`、`V`、`DV`、`Ff`、`Rect`、`Subtype=Widget`、頁面 `Annots`。
 
-- [ ] Step 2: 執行新測試並確認因 API 不存在而失敗
+- [x] Step 2: 執行新測試並確認因 API 不存在而失敗
 
 Run:
 `cmake --build build/phase0-upstream-release --target UnitTestsForms --parallel`
 
 Expected: compile failure 指向尚未實作的 builder methods。
 
-- [ ] Step 3: 實作最小 builder API
+- [x] Step 3: 實作最小 builder API
 
 加入：
 
@@ -109,11 +109,11 @@ PDFObjectReference appendAcroFormField(PDFObjectReference formField);
 
 沿用既有 signature builder 的 object factory 寫法；不建立私有 metadata。
 
-- [ ] Step 4: 驗證欄位可被 PDF4QT parser 重讀
+- [x] Step 4: 驗證欄位可被 PDF4QT parser 重讀
 
 測試需將 builder document 交給 `PDFFormManager`／`PDFForm::parse`，確認欄位型別、名稱、旗標與值一致。
 
-- [ ] Step 5: 建置與執行全套測試
+- [x] Step 5: 建置與執行全套測試
 
 Run:
 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/phase0/build-upstream-baseline.ps1 -Stage Build`

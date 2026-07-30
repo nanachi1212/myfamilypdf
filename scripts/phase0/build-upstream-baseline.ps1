@@ -30,6 +30,7 @@ $Targets = @(
     'UnitTestsImageOptimizer',
     'UnitTestsFontEncoding',
     'UnitTestsBookmarks',
+    'UnitTestsForms',
     'release_translations'
 )
 

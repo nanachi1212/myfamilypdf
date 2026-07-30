@@ -5270,6 +5270,116 @@ PDFObjectReference PDFDocumentBuilder::createFormFieldSignature(QString fieldNam
     return formFieldSignature;
 }
 
+PDFObjectReference PDFDocumentBuilder::createFormFieldText(
+    QString fieldName,
+    QString defaultValue,
+    PDFFormField::FieldFlags flags,
+    std::optional<PDFInteger> maximumLength)
+{
+    PDFObjectFactory objectBuilder;
+
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("FT");
+    objectBuilder << WrapName("Tx");
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("T");
+    objectBuilder << fieldName;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("V");
+    objectBuilder << defaultValue;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("DV");
+    objectBuilder << defaultValue;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Ff");
+    objectBuilder << static_cast<PDFInteger>(flags.toInt());
+    objectBuilder.endDictionaryItem();
+    if (maximumLength.has_value() && maximumLength.value() > 0)
+    {
+        objectBuilder.beginDictionaryItem("MaxLen");
+        objectBuilder << maximumLength.value();
+        objectBuilder.endDictionaryItem();
+    }
+    objectBuilder.endDictionary();
+
+    return addObject(objectBuilder.takeObject());
+}
+
+PDFObjectReference PDFDocumentBuilder::createFormFieldCheckBox(
+    QString fieldName,
+    bool checked,
+    PDFFormField::FieldFlags flags)
+{
+    const QByteArray state = checked ? QByteArrayLiteral("Yes") :
+                                       QByteArrayLiteral("Off");
+    PDFObjectFactory objectBuilder;
+
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("FT");
+    objectBuilder << WrapName("Btn");
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("T");
+    objectBuilder << fieldName;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("V");
+    objectBuilder << WrapName(state);
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("DV");
+    objectBuilder << WrapName(state);
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Ff");
+    objectBuilder << static_cast<PDFInteger>(flags.toInt());
+    objectBuilder.endDictionaryItem();
+    objectBuilder.endDictionary();
+
+    return addObject(objectBuilder.takeObject());
+}
+
+PDFObjectReference PDFDocumentBuilder::appendAcroFormField(
+    PDFObjectReference formField)
+{
+    PDFObjectReference acroFormReference;
+    if (const PDFDictionary* catalogDictionary =
+            getDictionaryFromObject(getObjectByReference(getCatalogReference())))
+    {
+        const PDFObject& acroFormObject = catalogDictionary->get("AcroForm");
+        if (acroFormObject.isReference())
+        {
+            acroFormReference = acroFormObject.getReference();
+        }
+        else if (acroFormObject.isDictionary())
+        {
+            acroFormReference = addObject(acroFormObject);
+            setCatalogAcroForm(acroFormReference);
+        }
+    }
+
+    if (!acroFormReference.isValid())
+    {
+        acroFormReference = createAcroForm({ formField });
+    }
+    else
+    {
+        PDFObjectFactory objectBuilder;
+        objectBuilder.beginDictionary();
+        objectBuilder.beginDictionaryItem("Fields");
+        objectBuilder << std::array{ formField };
+        objectBuilder.endDictionaryItem();
+        objectBuilder.endDictionary();
+        appendTo(acroFormReference, objectBuilder.takeObject());
+    }
+
+    PDFObjectFactory appearanceBuilder;
+    appearanceBuilder.beginDictionary();
+    appearanceBuilder.beginDictionaryItem("NeedAppearances");
+    appearanceBuilder << true;
+    appearanceBuilder.endDictionaryItem();
+    appearanceBuilder.endDictionary();
+    mergeTo(acroFormReference, appearanceBuilder.takeObject());
+
+    return acroFormReference;
+}
+
 
 void PDFDocumentBuilder::createFormFieldWidget(PDFObjectReference formField,
                                                PDFObjectReference page,
@@ -5308,6 +5418,47 @@ void PDFDocumentBuilder::createFormFieldWidget(PDFObjectReference formField,
     PDFObject pageObject = objectBuilder.takeObject();
     mergeTo(formField, widgetObject);
     appendTo(page, pageObject);
+}
+
+void PDFDocumentBuilder::createFormFieldWidget(
+    PDFObjectReference formField,
+    PDFObjectReference page,
+    QRectF rect,
+    QByteArray defaultAppearance)
+{
+    PDFObjectFactory objectBuilder;
+
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("Type");
+    objectBuilder << WrapName("Annot");
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Subtype");
+    objectBuilder << WrapName("Widget");
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("P");
+    objectBuilder << page;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Rect");
+    objectBuilder << rect;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("F");
+    objectBuilder << 4;
+    objectBuilder.endDictionaryItem();
+    if (!defaultAppearance.isEmpty())
+    {
+        objectBuilder.beginDictionaryItem("DA");
+        objectBuilder << WrapString(defaultAppearance);
+        objectBuilder.endDictionaryItem();
+    }
+    objectBuilder.endDictionary();
+    mergeTo(formField, objectBuilder.takeObject());
+
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("Annots");
+    objectBuilder << std::array{ formField };
+    objectBuilder.endDictionaryItem();
+    objectBuilder.endDictionary();
+    appendTo(page, objectBuilder.takeObject());
 }
 
 

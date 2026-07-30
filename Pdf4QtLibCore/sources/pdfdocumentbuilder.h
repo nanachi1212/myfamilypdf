@@ -26,6 +26,7 @@
 #include "pdfobject.h"
 #include "pdfdocument.h"
 #include "pdfannotation.h"
+#include "pdfform.h"
 
 class QBuffer;
 class QPdfWriter;
@@ -1276,6 +1277,29 @@ public:
                                                 PDFObjectReferenceVector kids,
                                                 PDFObjectReference signatureValue);
 
+    /// Creates a text AcroForm field. Call createFormFieldWidget() and
+    /// appendAcroFormField() to place it on a page and register it.
+    /// \param fieldName Partial field name
+    /// \param defaultValue Initial and default text value
+    /// \param flags AcroForm field flags
+    /// \param maximumLength Maximum number of characters, or no limit
+    PDFObjectReference createFormFieldText(QString fieldName,
+                                           QString defaultValue,
+                                           PDFFormField::FieldFlags flags,
+                                           std::optional<PDFInteger> maximumLength = std::nullopt);
+
+    /// Creates a check box AcroForm field.
+    /// \param fieldName Partial field name
+    /// \param checked Initial and default checked state
+    /// \param flags AcroForm field flags
+    PDFObjectReference createFormFieldCheckBox(QString fieldName,
+                                               bool checked,
+                                               PDFFormField::FieldFlags flags);
+
+    /// Appends a field to the document AcroForm, creating the AcroForm when
+    /// necessary. Returns the AcroForm object reference.
+    PDFObjectReference appendAcroFormField(PDFObjectReference formField);
+
 
     /// Creates visible form field widget without contents.
     /// \param formField Form field reference
@@ -1286,6 +1310,13 @@ public:
                                PDFObjectReference page,
                                PDFObjectReference appearanceStream,
                                QRectF rect);
+
+    /// Creates a visible merged field/widget annotation. The default
+    /// appearance applies to text and choice widgets.
+    void createFormFieldWidget(PDFObjectReference formField,
+                               PDFObjectReference page,
+                               QRectF rect,
+                               QByteArray defaultAppearance);
 
 
     /// 
