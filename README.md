@@ -40,6 +40,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - [Windows 安裝檔](docs/phase1/installer.md)
 - [OCR 使用方式](docs/phase1/ocr.md)
 - [功能驗證結果](docs/phase1/functional-verification.md)
+- [1,160 頁 PDF 互動與語系驗證](docs/qa/large-pdf-interaction.md)
 - [Microsoft Office 互通性驗證](docs/qa/office-interoperability.md)
 - [目前交付狀態與 SHA-256](docs/RELEASE-STATUS.md)
 
@@ -55,6 +56,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\ocr\build-ocr-installer.ps1 -SkipPackage
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\office\build-office-export-helper.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\run-final-regression.ps1
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\smoke-large-pdf-locales.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\smoke-microsoft-office.ps1
 ```
 

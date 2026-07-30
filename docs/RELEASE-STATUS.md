@@ -36,6 +36,7 @@
 - 最終可攜包回歸摘要：`build\final-regression-20260730-121838\summary.json`（本機可重建，不提交 Git）。
 - 最新主安裝程式再次隔離靜默安裝成功；安裝後六個插件及 Office helper 的 DOCX／XLSX 產物重讀通過。
 - Microsoft Word 16.0 已實際開啟匯出 DOCX，辨識兩頁、繁體中文、簡體中文及英文；Microsoft Excel 16.0 已實際開啟匯出 XLSX，辨識兩個工作表、表格值、繁簡中文及合併儲存格。驗證摘要：`build\microsoft-office-smoke\summary.json`。
+- 1,160 頁 PDF 已在繁中與簡中 GUI 分別完成第 1 → 580 → 1,160 → 1,157 頁跳轉；頁碼、主畫面與縮略圖同步，簡中視窗持續約 112 秒後仍為 Responding。
 
 ## Git
 

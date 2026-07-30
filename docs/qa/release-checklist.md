@@ -15,6 +15,7 @@
 - [x] Viewer／Editor 一次開啟三份 PDF，工作階段各記錄 3 份文件且保持 Responding。
 - [x] 主安裝程式隔離靜默安裝 exit code `0`；安裝後插件與 Office helper 回歸通過。
 - [x] Microsoft Word 16.0／Excel 16.0 實際唯讀開啟匯出產物；兩頁、多語文字、兩工作表、表格值與合併儲存格驗證通過。
+- [x] 1,160 頁 PDF 在繁中／簡中 GUI 完成頁碼欄、文件結尾及縮略圖跳轉，主畫面與縮圖同步且維持 Responding。
 
 執行：
 
@@ -31,6 +32,14 @@
 ```
 
 結果會寫入 `build\microsoft-office-smoke\summary.json`。
+
+大檔雙語系存活監測：
+
+```powershell
+.\scripts\qa\smoke-large-pdf-locales.ps1
+```
+
+結果會寫入 `build\large-pdf-locale-smoke\summary.json`。
 
 ## 發佈產物
 
