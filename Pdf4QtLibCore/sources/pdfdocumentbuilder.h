@@ -1296,6 +1296,30 @@ public:
                                                bool checked,
                                                PDFFormField::FieldFlags flags);
 
+    /// Creates a radio-button group. Add each option with
+    /// createFormFieldRadioWidget(), then register the group with
+    /// appendAcroFormField().
+    PDFObjectReference createFormFieldRadioGroup(
+        QString fieldName,
+        QString selectedExportValue,
+        PDFFormField::FieldFlags flags);
+
+    /// Adds one widget option to a radio-button group.
+    PDFObjectReference createFormFieldRadioWidget(
+        PDFObjectReference radioGroup,
+        PDFObjectReference page,
+        QRectF rect,
+        QString exportValue,
+        bool checked);
+
+    /// Creates a combo-box or list-box AcroForm field. Choice flags determine
+    /// whether the field is a combo box, editable, sorted, or multi-select.
+    PDFObjectReference createFormFieldChoice(
+        QString fieldName,
+        PDFFormFieldChoice::Options options,
+        std::vector<PDFInteger> selectedIndices,
+        PDFFormField::FieldFlags flags);
+
     /// Sets the alternate field name used as a tooltip and accessibility
     /// caption by PDF readers.
     void setFormFieldTooltip(PDFObjectReference formField, QString tooltip);

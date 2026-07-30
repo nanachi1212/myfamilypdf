@@ -32,7 +32,10 @@ private:
     enum class FieldType
     {
         Text,
-        CheckBox
+        CheckBox,
+        RadioButton,
+        ComboBox,
+        ListBox
     };
 
     void createField(FieldType fieldType);
@@ -45,6 +48,9 @@ private:
 
     QAction* m_createTextField;
     QAction* m_createCheckBox;
+    QAction* m_createRadioButton;
+    QAction* m_createComboBox;
+    QAction* m_createListBox;
     QAction* m_highlightFields;
     QAction* m_resetForm;
 };

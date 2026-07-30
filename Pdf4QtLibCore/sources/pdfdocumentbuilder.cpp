@@ -5335,6 +5335,295 @@ PDFObjectReference PDFDocumentBuilder::createFormFieldCheckBox(
     return addObject(objectBuilder.takeObject());
 }
 
+PDFObjectReference PDFDocumentBuilder::createFormFieldRadioGroup(
+    QString fieldName,
+    QString selectedExportValue,
+    PDFFormField::FieldFlags flags)
+{
+    flags.setFlag(PDFFormField::Radio);
+    const QByteArray selectedState =
+        selectedExportValue.isEmpty() ?
+            QByteArrayLiteral("Off") :
+            selectedExportValue.toUtf8();
+
+    PDFObjectFactory objectBuilder;
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("FT");
+    objectBuilder << WrapName("Btn");
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("T");
+    objectBuilder << fieldName;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("V");
+    objectBuilder << WrapName(selectedState);
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("DV");
+    objectBuilder << WrapName(selectedState);
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Ff");
+    objectBuilder << static_cast<PDFInteger>(flags.toInt());
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Kids");
+    objectBuilder.beginArray();
+    objectBuilder.endArray();
+    objectBuilder.endDictionaryItem();
+    objectBuilder.endDictionary();
+    return addObject(objectBuilder.takeObject());
+}
+
+PDFObjectReference PDFDocumentBuilder::createFormFieldRadioWidget(
+    PDFObjectReference radioGroup,
+    PDFObjectReference page,
+    QRectF rect,
+    QString exportValue,
+    bool checked)
+{
+    const QByteArray stateName = exportValue.toUtf8();
+    const QRectF appearanceBox(0, 0, rect.width(), rect.height());
+    auto createAppearance =
+        [this, appearanceBox](bool selected) -> PDFObjectReference
+    {
+        const PDFReal diameter =
+            qMax<PDFReal>(0, qMin(appearanceBox.width(),
+                                 appearanceBox.height()) - 1);
+        const PDFReal radius = diameter * 0.5;
+        const PDFReal centerX = appearanceBox.width() * 0.5;
+        const PDFReal centerY = appearanceBox.height() * 0.5;
+        const PDFReal kappa = radius * 0.5522847498;
+
+        QByteArray content = "q 1 1 1 rg 0 0 ";
+        content += formatPDFReal(appearanceBox.width());
+        content += ' ';
+        content += formatPDFReal(appearanceBox.height());
+        content += " re f 0 0 0 RG 1 w ";
+        content += formatPDFReal(centerX + radius);
+        content += ' ';
+        content += formatPDFReal(centerY);
+        content += " m ";
+        content += formatPDFReal(centerX + radius);
+        content += ' ';
+        content += formatPDFReal(centerY + kappa);
+        content += ' ';
+        content += formatPDFReal(centerX + kappa);
+        content += ' ';
+        content += formatPDFReal(centerY + radius);
+        content += ' ';
+        content += formatPDFReal(centerX);
+        content += ' ';
+        content += formatPDFReal(centerY + radius);
+        content += " c ";
+        content += formatPDFReal(centerX - kappa);
+        content += ' ';
+        content += formatPDFReal(centerY + radius);
+        content += ' ';
+        content += formatPDFReal(centerX - radius);
+        content += ' ';
+        content += formatPDFReal(centerY + kappa);
+        content += ' ';
+        content += formatPDFReal(centerX - radius);
+        content += ' ';
+        content += formatPDFReal(centerY);
+        content += " c ";
+        content += formatPDFReal(centerX - radius);
+        content += ' ';
+        content += formatPDFReal(centerY - kappa);
+        content += ' ';
+        content += formatPDFReal(centerX - kappa);
+        content += ' ';
+        content += formatPDFReal(centerY - radius);
+        content += ' ';
+        content += formatPDFReal(centerX);
+        content += ' ';
+        content += formatPDFReal(centerY - radius);
+        content += " c ";
+        content += formatPDFReal(centerX + kappa);
+        content += ' ';
+        content += formatPDFReal(centerY - radius);
+        content += ' ';
+        content += formatPDFReal(centerX + radius);
+        content += ' ';
+        content += formatPDFReal(centerY - kappa);
+        content += ' ';
+        content += formatPDFReal(centerX + radius);
+        content += ' ';
+        content += formatPDFReal(centerY);
+        content += " c S";
+        if (selected)
+        {
+            const PDFReal dotRadius = radius * 0.48;
+            content += " 0 0 0 rg ";
+            content += formatPDFReal(centerX - dotRadius);
+            content += ' ';
+            content += formatPDFReal(centerY - dotRadius);
+            content += ' ';
+            content += formatPDFReal(dotRadius * 2);
+            content += ' ';
+            content += formatPDFReal(dotRadius * 2);
+            content += " re f";
+        }
+        content += " Q";
+
+        PDFObjectFactory streamBuilder;
+        streamBuilder.beginDictionary();
+        streamBuilder.beginDictionaryItem("Type");
+        streamBuilder << WrapName("XObject");
+        streamBuilder.endDictionaryItem();
+        streamBuilder.beginDictionaryItem("Subtype");
+        streamBuilder << WrapName("Form");
+        streamBuilder.endDictionaryItem();
+        streamBuilder.beginDictionaryItem("BBox");
+        streamBuilder << appearanceBox;
+        streamBuilder.endDictionaryItem();
+        streamBuilder.beginDictionaryItem("Resources");
+        streamBuilder.beginDictionary();
+        streamBuilder.endDictionary();
+        streamBuilder.endDictionaryItem();
+        streamBuilder.beginDictionaryItem("Length");
+        streamBuilder << PDFInteger(content.size());
+        streamBuilder.endDictionaryItem();
+        streamBuilder.endDictionary();
+        PDFObject streamObject = streamBuilder.takeObject();
+        return addObject(PDFObject::createStream(
+            std::make_shared<PDFStream>(
+                PDFDictionary(*streamObject.getDictionary()),
+                qMove(content))));
+    };
+
+    const PDFObjectReference offAppearance = createAppearance(false);
+    const PDFObjectReference onAppearance = createAppearance(true);
+    PDFObjectFactory objectBuilder;
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("Type");
+    objectBuilder << WrapName("Annot");
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Subtype");
+    objectBuilder << WrapName("Widget");
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Parent");
+    objectBuilder << radioGroup;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("P");
+    objectBuilder << page;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Rect");
+    objectBuilder << rect;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("F");
+    objectBuilder << 4;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("AP");
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("N");
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("Off");
+    objectBuilder << offAppearance;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem(stateName);
+    objectBuilder << onAppearance;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.endDictionary();
+    objectBuilder.endDictionaryItem();
+    objectBuilder.endDictionary();
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("AS");
+    objectBuilder << WrapName(checked ? stateName : QByteArrayLiteral("Off"));
+    objectBuilder.endDictionaryItem();
+    objectBuilder.endDictionary();
+    const PDFObjectReference widget = addObject(objectBuilder.takeObject());
+
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("Kids");
+    objectBuilder << std::array{ widget };
+    objectBuilder.endDictionaryItem();
+    objectBuilder.endDictionary();
+    appendTo(radioGroup, objectBuilder.takeObject());
+
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("Annots");
+    objectBuilder << std::array{ widget };
+    objectBuilder.endDictionaryItem();
+    objectBuilder.endDictionary();
+    appendTo(page, objectBuilder.takeObject());
+    return widget;
+}
+
+PDFObjectReference PDFDocumentBuilder::createFormFieldChoice(
+    QString fieldName,
+    PDFFormFieldChoice::Options options,
+    std::vector<PDFInteger> selectedIndices,
+    PDFFormField::FieldFlags flags)
+{
+    PDFObjectFactory objectBuilder;
+    objectBuilder.beginDictionary();
+    objectBuilder.beginDictionaryItem("FT");
+    objectBuilder << WrapName("Ch");
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("T");
+    objectBuilder << fieldName;
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Ff");
+    objectBuilder << static_cast<PDFInteger>(flags.toInt());
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("Opt");
+    objectBuilder.beginArray();
+    for (const PDFFormFieldChoice::Option& option : options)
+    {
+        if (option.exportString == option.userString)
+        {
+            objectBuilder << option.userString;
+        }
+        else
+        {
+            objectBuilder.beginArray();
+            objectBuilder << option.exportString;
+            objectBuilder << option.userString;
+            objectBuilder.endArray();
+        }
+    }
+    objectBuilder.endArray();
+    objectBuilder.endDictionaryItem();
+
+    QStringList selectedValues;
+    for (PDFInteger index : selectedIndices)
+    {
+        if (index >= 0 && static_cast<size_t>(index) < options.size())
+        {
+            selectedValues.append(options[static_cast<size_t>(index)].exportString);
+        }
+    }
+    objectBuilder.beginDictionaryItem("V");
+    if (flags.testFlag(PDFFormField::MultiSelect))
+    {
+        objectBuilder.beginArray();
+        for (const QString& selectedValue : selectedValues)
+        {
+            objectBuilder << selectedValue;
+        }
+        objectBuilder.endArray();
+    }
+    else
+    {
+        objectBuilder << selectedValues.value(0);
+    }
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("DV");
+    objectBuilder << selectedValues.value(0);
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("I");
+    objectBuilder.beginArray();
+    for (PDFInteger selectedIndex : selectedIndices)
+    {
+        objectBuilder << selectedIndex;
+    }
+    objectBuilder.endArray();
+    objectBuilder.endDictionaryItem();
+    objectBuilder.beginDictionaryItem("TI");
+    objectBuilder << (selectedIndices.empty() ? 0 : selectedIndices.front());
+    objectBuilder.endDictionaryItem();
+    objectBuilder.endDictionary();
+    return addObject(objectBuilder.takeObject());
+}
+
 void PDFDocumentBuilder::setFormFieldTooltip(PDFObjectReference formField,
                                              QString tooltip)
 {

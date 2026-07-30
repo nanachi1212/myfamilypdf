@@ -10,10 +10,11 @@
 - 測試將 PDF 寫入磁碟，再由 PDF4QT reader 與 `PDFForm::parse` 重讀；欄位型別、名稱、值、提示、旗標、頁面及核取外觀均一致。
 - 產生的 `dist/qa/form-interop.pdf` 另以 `pypdf 6.14.2` 重讀，確認一頁、兩個欄位、Catalog 含 `/AcroForm`，文字欄位為 `/Tx`、核取方塊為 `/Btn`，且核取 Widget 含 `/AP`。
 - `pypdf` 取得的中文 Unicode code points 分別為 `59D3 540D`、`7E41 9AD4 6E2C 8A66`、`540C 610F`；終端若缺中文字型可能顯示方框或替代字元，但實際 Unicode 值正確。
+- `UnitTestsForms` 另建立含兩個 export value 的單選按鈕群組、含繁體／簡體顯示文字的下拉選單，以及可多選的清單；寫入磁碟後重讀並驗證 `/Btn`、`/Ch`、`/Opt`、`/V`、`/I`、欄位旗標與各單選 Widget 的 `/AP` 外觀均保留。
 
 ## 尚待發佈前人工巡覽
 
-- 在 FamilyPDF Editor 實際拖曳建立兩種欄位、儲存、關閉、重開並填值。
+- 在 FamilyPDF Editor 實際拖曳建立五種欄位、儲存、關閉、重開並填值。
 - 使用另一套 GUI 閱讀器（建議 Microsoft Edge 或 Adobe Acrobat Reader）開啟 `form-interop.pdf`，確認文字框可輸入、核取狀態可切換並在儲存後保留。
 - 以 Tab 鍵確認欄位依頁面 annotation 建立順序移動。
 

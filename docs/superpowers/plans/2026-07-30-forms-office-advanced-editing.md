@@ -166,10 +166,10 @@ Expected: 所有既有測試與 `UnitTestsForms` 通過。
 - Modify: `Pdf4QtEditorPlugins/FormPlugin/formfielddialog.*`
 - Modify: `UnitTests/tst_formbuildertest.cpp`
 
-- [ ] Step 1: 先寫 radio／combo／list 的 parser round-trip tests
-- [ ] Step 2: 實作 button group 與 choice field dictionaries、選項與 export values
-- [ ] Step 3: 在 dialog 支援單選群組、下拉選單、清單及多選設定
-- [ ] Step 4: 驗證建立、填寫、儲存、重開皆保留值
+- [x] Step 1: 先寫 radio／combo／list 的 parser round-trip tests
+- [x] Step 2: 實作 button group 與 choice field dictionaries、選項與 export values
+- [x] Step 3: 在 dialog 支援單選群組、下拉選單、清單及多選設定
+- [x] Step 4: 驗證建立、填寫、儲存、重開皆保留值
 
 ## Task 5：完成進階編輯常用項目
 
