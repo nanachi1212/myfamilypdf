@@ -61,6 +61,12 @@ class DocxExportTest(unittest.TestCase):
         self.assertIn("第二頁 / 第二页", text)
         self.assertIsNotNone(root.find(".//w:b", WORD_NS))
         self.assertIsNotNone(root.find(".//w:i", WORD_NS))
+        font_sizes = {
+            node.attrib.get(f"{{{WORD_NS['w']}}}val")
+            for node in root.findall(".//w:sz", WORD_NS)
+        }
+        self.assertIn("28", font_sizes)
+        self.assertIn("24", font_sizes)
         page_breaks = [
             node
             for node in root.findall(".//w:br", WORD_NS)

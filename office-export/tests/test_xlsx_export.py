@@ -28,7 +28,13 @@ class XlsxExportTest(unittest.TestCase):
                                 ["家庭測試", 2, 120],
                             ],
                             merges=[TableMerge(1, 1, 1, 2)],
-                        )
+                        ),
+                        ExtractedTable(
+                            rows=[
+                                ["分類", "說明"],
+                                ["附加", "第二個表格 / 第二个表格"],
+                            ]
+                        ),
                     ],
                 ),
                 ExtractedPage(
@@ -46,7 +52,7 @@ class XlsxExportTest(unittest.TestCase):
             report = write_xlsx(document, output_path)
 
             self.assertEqual(report.pages_exported, 2)
-            self.assertEqual(report.tables_exported, 1)
+            self.assertEqual(report.tables_exported, 2)
             self.assertEqual(report.fallback_pages, [2])
             workbook = load_workbook(output_path)
 
@@ -58,6 +64,12 @@ class XlsxExportTest(unittest.TestCase):
         self.assertEqual(first["B2"].value, 2)
         self.assertEqual(first["C2"].value, 120)
         self.assertIn("A1:B1", {str(item) for item in first.merged_cells.ranges})
+        self.assertEqual(first["A4"].value, "分類")
+        self.assertEqual(first["B4"].value, "說明")
+        self.assertEqual(first["A5"].value, "附加")
+        self.assertEqual(first["B5"].value, "第二個表格 / 第二个表格")
+        self.assertTrue(first["A1"].font.bold)
+        self.assertTrue(first["A4"].font.bold)
 
         second = workbook["Page 2"]
         self.assertEqual(second["A1"].value, "無表格第一行")

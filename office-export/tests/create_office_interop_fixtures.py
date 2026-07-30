@@ -33,7 +33,54 @@ def build_docx_fixture(path: Path) -> None:
             ),
             ExtractedPage(
                 number=2,
-                blocks=[TextBlock(runs=[TextRun("第二頁 / 第二页")])],
+                blocks=[
+                    TextBlock(runs=[TextRun("第二頁 / 第二页")]),
+                    TextBlock(
+                        runs=[
+                            TextRun(
+                                "多段落繁體內容",
+                                bold=True,
+                                font_size=18.0,
+                            ),
+                            TextRun(" / "),
+                            TextRun(
+                                "多段落简体内容",
+                                italic=True,
+                                font_size=9.0,
+                            ),
+                        ]
+                    ),
+                    TextBlock(
+                        runs=[
+                            TextRun(
+                                "FamilyPDF preserves editable paragraphs "
+                                "across explicit PDF page boundaries."
+                            )
+                        ]
+                    ),
+                ],
+            ),
+            ExtractedPage(
+                number=3,
+                blocks=[
+                    TextBlock(
+                        runs=[
+                            TextRun(
+                                "第三頁 / 第三页",
+                                bold=True,
+                                font_size=16.0,
+                            )
+                        ]
+                    ),
+                    TextBlock(runs=[TextRun("家庭文件摘要 / 家庭文件摘要")]),
+                    TextBlock(
+                        runs=[
+                            TextRun("Mixed style: ", bold=True),
+                            TextRun("editable", italic=True),
+                            TextRun(" Office output"),
+                        ]
+                    ),
+                ],
             ),
         ]
     )
@@ -52,7 +99,13 @@ def build_xlsx_fixture(path: Path) -> None:
                             ["家庭測試", 2, 120],
                         ],
                         merges=[TableMerge(1, 1, 1, 2)],
-                    )
+                    ),
+                    ExtractedTable(
+                        rows=[
+                            ["分類", "說明"],
+                            ["附加", "第二個表格 / 第二个表格"],
+                        ]
+                    ),
                 ],
             ),
             ExtractedPage(
@@ -60,6 +113,21 @@ def build_xlsx_fixture(path: Path) -> None:
                 blocks=[
                     TextBlock(runs=[TextRun("無表格第一行")]),
                     TextBlock(runs=[TextRun("无表格第二行")]),
+                    TextBlock(runs=[TextRun("FamilyPDF fallback row 3")]),
+                    TextBlock(runs=[TextRun("長文字欄位 / 长文字栏位")]),
+                ],
+            ),
+            ExtractedPage(
+                number=3,
+                tables=[
+                    ExtractedTable(
+                        rows=[
+                            ["第三頁摘要 / 第三页摘要", None, None, None],
+                            ["地區", "繁體", "简体", "Total"],
+                            ["家庭", 10, 20, 30],
+                        ],
+                        merges=[TableMerge(1, 1, 1, 4)],
+                    )
                 ],
             ),
         ]

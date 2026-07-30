@@ -59,10 +59,14 @@ $excel = $null
 $workbook = $null
 $firstSheet = $null
 $secondSheet = $null
+$thirdSheet = $null
 $traditionalRange = $null
 $simplifiedRange = $null
+$multiTraditionalRange = $null
+$multiSimplifiedRange = $null
 $firstPageRange = $null
 $secondPageRange = $null
+$thirdPageRange = $null
 $summaryPath = Join-Path $OutputDirectory 'summary.json'
 
 function ConvertFrom-CodePoints {
@@ -151,14 +155,41 @@ $traditionalChinese = ConvertFrom-CodePoints @(0x7E41, 0x9AD4, 0x4E2D, 0x6587)
 $simplifiedChinese = ConvertFrom-CodePoints @(0x7B80, 0x4F53, 0x4E2D, 0x6587)
 $secondPageTraditional = ConvertFrom-CodePoints @(0x7B2C, 0x4E8C, 0x9801)
 $secondPageSimplified = ConvertFrom-CodePoints @(0x7B2C, 0x4E8C, 0x9875)
+$thirdPageTraditional = ConvertFrom-CodePoints @(0x7B2C, 0x4E09, 0x9801)
+$thirdPageSimplified = ConvertFrom-CodePoints @(0x7B2C, 0x4E09, 0x9875)
+$multiTraditional = ConvertFrom-CodePoints @(
+    0x591A, 0x6BB5, 0x843D, 0x7E41, 0x9AD4, 0x5167, 0x5BB9
+)
+$multiSimplified = ConvertFrom-CodePoints @(
+    0x591A, 0x6BB5, 0x843D, 0x7B80, 0x4F53, 0x5185, 0x5BB9
+)
 $itemHeader = ConvertFrom-CodePoints @(0x9805, 0x76EE)
 $amountHeader = ConvertFrom-CodePoints @(0x91D1, 0x984D)
 $familyTest = ConvertFrom-CodePoints @(0x5BB6, 0x5EAD, 0x6E2C, 0x8A66)
+$categoryHeader = ConvertFrom-CodePoints @(0x5206, 0x985E)
+$descriptionHeader = ConvertFrom-CodePoints @(0x8AAA, 0x660E)
+$additionalValue = ConvertFrom-CodePoints @(0x9644, 0x52A0)
+$secondTableValue = ConvertFrom-CodePoints @(
+    0x7B2C, 0x4E8C, 0x500B, 0x8868, 0x683C, 0x20, 0x2F, 0x20,
+    0x7B2C, 0x4E8C, 0x4E2A, 0x8868, 0x683C
+)
+$thirdPageSummary = ConvertFrom-CodePoints @(
+    0x7B2C, 0x4E09, 0x9801, 0x6458, 0x8981, 0x20, 0x2F, 0x20,
+    0x7B2C, 0x4E09, 0x9875, 0x6458, 0x8981
+)
+$regionHeader = ConvertFrom-CodePoints @(0x5730, 0x5340)
+$traditionalHeader = ConvertFrom-CodePoints @(0x7E41, 0x9AD4)
+$simplifiedHeader = ConvertFrom-CodePoints @(0x7B80, 0x4F53)
+$familyValue = ConvertFrom-CodePoints @(0x5BB6, 0x5EAD)
 $fallbackTraditional = ConvertFrom-CodePoints @(
     0x7121, 0x8868, 0x683C, 0x7B2C, 0x4E00, 0x884C
 )
 $fallbackSimplified = ConvertFrom-CodePoints @(
     0x65E0, 0x8868, 0x683C, 0x7B2C, 0x4E8C, 0x884C
+)
+$longFieldValue = ConvertFrom-CodePoints @(
+    0x9577, 0x6587, 0x5B57, 0x6B04, 0x4F4D, 0x20, 0x2F, 0x20,
+    0x957F, 0x6587, 0x5B57, 0x680F, 0x4F4D
 )
 
 try {
@@ -173,54 +204,92 @@ try {
         $simplifiedChinese,
         'FamilyPDF Office interoperability',
         $secondPageTraditional,
-        $secondPageSimplified
+        $secondPageSimplified,
+        $multiTraditional,
+        $multiSimplified,
+        $thirdPageTraditional,
+        $thirdPageSimplified,
+        'Mixed style: editable Office output'
     )) {
         if (-not $wordText.Contains($expected)) {
             throw "Microsoft Word did not read expected text: $expected"
         }
     }
     $wordPageCount = [int]$document.ComputeStatistics(2)
-    if ($wordPageCount -lt 2) {
-        throw "Microsoft Word reported $wordPageCount page instead of at least 2."
+    if ($wordPageCount -ne 3) {
+        throw "Microsoft Word reported $wordPageCount pages instead of 3."
+    }
+    $wordParagraphCount = [int]$document.Paragraphs.Count
+    if ($wordParagraphCount -ne 10) {
+        throw "Microsoft Word reported $wordParagraphCount paragraphs instead of 10."
     }
 
     $traditionalRange = $documentRange.Duplicate
     if (-not $traditionalRange.Find.Execute($traditionalChinese) -or
-        [int]$traditionalRange.Bold -ne -1) {
+        [int]$traditionalRange.Bold -ne -1 -or
+        [Math]::Abs([double]$traditionalRange.Font.Size - 14.0) -gt 0.1) {
         throw 'Microsoft Word did not preserve the expected bold run.'
     }
     $simplifiedRange = $documentRange.Duplicate
     if (-not $simplifiedRange.Find.Execute($simplifiedChinese) -or
-        [int]$simplifiedRange.Italic -ne -1) {
+        [int]$simplifiedRange.Italic -ne -1 -or
+        [Math]::Abs([double]$simplifiedRange.Font.Size - 12.0) -gt 0.1) {
         throw 'Microsoft Word did not preserve the expected italic run.'
+    }
+    $multiTraditionalRange = $documentRange.Duplicate
+    if (-not $multiTraditionalRange.Find.Execute($multiTraditional) -or
+        [int]$multiTraditionalRange.Bold -ne -1 -or
+        [Math]::Abs([double]$multiTraditionalRange.Font.Size - 18.0) -gt 0.1) {
+        throw 'Microsoft Word did not preserve the 18 pt bold paragraph run.'
+    }
+    $multiSimplifiedRange = $documentRange.Duplicate
+    if (-not $multiSimplifiedRange.Find.Execute($multiSimplified) -or
+        [int]$multiSimplifiedRange.Italic -ne -1 -or
+        [Math]::Abs([double]$multiSimplifiedRange.Font.Size - 9.0) -gt 0.1) {
+        throw 'Microsoft Word did not preserve the 9 pt italic paragraph run.'
     }
     $secondPageRange = $documentRange.Duplicate
     if (-not $secondPageRange.Find.Execute($secondPageTraditional) -or
         [int]$secondPageRange.Information(3) -ne 2) {
         throw 'Microsoft Word did not lay out the second-page text on page 2.'
     }
+    $thirdPageRange = $documentRange.Duplicate
+    if (-not $thirdPageRange.Find.Execute($thirdPageTraditional) -or
+        [int]$thirdPageRange.Information(3) -ne 3 -or
+        [int]$thirdPageRange.Bold -ne -1 -or
+        [Math]::Abs([double]$thirdPageRange.Font.Size - 16.0) -gt 0.1) {
+        throw 'Microsoft Word did not preserve the third-page heading.'
+    }
     $firstPageRange = $documentRange.Duplicate
     $firstPageRange.End = [Math]::Max(
         $firstPageRange.Start,
         $secondPageRange.Start - 1
     )
-    [void]$secondPageRange.Expand(4)
+    $secondPageRange.End = [Math]::Max(
+        $secondPageRange.Start,
+        $thirdPageRange.Start - 1
+    )
+    $thirdPageRange.End = $documentRange.End
     $wordFirstPagePreview = Save-WordRangePreview `
         -Range $firstPageRange `
         -BasePath (Join-Path $OutputDirectory 'word-page-1-preview')
     $wordSecondPagePreview = Save-WordRangePreview `
         -Range $secondPageRange `
         -BasePath (Join-Path $OutputDirectory 'word-page-2-preview')
+    $wordThirdPagePreview = Save-WordRangePreview `
+        -Range $thirdPageRange `
+        -BasePath (Join-Path $OutputDirectory 'word-page-3-preview')
 
     $excel = New-Object -ComObject Excel.Application
     $excel.Visible = $false
     $excel.DisplayAlerts = $false
     $workbook = $excel.Workbooks.Open($xlsxPath, 0, $true)
-    if ($workbook.Worksheets.Count -ne 2) {
-        throw "Microsoft Excel reported $($workbook.Worksheets.Count) worksheets instead of 2."
+    if ($workbook.Worksheets.Count -ne 3) {
+        throw "Microsoft Excel reported $($workbook.Worksheets.Count) worksheets instead of 3."
     }
     $firstSheet = $workbook.Worksheets.Item('Page 1')
     $secondSheet = $workbook.Worksheets.Item('Page 2')
+    $thirdSheet = $workbook.Worksheets.Item('Page 3')
     if ($firstSheet.Range('A1').Text -ne $itemHeader -or
         $firstSheet.Range('C1').Text -ne $amountHeader -or
         $firstSheet.Range('A2').Text -ne $familyTest -or
@@ -231,14 +300,35 @@ try {
     if (-not [bool]$firstSheet.Range('A1:B1').MergeCells) {
         throw 'Microsoft Excel did not preserve the expected merged cell range.'
     }
+    if ($firstSheet.Range('A4').Text -ne $categoryHeader -or
+        $firstSheet.Range('B4').Text -ne $descriptionHeader -or
+        $firstSheet.Range('A5').Text -ne $additionalValue -or
+        $firstSheet.Range('B5').Text -ne $secondTableValue) {
+        throw 'Microsoft Excel did not preserve the second table.'
+    }
     if ($secondSheet.Range('A1').Text -ne $fallbackTraditional -or
-        $secondSheet.Range('A2').Text -ne $fallbackSimplified) {
+        $secondSheet.Range('A2').Text -ne $fallbackSimplified -or
+        $secondSheet.Range('A3').Text -ne 'FamilyPDF fallback row 3' -or
+        $secondSheet.Range('A4').Text -ne $longFieldValue) {
         throw 'Microsoft Excel did not read the expected fallback text.'
     }
-    if ([int]$firstSheet.UsedRange.Rows.Count -ne 2 -or
+    if ($thirdSheet.Range('A1').Text -ne $thirdPageSummary -or
+        $thirdSheet.Range('A2').Text -ne $regionHeader -or
+        $thirdSheet.Range('B2').Text -ne $traditionalHeader -or
+        $thirdSheet.Range('C2').Text -ne $simplifiedHeader -or
+        $thirdSheet.Range('A3').Text -ne $familyValue -or
+        [int]$thirdSheet.Range('B3').Value2 -ne 10 -or
+        [int]$thirdSheet.Range('C3').Value2 -ne 20 -or
+        [int]$thirdSheet.Range('D3').Value2 -ne 30 -or
+        -not [bool]$thirdSheet.Range('A1:D1').MergeCells) {
+        throw 'Microsoft Excel did not preserve the third-page summary table.'
+    }
+    if ([int]$firstSheet.UsedRange.Rows.Count -ne 5 -or
         [int]$firstSheet.UsedRange.Columns.Count -ne 3 -or
-        [int]$secondSheet.UsedRange.Rows.Count -ne 2 -or
-        [int]$secondSheet.UsedRange.Columns.Count -ne 1) {
+        [int]$secondSheet.UsedRange.Rows.Count -ne 4 -or
+        [int]$secondSheet.UsedRange.Columns.Count -ne 1 -or
+        [int]$thirdSheet.UsedRange.Rows.Count -ne 3 -or
+        [int]$thirdSheet.UsedRange.Columns.Count -ne 4) {
         throw 'Microsoft Excel reported an unexpected used layout range.'
     }
     $firstColumnWidth = [double]$firstSheet.Columns.Item(1).ColumnWidth
@@ -246,6 +336,8 @@ try {
     # Excel reports the openpyxl width of 8 as about 7.38 because its
     # displayed ColumnWidth unit depends on the Normal style font metrics.
     if (-not [bool]$firstSheet.Range('A1').Font.Bold -or
+        -not [bool]$firstSheet.Range('A4').Font.Bold -or
+        -not [bool]$thirdSheet.Range('A1').Font.Bold -or
         $firstColumnWidth -lt 7 -or
         $thirdColumnWidth -lt 7) {
         throw 'Microsoft Excel did not preserve header style or fitted columns.'
@@ -271,11 +363,15 @@ finally {
         $word.Quit()
     }
     foreach ($comObject in @(
+        $thirdPageRange,
         $secondPageRange,
         $firstPageRange,
+        $multiSimplifiedRange,
+        $multiTraditionalRange,
         $simplifiedRange,
         $traditionalRange,
         $documentRange,
+        $thirdSheet,
         $secondSheet,
         $firstSheet,
         $workbook,
@@ -297,6 +393,7 @@ $summary = [ordered]@{
         application = $wordApplicationName
         version = $wordVersion
         pages = $wordPageCount
+        paragraphs = $wordParagraphCount
         file = $docxPath
         multilingual_text = $true
         bold_style = $true
@@ -305,6 +402,7 @@ $summary = [ordered]@{
         native_rendering = $true
         first_page_preview = $wordFirstPagePreview
         second_page_preview = $wordSecondPagePreview
+        third_page_preview = $wordThirdPagePreview
     }
     excel = [ordered]@{
         application = $excelApplicationName
@@ -312,6 +410,7 @@ $summary = [ordered]@{
         worksheets = $excelWorksheetCount
         file = $xlsxPath
         table_values = $true
+        multiple_tables = $true
         merged_cells = $true
         used_ranges = $true
         header_style = $true

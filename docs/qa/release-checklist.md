@@ -14,8 +14,8 @@
 - [x] `PdfTool info` 確認大型測試檔為 1,160 頁。
 - [x] Viewer／Editor 一次開啟三份 PDF，工作階段各記錄 3 份文件且保持 Responding。
 - [x] 主安裝程式隔離靜默安裝 exit code `0`；安裝後插件與 Office helper 回歸通過。
-- [x] Microsoft Word 16.0／Excel 16.0 實際唯讀開啟匯出產物；兩頁分頁、多語文字、粗斜體、兩工作表、UsedRange、表格值、合併儲存格、表頭樣式與欄寬驗證通過。
-- [x] Word 原生 renderer 輸出兩頁 PNG 預覽；尺寸、非空白像素及 SHA-256 已記錄，固定 fixture 的繁簡中、英文、粗斜體及第二頁內容巡覽未見亂碼、缺字方框、裁切或重疊。
+- [x] Microsoft Word 16.0／Excel 16.0 實際唯讀開啟匯出產物；三頁十段落、五種字級、多語粗斜體、三工作表、同頁多表格、四行 fallback、UsedRange、跨欄合併、各表表頭樣式與欄寬驗證通過。
+- [x] Word 原生 renderer 輸出三頁 PNG 預覽；尺寸、非空白像素及 SHA-256 已記錄，固定 fixture 的繁簡中、英文、混合字級、粗斜體及三頁內容巡覽未見亂碼、缺字方框、裁切或重疊。
 - [x] 1,160 頁 PDF 在繁中／簡中 GUI 完成頁碼欄、文件結尾及縮略圖跳轉，主畫面與縮圖同步且維持 Responding。
 - [x] 一鍵完整安裝程式的完整／精簡元件選擇均隔離安裝成功；完整模式通過繁簡中 OCR，精簡模式不含 OCR。
 - [x] 一鍵完整安裝程式的繁中／簡中 GUI 均正確顯示三種安裝類型；完整與精簡模式切換會同步勾選／取消 OCR。
@@ -99,7 +99,7 @@ Adobe Acrobat 文件級編輯互通：
 - [ ] 在簡體中文 Windows 實機長時間快速翻閱 1,160 頁 PDF。
 - [x] 用 Adobe Acrobat DC 填寫並儲存 `dist\qa\form-interop.pdf`，再以獨立 parser 驗證。
 - [ ] 由真人巡覽不同內容下的浮水印、背景、裁切及旋轉視覺品質；固定 fixture 已完成 Adobe 另存與逐頁像素等價回歸。
-- [ ] 使用 Microsoft Word／Excel 人工巡覽任意複雜 PDF 的多欄、浮動圖片、跨頁表格及特殊字型匯出結果；固定兩頁 fixture 已完成 Word 原生渲染與巡覽。
+- [ ] 使用 Microsoft Word／Excel 人工巡覽 writer 尚未支援的多欄、浮動圖片、跨頁表格、精確座標版面及特殊字型；支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。
 - [ ] 以正式程式碼簽章憑證簽署安裝檔；目前 SmartScreen 可能顯示未知發行者。
 
 這些未勾選項目不代表檔案結構或自動回歸失敗，而是需要人工視覺判斷、不同語系實機或商業簽章憑證才能完成的驗收邊界。Adobe 表單互通已透過官方 IAC 完成；文件級編輯成果仍保留人工視覺巡覽。
