@@ -44,9 +44,9 @@
 
 ## 已知限制
 
-- 五種 AcroForm 欄位已完成建立 UI 與 parser round-trip 自動測試；仍待外部 GUI 閱讀器人工巡覽。
+- 五種 AcroForm 欄位已完成建立 UI、parser round-trip，以及 Adobe Acrobat DC 實際修改另存與獨立 parser 回讀。
 - PDF 轉 DOCX／XLSX 已完成文字層、基本樣式、表格與逐行 fallback；複雜版面可能需要人工整理。
-- 進階內容編輯、浮水印、背景與頁面幾何工具已完成自動測試；仍待繁體／簡體 Windows 的 GUI 人工巡覽。
+- 進階內容編輯、浮水印、背景與頁面幾何工具已完成自動測試；固定 fixture 另經 Adobe Acrobat DC 逐頁解析與另存，獨立 renderer 的逐頁 RGB 像素不變。不同實際內容仍待真人視覺巡覽。
 - 尚未在兩台分別使用繁體中文與簡體中文 Windows 的實機上逐頁人工巡覽；目前證據是雙語 `.qm`、雙語安裝語系與本機 Windows 執行驗證。
 - 自製安裝程式尚未使用商業程式碼簽章憑證；Windows SmartScreen 可能顯示未知發行者。
 - 數百頁測試證明可開啟與保持回應，不等同長時間人工快速翻頁壓力測試。

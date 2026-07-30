@@ -55,7 +55,9 @@ E:\CodexProject\FamilyPDF\dist\FamilyPDF-OCR-Plugin-windows-x64.zip
 - 安裝後 PdfTool：合併成 58 頁，單數／雙數／`10-20` 範圍為 29／29／11 頁，1,160 頁資訊通過。
 - Viewer／Editor 同時載入三份 PDF；1,160 頁檔案在繁中／簡中 GUI 完成頁碼與縮略圖跳轉並保持 Responding。
 - Adobe Acrobat DC 實際修改並另存 AcroForm 後，中文欄位名稱、值與預設值由 `pypdf` 獨立讀回。
+- Adobe Acrobat DC 實際逐頁解析並另存浮水印／背景與頁面幾何 fixture，獨立 parser 結構及逐頁 RGB 渲染雜湊均保留。
 - Microsoft Word／Excel 16.0 實際開啟匯出產物，頁數、工作表、多語文字、表格值與合併儲存格通過。
+- 完整／精簡安裝後的核心與 OCR payload 已逐檔比對目前可攜包 SHA-256。
 
 完整證據見 `docs\RELEASE-STATUS.md`、`docs\REQUIREMENTS-AUDIT.md` 與 `docs\qa\release-checklist.md`。
 

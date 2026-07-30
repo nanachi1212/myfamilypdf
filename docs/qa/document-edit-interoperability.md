@@ -1,25 +1,26 @@
-# 文件級進階編輯互通性驗證
+# 文件級編輯互通性驗證
 
 更新日期：2026-07-30
 
 ## 已完成的自動驗證
 
-- `UnitTestsDocumentEdit` 建立三頁 PDF，保留每頁原始內容流，再只對單數頁插入背景內容流、只對第二頁插入繁體中文文字浮水印。
-- 背景使用標準頁面 `/Contents` 陣列的第一個 stream（`PlaceBefore`）；前景浮水印使用最後一個 stream（`PlaceAfter`），不使用 FamilyPDF 私有 sidecar。
-- 圖片背景以 QImage 寫入標準 PDF image resource，支援 Fit、Fill 及 Stretch；測試寫入磁碟後由 PDF4QT reader 重開。
-- 頁面幾何測試只修改第二頁為 148 × 210 mm、同步 `MediaBox`／`CropBox` 並順時針旋轉 90 度；第一頁維持 300 × 400 pt 與 0 度。
-- 六組 CTest 全數通過，包含新的 `UnitTestsDocumentEdit`。
-- 最終繁中可攜包 GUI 已確認 `Document Edit` 工具列由舊空白插件設定自動啟用並顯示 `Add Text Watermark` 動作。
+- `UnitTestsDocumentEdit` 建立三頁文件，將純色背景套用單數頁、將「家庭測試」文字浮水印套用第 2 頁，並驗證背景在原內容之前、浮水印在原內容之後。
+- 同一測試另建立頁面尺寸、MediaBox、CropBox 與 90 度旋轉 fixture；由 PDF4QT 寫入磁碟、重開並確認幾何值保留。
+- `dist\qa\document-edit-interop.pdf` 與 `dist\qa\page-geometry-interop.pdf` 均由 Adobe Acrobat DC 實際開啟、逐頁取得頁面物件並另存。
+- Adobe 另存結果由 `pypdf` 驗證頁數、MediaBox、CropBox 與旋轉；再由 `pypdfium2` 以固定倍率逐頁渲染，來源與另存結果的 RGB 像素 SHA-256 完全一致。
+- Acrobat 測試拒絕在使用者已有 Acrobat 行程時啟動，並只會清理由隔離測試建立的 Acrobat 行程。
 
-## 外部 parser 檢查
+執行：
 
-- `pypdf 6.14.2` 重讀 `dist/qa/document-edit-interop.pdf`，確認三頁的 `/Contents` 都是兩個 stream 的陣列，解碼後總長分別為 358、429、358 bytes。
-- `pypdf 6.14.2` 重讀 `dist/qa/page-geometry-interop.pdf`，確認旋轉值為 `[0, 90]`，第二頁尺寸為 `419.52756 × 595.2756 pt`，且兩頁 `CropBox` 均與各自 `MediaBox` 一致。
+```powershell
+.\scripts\qa\smoke-acrobat-document-edit.ps1
+```
 
-## 尚待發佈前人工巡覽
+結果會寫入 `build\acrobat-document-edit-interop\summary.json`。
 
-- 在 FamilyPDF Editor 的 `Document Edit` 選單逐一操作文字浮水印、純色背景、圖片背景、頁面尺寸與左右旋轉。
-- 儲存後以 Microsoft Edge 或 Adobe Acrobat Reader 開啟，確認內容層順序、中文字形、透明度、圖片裁切與頁面方向。
-- 在繁體中文及簡體中文 Windows 各測一次預設中文字型與檔案選擇對話框。
+## 尚待人工巡覽
 
-人工巡覽完成前，本文件只證明 PDF 結構、磁碟 round-trip 與獨立 parser 互通，不宣稱已完成所有 GUI 驗收。
+- 在 FamilyPDF Editor 以不同文字、顏色、圖片與頁碼範圍實際操作每個對話框。
+- 由真人依主觀可讀性判斷浮水印透明度、背景圖片裁切及複雜原始內容的視覺品質。
+
+自動回歸已證明標準 PDF 結構可由 Adobe 讀取／另存，且固定 fixture 的渲染畫面不變；它不取代不同實際文件的主觀視覺驗收。

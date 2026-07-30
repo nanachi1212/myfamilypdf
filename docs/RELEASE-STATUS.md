@@ -19,6 +19,7 @@
 - CTest 6/6 通過；另有 Office Export Python 單元測試 7/7 通過。
 - pypdf 獨立讀回標準 PDF outline：繁體中文標題、資料夾階層、文字顏色、粗體及頁面目的地均保留。
 - Adobe Acrobat DC 已透過官方 IAC 開啟、修改並另存 AcroForm；`pypdf` 獨立讀回確認「姓名」「同意」欄位名稱、修改值與原始預設值保留。修正過程也為 PDF writer 補上 CR／LF hexadecimal string 序列化，避免 UTF-16BE 位元組被外部閱讀器正規化。
+- Adobe Acrobat DC 已實際開啟、逐頁解析並另存浮水印／背景與頁面幾何 fixture；`pypdf` 確認頁數、MediaBox、CropBox、旋轉保留，`pypdfium2` 固定倍率逐頁 RGB 像素 SHA-256 與來源完全一致。摘要：`build\acrobat-document-edit-interop\summary.json`。
 - 標準 Highlight、Underline、StrikeOut、Square、FreeText、Text 六種註解由 FamilyPDF 嚴格模式重開及 pypdf 交叉驗證通過。
 - 繁體及簡體中文驗證安裝各為 exit code `0`；安裝後 Viewer、Editor、PageMaster 同時載入中文檔名與 1,160 頁 PDF，15 秒後全部為 Responding。
 - 單數頁、雙數頁及 `10-20` 範圍輸出經獨立引擎驗證為 29、29、11 頁；合併 58 頁及大型 1,160 頁檔案頁數亦正確。
@@ -42,6 +43,7 @@
 - 最終可攜包回歸摘要：`build\final-regression-20260730-140036\summary.json`（本機可重建，不提交 Git）。
 - 最新主安裝程式再次隔離靜默安裝成功；安裝後六個插件及 Office helper 的 DOCX／XLSX 產物重讀通過。
 - 修正後的完整驗證安裝檔已重新建置；完整與精簡模式安裝通過，完整模式繁中／簡中／英文 OCR 與可搜尋 PDF 回歸通過。摘要：`build\full-installer-smoke\summary.json`。
+- 完整安裝的 405 個核心檔案與 29 個 OCR 檔案、精簡安裝的 405 個核心檔案，均與目前 `dist` 可攜包逐檔 SHA-256 相同；安裝器刻意排除僅供免安裝模式使用的 `portable.mode`。
 - Microsoft Word 16.0 已實際開啟匯出 DOCX，辨識兩頁、繁體中文、簡體中文及英文；Microsoft Excel 16.0 已實際開啟匯出 XLSX，辨識兩個工作表、表格值、繁簡中文及合併儲存格。驗證摘要：`build\microsoft-office-smoke\summary.json`。
 - 1,160 頁 PDF 已在繁中與簡中 GUI 分別完成第 1 → 580 → 1,160 → 1,157 頁跳轉；頁碼、主畫面與縮略圖同步，簡中視窗持續約 112 秒後仍為 Responding。
 

@@ -55,6 +55,55 @@ function Install-Isolated {
     }
 }
 
+function Assert-PayloadMatches {
+    param(
+        [Parameter(Mandatory)][string]$Source,
+        [Parameter(Mandatory)][string]$Target,
+        [Parameter(Mandatory)][string]$Label,
+        [string[]]$Exclude = @()
+    )
+
+    if (-not (Test-Path -LiteralPath $Source -PathType Container)) {
+        throw "Payload source was not found: $Source"
+    }
+    $sourceRoot = [IO.Path]::GetFullPath($Source).TrimEnd('\')
+    $sourcePrefix = $sourceRoot + '\'
+    $files = @(Get-ChildItem -LiteralPath $sourceRoot -File -Recurse)
+    foreach ($sourceFile in $files) {
+        if (-not $sourceFile.FullName.StartsWith(
+                $sourcePrefix,
+                [StringComparison]::OrdinalIgnoreCase
+            )) {
+            throw "Payload file escaped its source root: $($sourceFile.FullName)"
+        }
+        $relativePath = $sourceFile.FullName.Substring(
+            $sourcePrefix.Length
+        )
+        if ($Exclude -contains $relativePath) {
+            continue
+        }
+        $installedFile = Join-Path $Target $relativePath
+        if (-not (Test-Path -LiteralPath $installedFile -PathType Leaf)) {
+            throw "$Label is missing packaged file: $relativePath"
+        }
+        $sourceHash = (
+            Get-FileHash -Algorithm SHA256 -LiteralPath $sourceFile.FullName
+        ).Hash
+        $installedHash = (
+            Get-FileHash -Algorithm SHA256 -LiteralPath $installedFile
+        ).Hash
+        if ($sourceHash -ne $installedHash) {
+            throw "$Label payload differs from package: $relativePath"
+        }
+    }
+    return @(
+        $files | Where-Object {
+            $relative = $_.FullName.Substring($sourcePrefix.Length)
+            $Exclude -notcontains $relative
+        }
+    ).Count
+}
+
 Install-Isolated -Target $fullRoot -Components 'core,ocr'
 Install-Isolated -Target $coreRoot -Components 'core'
 
@@ -102,6 +151,18 @@ foreach ($relativePath in @(
     }
 }
 
+$corePackage = Join-Path $repositoryRoot 'dist\FamilyPDF-windows-x64'
+$ocrPackage = Join-Path $repositoryRoot `
+    'dist\FamilyPDF-OCR-Plugin-windows-x64'
+$fullCoreFileCount = Assert-PayloadMatches `
+    -Source $corePackage -Target $fullRoot -Label 'Full installation core' `
+    -Exclude @('portable.mode')
+$coreOnlyFileCount = Assert-PayloadMatches `
+    -Source $corePackage -Target $coreRoot -Label 'Core-only installation' `
+    -Exclude @('portable.mode')
+$fullOcrFileCount = Assert-PayloadMatches `
+    -Source $ocrPackage -Target $fullRoot -Label 'Full installation OCR'
+
 & (Join-Path $repositoryRoot 'scripts\ocr\Test-FamilyPDF-OCR-Horizontal.ps1') `
     -PdfToolPath (Join-Path $fullRoot 'PdfTool.exe') `
     -TesseractPath (Join-Path $fullRoot 'ocr\tesseract.exe') `
@@ -136,11 +197,14 @@ $summary = [ordered]@{
         languages = @('eng', 'chi_tra', 'chi_sim', 'chi_tra_vert', 'chi_sim_vert')
         horizontal_ocr = $true
         viewer_responding = $true
+        core_payload_files_verified = $fullCoreFileCount
+        ocr_payload_files_verified = $fullOcrFileCount
     }
     core_only_install = [ordered]@{
         path = $coreRoot
         base_application = $true
         ocr = $false
+        core_payload_files_verified = $coreOnlyFileCount
     }
 }
 $summaryPath = Join-Path $testRoot 'summary.json'

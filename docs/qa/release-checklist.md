@@ -22,6 +22,8 @@
 - [x] Windows PDF 整合實際安裝與解除安裝 exit code 均為 `0`；Viewer／Editor 可透過完整引用命令開啟含中文與空格的 PDF，解除安裝後 Registry 與安裝檔案均已移除。
 - [x] Adobe Acrobat DC 實際開啟、修改並另存 AcroForm；`pypdf` 重讀確認中文欄位名稱、修改值與預設值均保留。
 - [x] PDF writer 遇到 CR／LF 的 Unicode 位元組時改用 hexadecimal string，避免外部閱讀器正規化造成中文欄位名稱變異。
+- [x] Adobe Acrobat DC 實際開啟、逐頁解析並另存浮水印／背景與頁面幾何 fixture；`pypdf` 結構及 `pypdfium2` 逐頁 RGB 渲染雜湊均保留。
+- [x] 完整安裝的 405 個核心檔案與 29 個 OCR 檔案、精簡安裝的 405 個核心檔案，均與目前可攜包逐檔 SHA-256 相同；僅排除安裝版不應攜帶的 `portable.mode`。
 
 執行：
 
@@ -71,6 +73,14 @@ Adobe Acrobat 表單互通：
 
 結果會寫入 `build\acrobat-form-interop\summary.json`。
 
+Adobe Acrobat 文件級編輯互通：
+
+```powershell
+.\scripts\qa\smoke-acrobat-document-edit.ps1
+```
+
+結果會寫入 `build\acrobat-document-edit-interop\summary.json`。
+
 ## 發佈產物
 
 - [x] `dist\FamilyPDF-Full-Setup-x64.exe`
@@ -87,7 +97,7 @@ Adobe Acrobat 表單互通：
 - [ ] 在繁體中文 Windows 實機長時間快速翻閱 1,160 頁 PDF。
 - [ ] 在簡體中文 Windows 實機長時間快速翻閱 1,160 頁 PDF。
 - [x] 用 Adobe Acrobat DC 填寫並儲存 `dist\qa\form-interop.pdf`，再以獨立 parser 驗證。
-- [ ] 用 Microsoft Edge 或 Adobe Acrobat Reader 巡覽浮水印、背景、裁切及旋轉結果。
+- [ ] 由真人巡覽不同內容下的浮水印、背景、裁切及旋轉視覺品質；固定 fixture 已完成 Adobe 另存與逐頁像素等價回歸。
 - [ ] 使用 Microsoft Word／Excel 人工巡覽複雜版面匯出結果。
 - [ ] 以正式程式碼簽章憑證簽署安裝檔；目前 SmartScreen 可能顯示未知發行者。
 

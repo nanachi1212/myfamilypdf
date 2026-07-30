@@ -115,6 +115,14 @@
 - Word／Excel 關閉時不儲存，COM 物件釋放後沒有殘留 Office 行程。
 - 這項驗證證明 Microsoft Office 本體可以解析 FamilyPDF 產物；複雜 PDF 轉換後的視覺排版品質仍需要人工巡覽。
 
+## Adobe Acrobat 文件互通（2026-07-30）
+
+- Adobe Acrobat DC 透過官方 IAC 實際開啟、逐頁解析並另存浮水印／背景及頁面幾何 fixture。
+- `pypdf` 確認三頁裝飾文件與兩頁幾何文件的頁數，以及 MediaBox、CropBox、旋轉均保留。
+- `pypdfium2` 以固定倍率逐頁渲染來源及 Adobe 另存檔；所有 RGB 像素 SHA-256 完全一致。
+- 測試會拒絕干擾已開啟的使用者 Acrobat 工作階段，完成後也不留下測試建立的 Acrobat 行程。
+- `scripts\qa\smoke-acrobat-document-edit.ps1` 可重跑，摘要位於 `build\acrobat-document-edit-interop\summary.json`。
+
 ## 1,160 頁 GUI 跳轉（2026-07-30）
 
 - 最終可攜版 Viewer 在繁中與簡中設定下均正確顯示對應語系選單、頁碼、縮略圖及側欄文字。

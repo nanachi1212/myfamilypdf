@@ -40,6 +40,16 @@ if (Get-Process -Name Acrobat -ErrorAction SilentlyContinue) {
     throw 'Adobe Acrobat is already running. Close it before this isolated smoke test.'
 }
 
+function Stop-IsolatedAcrobat {
+    $processes = @(Get-Process -Name Acrobat -ErrorAction SilentlyContinue)
+    if ($processes.Count -eq 0) {
+        return
+    }
+    $processes | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
+    Get-Process -Name Acrobat -ErrorAction SilentlyContinue |
+        Stop-Process -Force
+}
+
 $venvPython = Join-Path (
     Split-Path $repositoryRoot -Parent
 ) 'FamilyPDF-tools\office-export-venv\Scripts\python.exe'
@@ -73,13 +83,13 @@ for ($attempt = 1; $attempt -le 3; $attempt++) {
         (Test-Path -LiteralPath $outputPdf -PathType Leaf)
     ) {
         $driverSucceeded = $true
+        Stop-IsolatedAcrobat
         break
     }
 
     # This script refuses to start when Acrobat was already running, so any
     # Acrobat process here belongs to the failed isolated attempt.
-    Get-Process -Name Acrobat -ErrorAction SilentlyContinue |
-        Stop-Process -Force
+    Stop-IsolatedAcrobat
     if ($attempt -lt 3) {
         Write-Warning (
             "Acrobat COM attempt $attempt failed with exit code " +
