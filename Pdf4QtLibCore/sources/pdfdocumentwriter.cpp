@@ -99,7 +99,9 @@ void PDFWriteObjectVisitor::visitString(PDFStringRef string)
     QByteArray data = string.getString();
     if (data.indexOf('(') != -1 ||
         data.indexOf(')') != -1 ||
-        data.indexOf('\\') != -1)
+        data.indexOf('\\') != -1 ||
+        data.indexOf('\r') != -1 ||
+        data.indexOf('\n') != -1)
     {
         m_device->write("<");
         m_device->write(data.toHex());

@@ -8,6 +8,7 @@
 #include "pdfform.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -74,6 +75,13 @@ void FormBuilderTest::textAndCheckBoxFieldsRoundTrip()
         writer.write(outputPath, &document, true);
     QVERIFY2(static_cast<bool>(writeResult),
              qPrintable(writeResult.getErrorMessage()));
+
+    QFile serializedFile(outputPath);
+    QVERIFY(serializedFile.open(QFile::ReadOnly));
+    const QByteArray serializedPdf = serializedFile.readAll();
+    QVERIFY2(serializedPdf.contains(QByteArrayLiteral("<feff59d3540d>")),
+             "UTF-16BE field names containing CR/LF bytes must use a hex "
+             "PDF string so external readers do not normalize the bytes.");
 
     pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
     pdf::PDFDocument restoredDocument = reader.readFromFile(outputPath);

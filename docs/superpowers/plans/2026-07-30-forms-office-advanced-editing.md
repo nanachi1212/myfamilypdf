@@ -153,7 +153,7 @@ Expected: 所有既有測試與 `UnitTestsForms` 通過。
 
 加入反白切換、重設到預設值、Tab 欄位順序，並確保修改會觸發主程式 dirty state。
 
-- [ ] Step 5: 互通性測試
+- [x] Step 5: 互通性測試
 
 建立含中英文欄位名稱與值的 PDF，儲存後以 PDF4QT parser 重讀；另以至少一個外部閱讀器手動確認文字與核取狀態保留。手動檢查結果寫入 `docs/qa/form-interoperability.md`。
 
@@ -267,7 +267,7 @@ Expected: `dist/FamilyPDF-Office-Export/FamilyPDFOfficeExport.exe` 可在未安�
 - [x] Step 2: 以 `QProcess` 呼叫 helper，顯示進度、取消、警告與錯誤，不阻塞 UI
 - [x] Step 3: 偵測無文字層頁面並提示先安裝／執行 OCR
 - [x] Step 4: 將 Office Export 隔離在 `office-export` 子目錄並納入主安裝包；移除主程式會一併安全移除
-- [ ] Step 5: 驗證繁中與簡中 Windows 安裝、DOCX／XLSX 產物重讀
+- [x] Step 5: 驗證繁中與簡中 Windows 安裝、DOCX／XLSX 產物重讀
 
 ## Task 8：最終回歸、文件、發佈
 

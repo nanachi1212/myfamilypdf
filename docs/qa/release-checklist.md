@@ -20,6 +20,8 @@
 - [x] 一鍵完整安裝程式的繁中／簡中 GUI 均正確顯示三種安裝類型；完整與精簡模式切換會同步勾選／取消 OCR。
 - [x] 繁中／簡中 GUI 正確顯示 Windows PDF 整合且預設勾選；Registry 僅使用 HKCU、受單一安裝 task 控制、命令完整引用路徑及 `%1`，並具解除安裝清理旗標。
 - [x] Windows PDF 整合實際安裝與解除安裝 exit code 均為 `0`；Viewer／Editor 可透過完整引用命令開啟含中文與空格的 PDF，解除安裝後 Registry 與安裝檔案均已移除。
+- [x] Adobe Acrobat DC 實際開啟、修改並另存 AcroForm；`pypdf` 重讀確認中文欄位名稱、修改值與預設值均保留。
+- [x] PDF writer 遇到 CR／LF 的 Unicode 位元組時改用 hexadecimal string，避免外部閱讀器正規化造成中文欄位名稱變異。
 
 執行：
 
@@ -61,6 +63,14 @@ Windows PDF 整合安裝／解除安裝：
 
 結果會寫入 `build\shell-installer-smoke-summary.json`。
 
+Adobe Acrobat 表單互通：
+
+```powershell
+.\scripts\qa\smoke-acrobat-form-interop.ps1
+```
+
+結果會寫入 `build\acrobat-form-interop\summary.json`。
+
 ## 發佈產物
 
 - [x] `dist\FamilyPDF-Full-Setup-x64.exe`
@@ -76,9 +86,9 @@ Windows PDF 整合安裝／解除安裝：
 
 - [ ] 在繁體中文 Windows 實機長時間快速翻閱 1,160 頁 PDF。
 - [ ] 在簡體中文 Windows 實機長時間快速翻閱 1,160 頁 PDF。
-- [ ] 用 Microsoft Edge 或 Adobe Acrobat Reader 填寫並儲存 `dist\qa\form-interop.pdf`。
+- [x] 用 Adobe Acrobat DC 填寫並儲存 `dist\qa\form-interop.pdf`，再以獨立 parser 驗證。
 - [ ] 用 Microsoft Edge 或 Adobe Acrobat Reader 巡覽浮水印、背景、裁切及旋轉結果。
 - [ ] 使用 Microsoft Word／Excel 人工巡覽複雜版面匯出結果。
 - [ ] 以正式程式碼簽章憑證簽署安裝檔；目前 SmartScreen 可能顯示未知發行者。
 
-這些未勾選項目不代表檔案結構或自動回歸失敗，而是需要人工視覺判斷、不同語系實機或商業簽章憑證才能完成的驗收邊界。瀏覽器控制安全層禁止代理程式載入本機 `file://` PDF，因此 Edge／Adobe 的兩項不得以自動化繞過。
+這些未勾選項目不代表檔案結構或自動回歸失敗，而是需要人工視覺判斷、不同語系實機或商業簽章憑證才能完成的驗收邊界。Adobe 表單互通已透過官方 IAC 完成；文件級編輯成果仍保留人工視覺巡覽。
