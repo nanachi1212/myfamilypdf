@@ -54,18 +54,97 @@ foreach ($path in @($docxPath, $xlsxPath)) {
 
 $word = $null
 $document = $null
+$documentRange = $null
 $excel = $null
 $workbook = $null
 $firstSheet = $null
 $secondSheet = $null
 $traditionalRange = $null
 $simplifiedRange = $null
+$firstPageRange = $null
 $secondPageRange = $null
 $summaryPath = Join-Path $OutputDirectory 'summary.json'
 
 function ConvertFrom-CodePoints {
     param([Parameter(Mandatory)][int[]]$Value)
     return -join @($Value | ForEach-Object { [char]$_ })
+}
+
+function Save-WordRangePreview {
+    param(
+        [Parameter(Mandatory)][object]$Range,
+        [Parameter(Mandatory)][string]$BasePath
+    )
+
+    $emfPath = "$BasePath.emf"
+    $pngPath = "$BasePath.png"
+    $bits = [byte[]]$Range.EnhMetaFileBits
+    if ($bits.Count -eq 0) {
+        throw "Microsoft Word returned no rendered EMF data: $BasePath"
+    }
+    [IO.File]::WriteAllBytes($emfPath, $bits)
+
+    Add-Type -AssemblyName System.Drawing
+    $image = [Drawing.Image]::FromFile($emfPath)
+    try {
+        if ($image.Width -lt 16 -or $image.Height -lt 16) {
+            throw "Microsoft Word returned an invalid preview size: $BasePath"
+        }
+        $bitmap = New-Object Drawing.Bitmap(
+            $image.Width,
+            $image.Height,
+            [Drawing.Imaging.PixelFormat]::Format32bppArgb
+        )
+        try {
+            $graphics = [Drawing.Graphics]::FromImage($bitmap)
+            try {
+                $graphics.Clear([Drawing.Color]::White)
+                $graphics.DrawImage(
+                    $image,
+                    0,
+                    0,
+                    $bitmap.Width,
+                    $bitmap.Height
+                )
+            }
+            finally {
+                $graphics.Dispose()
+            }
+            $bitmap.Save($pngPath, [Drawing.Imaging.ImageFormat]::Png)
+            $nonwhite = 0
+            $sampleCount = 0
+            for ($y = 0; $y -lt $bitmap.Height; $y += 4) {
+                for ($x = 0; $x -lt $bitmap.Width; $x += 4) {
+                    $sampleCount++
+                    $color = $bitmap.GetPixel($x, $y)
+                    if ([Math]::Min(
+                            $color.R,
+                            [Math]::Min($color.G, $color.B)
+                        ) -lt 245) {
+                        $nonwhite++
+                    }
+                }
+            }
+            if ($nonwhite -lt 50) {
+                throw "Microsoft Word returned a blank preview: $BasePath"
+            }
+        }
+        finally {
+            $bitmap.Dispose()
+        }
+        return [ordered]@{
+            png = $pngPath
+            width = $image.Width
+            height = $image.Height
+            nonwhite_ratio = $nonwhite / $sampleCount
+            sha256 = (
+                Get-FileHash -Algorithm SHA256 -LiteralPath $pngPath
+            ).Hash
+        }
+    }
+    finally {
+        $image.Dispose()
+    }
 }
 
 $traditionalChinese = ConvertFrom-CodePoints @(0x7E41, 0x9AD4, 0x4E2D, 0x6587)
@@ -87,7 +166,8 @@ try {
     $word.Visible = $false
     $word.DisplayAlerts = 0
     $document = $word.Documents.Open($docxPath, $false, $true, $false)
-    $wordText = [string]$document.Content.Text
+    $documentRange = $document.Content
+    $wordText = [string]$documentRange.Text
     foreach ($expected in @(
         $traditionalChinese,
         $simplifiedChinese,
@@ -104,21 +184,33 @@ try {
         throw "Microsoft Word reported $wordPageCount page instead of at least 2."
     }
 
-    $traditionalRange = $document.Content.Duplicate
+    $traditionalRange = $documentRange.Duplicate
     if (-not $traditionalRange.Find.Execute($traditionalChinese) -or
         [int]$traditionalRange.Bold -ne -1) {
         throw 'Microsoft Word did not preserve the expected bold run.'
     }
-    $simplifiedRange = $document.Content.Duplicate
+    $simplifiedRange = $documentRange.Duplicate
     if (-not $simplifiedRange.Find.Execute($simplifiedChinese) -or
         [int]$simplifiedRange.Italic -ne -1) {
         throw 'Microsoft Word did not preserve the expected italic run.'
     }
-    $secondPageRange = $document.Content.Duplicate
+    $secondPageRange = $documentRange.Duplicate
     if (-not $secondPageRange.Find.Execute($secondPageTraditional) -or
         [int]$secondPageRange.Information(3) -ne 2) {
         throw 'Microsoft Word did not lay out the second-page text on page 2.'
     }
+    $firstPageRange = $documentRange.Duplicate
+    $firstPageRange.End = [Math]::Max(
+        $firstPageRange.Start,
+        $secondPageRange.Start - 1
+    )
+    [void]$secondPageRange.Expand(4)
+    $wordFirstPagePreview = Save-WordRangePreview `
+        -Range $firstPageRange `
+        -BasePath (Join-Path $OutputDirectory 'word-page-1-preview')
+    $wordSecondPagePreview = Save-WordRangePreview `
+        -Range $secondPageRange `
+        -BasePath (Join-Path $OutputDirectory 'word-page-2-preview')
 
     $excel = New-Object -ComObject Excel.Application
     $excel.Visible = $false
@@ -180,8 +272,10 @@ finally {
     }
     foreach ($comObject in @(
         $secondPageRange,
+        $firstPageRange,
         $simplifiedRange,
         $traditionalRange,
+        $documentRange,
         $secondSheet,
         $firstSheet,
         $workbook,
@@ -208,6 +302,9 @@ $summary = [ordered]@{
         bold_style = $true
         italic_style = $true
         page_break_layout = $true
+        native_rendering = $true
+        first_page_preview = $wordFirstPagePreview
+        second_page_preview = $wordSecondPagePreview
     }
     excel = [ordered]@{
         application = $excelApplicationName

@@ -44,7 +44,7 @@
 - 最新主安裝程式再次隔離靜默安裝成功；安裝後六個插件及 Office helper 的 DOCX／XLSX 產物重讀通過。
 - 修正後的完整驗證安裝檔已重新建置；完整與精簡模式安裝通過，完整模式繁中／簡中／英文 OCR 與可搜尋 PDF 回歸通過。摘要：`build\full-installer-smoke\summary.json`。
 - 完整安裝的 405 個核心檔案與 29 個 OCR 檔案、精簡安裝的 405 個核心檔案，均與目前 `dist` 可攜包逐檔 SHA-256 相同；安裝器刻意排除僅供免安裝模式使用的 `portable.mode`。
-- Microsoft Word 16.0 已實際開啟匯出 DOCX，辨識兩頁、明確分頁、繁體中文、簡體中文、英文及粗斜體；Microsoft Excel 16.0 已實際開啟匯出 XLSX，辨識兩個工作表、UsedRange、表格值、繁簡中文、合併儲存格、表頭粗體及自動欄寬。驗證摘要：`build\microsoft-office-smoke\summary.json`。
+- Microsoft Word 16.0 已實際開啟匯出 DOCX，辨識兩頁、明確分頁、繁體中文、簡體中文、英文及粗斜體；Word 原生 renderer 另輸出兩頁 PNG，尺寸、非白色像素比例及 SHA-256 均已記錄，固定 fixture 巡覽未見亂碼、缺字方框、裁切或重疊。Microsoft Excel 16.0 已實際開啟匯出 XLSX，辨識兩個工作表、UsedRange、表格值、繁簡中文、合併儲存格、表頭粗體及自動欄寬。驗證摘要：`build\microsoft-office-smoke\summary.json`。
 - 1,160 頁 PDF 已在繁中與簡中 GUI 分別完成第 1 → 580 → 1,160 → 1,157 頁跳轉；頁碼、主畫面與縮略圖同步，簡中視窗持續約 112 秒後仍為 Responding。
 
 ## Git

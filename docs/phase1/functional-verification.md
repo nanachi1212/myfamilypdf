@@ -111,9 +111,11 @@
 
 - `scripts\qa\smoke-microsoft-office.ps1` 先以 FamilyPDF writer 產生確定性的 DOCX／XLSX 互通 fixture，再使用本機 Microsoft Office COM 引擎唯讀開啟。
 - Microsoft Word 16.0 讀得兩頁，內容包含繁體中文、簡體中文、英文及明確分頁；繁中 run 的粗體與簡中 run 的斜體亦由 Word 本體確認。
+- Word 的 `Range.EnhMetaFileBits` 原生 renderer 已將第 1、2 頁輸出為 PNG；腳本驗證尺寸、非白色像素比例並記錄 SHA-256。
+- 固定 fixture 的兩張預覽已完成巡覽：繁簡中與英文均可辨識，粗斜體及第二頁內容正確，未見亂碼、缺字方框、裁切或重疊。
 - Microsoft Excel 16.0 讀得 `Page 1`、`Page 2` 兩個工作表；UsedRange、表頭粗體、自動欄寬、數值、繁簡中文字、逐行 fallback 與 `A1:B1` 合併儲存格均保留。
 - Word／Excel 關閉時不儲存，COM 物件釋放後沒有殘留 Office 行程。
-- 這項驗證證明 Microsoft Office 本體可以解析 FamilyPDF 產物；複雜 PDF 轉換後的視覺排版品質仍需要人工巡覽。
+- 這項驗證證明 Microsoft Office 本體可以解析及渲染固定 FamilyPDF 產物；任意複雜 PDF 的多欄、浮動圖片、跨頁表格及特殊字型仍需要人工巡覽。
 
 ## Adobe Acrobat 文件互通（2026-07-30）
 
