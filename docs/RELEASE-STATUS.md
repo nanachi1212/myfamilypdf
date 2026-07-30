@@ -35,6 +35,7 @@
 - Viewer 與 Editor 的命令列多檔輸入已修正為載入全部檔案；兩者均以兩份一般 PDF 加一份 1,160 頁 PDF 回歸，工作階段記錄 3 份文件且維持 Responding。
 - 最終可攜包回歸摘要：`build\final-regression-20260730-121838\summary.json`（本機可重建，不提交 Git）。
 - 最新主安裝程式再次隔離靜默安裝成功；安裝後六個插件及 Office helper 的 DOCX／XLSX 產物重讀通過。
+- Microsoft Word 16.0 已實際開啟匯出 DOCX，辨識兩頁、繁體中文、簡體中文及英文；Microsoft Excel 16.0 已實際開啟匯出 XLSX，辨識兩個工作表、表格值、繁簡中文及合併儲存格。驗證摘要：`build\microsoft-office-smoke\summary.json`。
 
 ## Git
 

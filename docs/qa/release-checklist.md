@@ -14,6 +14,7 @@
 - [x] `PdfTool info` 確認大型測試檔為 1,160 頁。
 - [x] Viewer／Editor 一次開啟三份 PDF，工作階段各記錄 3 份文件且保持 Responding。
 - [x] 主安裝程式隔離靜默安裝 exit code `0`；安裝後插件與 Office helper 回歸通過。
+- [x] Microsoft Word 16.0／Excel 16.0 實際唯讀開啟匯出產物；兩頁、多語文字、兩工作表、表格值與合併儲存格驗證通過。
 
 執行：
 
@@ -22,6 +23,14 @@
 ```
 
 成功結果會寫入 `build\final-regression-<timestamp>\summary.json`。
+
+在已安裝 Microsoft Office 的 Windows 另執行：
+
+```powershell
+.\scripts\qa\smoke-microsoft-office.ps1
+```
+
+結果會寫入 `build\microsoft-office-smoke\summary.json`。
 
 ## 發佈產物
 
@@ -41,4 +50,4 @@
 - [ ] 使用 Microsoft Word／Excel 人工巡覽複雜版面匯出結果。
 - [ ] 以正式程式碼簽章憑證簽署安裝檔；目前 SmartScreen 可能顯示未知發行者。
 
-這些未勾選項目不代表檔案結構或自動回歸失敗，而是需要其他 GUI 軟體、不同語系實機或商業簽章憑證才能完成的驗收邊界。
+這些未勾選項目不代表檔案結構或自動回歸失敗，而是需要人工視覺判斷、不同語系實機或商業簽章憑證才能完成的驗收邊界。瀏覽器控制安全層禁止代理程式載入本機 `file://` PDF，因此 Edge／Adobe 的兩項不得以自動化繞過。

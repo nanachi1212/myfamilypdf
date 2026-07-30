@@ -106,3 +106,11 @@
 - 繁體中文與簡體中文 Windows locale 的兩台實機長時間人工操作；目前已完成兩種中文安裝語系、翻譯 payload 與中文檔名自動回歸。
 - 1,160 頁 PDF 的長時間人工快速翻頁體感；目前已完成 15 秒 Viewer／Editor Responding smoke test。
 - 直排繁／簡中文模型已完成官方下載、Tesseract 載入、直接辨識及 FamilyPDF 可搜尋 PDF 回歸。
+
+## Microsoft Office 本體互通（2026-07-30）
+
+- `scripts\qa\smoke-microsoft-office.ps1` 先以 FamilyPDF writer 產生確定性的 DOCX／XLSX 互通 fixture，再使用本機 Microsoft Office COM 引擎唯讀開啟。
+- Microsoft Word 16.0 讀得兩頁，內容包含繁體中文、簡體中文、英文及明確分頁。
+- Microsoft Excel 16.0 讀得 `Page 1`、`Page 2` 兩個工作表；表頭、數值、繁簡中文字、逐行 fallback 與 `A1:B1` 合併儲存格均保留。
+- Word／Excel 關閉時不儲存，COM 物件釋放後沒有殘留 Office 行程。
+- 這項驗證證明 Microsoft Office 本體可以解析 FamilyPDF 產物；複雜 PDF 轉換後的視覺排版品質仍需要人工巡覽。
