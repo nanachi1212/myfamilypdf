@@ -36,13 +36,42 @@ Name: "chinesetraditional"; MessagesFile: "compiler:Languages\ChineseTraditional
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+chinesetraditional.WindowsIntegration=Windows 整合
+chinesetraditional.PdfShellTask=加入 PDF 右鍵「使用 FamilyPDF 開啟／編輯」及 Windows「開啟方式」
+chinesetraditional.OpenWithFamilyPDF=使用 FamilyPDF 開啟
+chinesetraditional.EditWithFamilyPDF=使用 FamilyPDF 編輯
+chinesesimplified.WindowsIntegration=Windows 集成
+chinesesimplified.PdfShellTask=添加 PDF 右键“使用 FamilyPDF 打开／编辑”及 Windows“打开方式”
+chinesesimplified.OpenWithFamilyPDF=使用 FamilyPDF 打开
+chinesesimplified.EditWithFamilyPDF=使用 FamilyPDF 编辑
+english.WindowsIntegration=Windows integration
+english.PdfShellTask=Add Open/Edit with FamilyPDF to PDF context menus and Open with
+english.OpenWithFamilyPDF=Open with FamilyPDF
+english.EditWithFamilyPDF=Edit with FamilyPDF
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "pdfshell"; Description: "{cm:PdfShellTask}"; GroupDescription: "{cm:WindowsIntegration}"
 
 [Files]
 Source: "..\dist\FamilyPDF-windows-x64\*"; DestDir: "{app}"; Excludes: "portable.mode"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 #ifndef VerificationBuild
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtViewer.exe"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "FamilyPDF Reader"; Flags: uninsdeletekey; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtViewer.exe\SupportedTypes"; ValueType: none; ValueName: ".pdf"; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtViewer.exe\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtViewer.exe"" ""%1"""; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtEditor.exe"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "FamilyPDF Editor"; Flags: uninsdeletekey; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtEditor.exe\SupportedTypes"; ValueType: none; ValueName: ".pdf"; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtEditor.exe\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open"; ValueType: string; ValueName: ""; ValueData: "{cm:OpenWithFamilyPDF}"; Flags: uninsdeletekey; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\Pdf4QtViewer.exe"; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtViewer.exe"" ""%1"""; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit"; ValueType: string; ValueName: ""; ValueData: "{cm:EditWithFamilyPDF}"; Flags: uninsdeletekey; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\Pdf4QtEditor.exe"; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""; Tasks: pdfshell
+
 [Icons]
 Name: "{group}\FamilyPDF 閱讀器"; Filename: "{app}\Pdf4QtViewer.exe"; WorkingDir: "{app}"
 Name: "{group}\FamilyPDF 編輯器"; Filename: "{app}\Pdf4QtEditor.exe"; WorkingDir: "{app}"

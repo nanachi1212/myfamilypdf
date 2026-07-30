@@ -38,6 +38,22 @@ FamilyPDF 提供三個免管理員權限、支援繁體中文／簡體中文／�
 
 Codex 沙盒無權建立使用者開始功能表與登錄；因此另有只供自動測試的 `-VerificationBuild`，停用這兩項後驗證完全相同的 payload。正式安裝器不會停用它們。
 
+## Windows PDF 整合
+
+基礎版與完整版都預設勾選使用者層級的 Windows 整合：
+
+- PDF 右鍵選單加入「使用 FamilyPDF 開啟」與「使用 FamilyPDF 編輯」。
+- Viewer 與 Editor 會出現在 Windows「開啟方式」。
+- 只寫入 `HKCU\Software\Classes`，不需要管理員權限。
+- 不直接修改 `.pdf` 的預設 ProgID，因此不會搶走 Edge、Adobe 或其他既有預設閱讀器。
+- 取消安裝時只刪除 FamilyPDF 自己建立的四個 Registry 子樹。
+
+安裝時可以取消這個選項。來源規則可用下列命令重跑檢查：
+
+```powershell
+.\scripts\qa\verify-installer-shell-integration.ps1
+```
+
 ## 完整安裝程式驗證
 
 ```powershell

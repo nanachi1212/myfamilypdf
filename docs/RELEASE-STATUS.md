@@ -6,8 +6,8 @@
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,615,169 | `D3C2D1766A6BAF2A9572598B8F4B98A6E676680DE918874B9808E8889ADA452A` |
-| `dist\FamilyPDF-Setup-x64.exe` | 58,726,062 | `62FAC4F278420C4132224A983F2B60B35F9F3AD3634C5805247ECDB24C55E504` |
+| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,615,628 | `AD072CAE7559D3F21576BDBFE6E21B8E93CBAB90D767DA6C34BFD8DBF52A732B` |
+| `dist\FamilyPDF-Setup-x64.exe` | 58,724,838 | `B0FAAA20B6DFBDE2B22D913C701703A8D09DB60B4CBBF22BCCA807967D6798D0` |
 | `dist\FamilyPDF-windows-x64.zip` | 85,970,935 | `E3436FEF229D1A8F5E3B869D7EB3AFB827378C39FD7DAB7812F36003643AC5D2` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
@@ -25,6 +25,7 @@
 - OCR 外掛 0.3.0 最新隔離安裝 exit code `0`；安裝後 manifest、五個語言模型及橫排／直排 OCR 回歸均通過。
 - 一鍵完整安裝程式已分別以 `core,ocr` 與 `core` 元件隔離安裝：完整模式含五個模型並通過繁簡中可搜尋 PDF 回歸，精簡模式不含 OCR，兩者安裝 exit code 均為 `0`。
 - 一鍵完整安裝程式已在繁中／簡中互動式 GUI 實測：三種安裝類型及元件說明使用正確語系，完整模式預設勾選 OCR，精簡模式取消 OCR，來回切換可正確恢復元件狀態。
+- 基礎版與完整版新增可取消的使用者層級 Windows PDF 整合：繁中／簡中 GUI 均正確顯示且預設勾選；正式安裝器已成功編譯 12 個 HKCU Registry 項目，不改寫預設 `.pdf` ProgID，解除安裝會刪除 FamilyPDF 自有鍵。
 - 安裝後 OCR 單頁、雙頁流程通過：頁數不變、原檔 SHA-256 不變、輸出為 PDF、`fetch-text` 可取得文字。
 - 橫排繁體中文、簡體中文及英文模型已內建；直接辨識分別取得「傳統中文測試」、「简体中文测试」與 `FamilyPDF OCR 2026`。封裝後端對端流程亦確認原檔雜湊不變、頁數不變、PDF 文字層含繁簡中文字元，且 UTF-8 文字檔保留完整字序。
 - 缺少所選語言時，OCR 主流程會自動啟動官方下載、最多三次重試、大小檢查、Tesseract 載入驗證及原子替換；斷線測試確認不產生輸出 PDF 或殘留半檔。

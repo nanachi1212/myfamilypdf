@@ -33,6 +33,16 @@
   「OCR 可搜索文字（繁体、简体、英文及竖排模型）」。
 - 完整模式預設勾選 OCR；精簡模式取消 OCR；切回完整模式後恢復勾選。
 
+## Windows 整合選項
+
+- 繁中畫面顯示「Windows 整合」及「加入 PDF 右鍵『使用 FamilyPDF
+  開啟／編輯』及 Windows『開啟方式』」。
+- 簡中畫面顯示「Windows 集成」及「添加 PDF 右键『使用 FamilyPDF
+  打开／编辑』及 Windows『打开方式』」。
+- 兩種語系均預設勾選 Windows 整合；桌面捷徑仍預設不勾選。
+- 驗證安裝器不含正式 Registry 寫入段落，因此 GUI 檢查不會修改目前電腦
+  的檔案關聯。
+
 ## 其他自動證據
 
 `scripts\qa\smoke-full-installer.ps1` 另以隔離目錄實際完成兩種元件組合：

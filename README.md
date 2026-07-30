@@ -16,6 +16,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - Office 匯出：在 `Pdf4QtEditor.exe` 的 `Office Export` 選單將全部或指定頁碼的可搜尋文字匯出成可編輯 DOCX／XLSX；掃描檔會提示先執行 OCR。
 - OCR 可由完整安裝程式一次安裝，也保留獨立外掛封裝；基礎安裝程式不夾帶 OCR 執行環境。
 - 免管理員權限的 Windows 安裝程式，以及免安裝可攜式 ZIP。
+- 安裝後可由 PDF 右鍵選單使用 FamilyPDF 開啟或編輯，也會出現在 Windows「開啟方式」；不會強制取代原本的預設 PDF 程式。
 
 ## 直接使用
 
@@ -60,6 +61,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\office\build-office-export-helper.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\run-final-regression.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\smoke-full-installer.ps1
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\verify-installer-shell-integration.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\smoke-large-pdf-locales.ps1
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\smoke-microsoft-office.ps1
 ```
