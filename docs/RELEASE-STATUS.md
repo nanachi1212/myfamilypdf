@@ -6,8 +6,8 @@
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Setup-x64.exe` | 33,793,932 | `82549EFE94032EE401C4F2A7AA603313932A9458DBD80265A05A936917201627` |
-| `dist\FamilyPDF-windows-x64.zip` | 45,631,774 | `A0CAE0D88498765434DA255FA26CB83AF1A0E4A110DA03EDEFD69B341F465C27` |
+| `dist\FamilyPDF-Setup-x64.exe` | 58,730,014 | `C5B133724D7D748BA59AA81D63C09E162F73C164F219EEE54638E07534A67D69` |
+| `dist\FamilyPDF-windows-x64.zip` | 85,967,817 | `2C97B89190DC1B962B5C2D0117423BA4EDA0A990EE26A693F418AF6703E4794A` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,048,057 | `C7092441CDB7992B12A339D17047B0BF27B056CA0B7503FCEF531F2C4B2321A3` |
 | `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,657,824 | `57A33A39EFC7B1B946C49FDFAD8892E3311D0CBA3ED8EEF4A681B9284B4D4162` |
 
@@ -15,7 +15,7 @@
 
 ## 已驗證
 
-- CTest 4/4 通過；書籤、安全儲存、工作階段及 PDF 互通測試共 16 項通過。
+- CTest 6/6 通過；另有 Office Export Python 單元測試 7/7 通過。
 - pypdf 獨立讀回標準 PDF outline：繁體中文標題、資料夾階層、文字顏色、粗體及頁面目的地均保留。
 - 標準 Highlight、Underline、StrikeOut、Square、FreeText、Text 六種註解由 FamilyPDF 嚴格模式重開及 pypdf 交叉驗證通過。
 - 繁體及簡體中文驗證安裝各為 exit code `0`；安裝後 Viewer、Editor、PageMaster 同時載入中文檔名與 1,160 頁 PDF，15 秒後全部為 Responding。
@@ -27,6 +27,8 @@
 - 缺少所選語言時，OCR 主流程會自動啟動官方下載、最多三次重試、大小檢查、Tesseract 載入驗證及原子替換；斷線測試確認不產生輸出 PDF 或殘留半檔。
 - 直排繁／簡中文已由官方 `tessdata_fast` 成功下載、SHA-256 與 Tesseract 載入驗證通過，並已內建於目前產物。
 - `EditorPlugin.dll`、`RedactPlugin.dll`、`SignaturePlugin.dll` 已進入 release 可攜包及正式安裝程式；專用 verification installer 安裝 exit code `0`，安裝後三個 DLL 的大小檢查通過。
+- `FormPlugin.dll`、`DocumentEditPlugin.dll`、`OfficeExportPlugin.dll` 與 Office helper 已進入可攜包及正式安裝程式；Office helper 在清除 Python PATH 後完成 DOCX／XLSX 轉換與重讀。
+- 最新主安裝程式隔離靜默安裝 exit code `0`；安裝後 Office helper 在無 Python PATH 下完成兩頁 DOCX 匯出。
 
 ## Git
 

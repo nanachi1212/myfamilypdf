@@ -25,6 +25,7 @@
 - release 建置與可攜包已包含 `EditorPlugin.dll`、`RedactPlugin.dll`、`SignaturePlugin.dll`、`FormPlugin.dll`，並有自動打包檢查。
 - `Forms` 選單可拖曳建立標準 AcroForm 文字框、核取方塊、單選按鈕群組、下拉選單與清單，設定常用欄位屬性、清單多選、切換欄位反白及重設預設值。
 - `Document Edit` 選單可依頁碼範圍及單雙數加入文字浮水印、純色／圖片背景、調整頁面尺寸與裁切框、縮放內容與 annotation，以及向左／向右旋轉。
+- `Office Export` 選單可將全部或 `1-3,5` 指定頁碼匯出成 DOCX／XLSX；helper 自帶 Python runtime，使用端無須安裝 Python。
 - 已產生完整可攜式 ZIP，內含 Viewer、Editor、PageMaster、PdfTool、Qt runtime 與 OCR。
 - 已用 290 頁 PDF 驗證 Viewer 與 PageMaster 能開啟並保持回應。
 - 已以安裝後的程式驗證三組單元測試、合併、拆分、OCR 與書籤重啟保存。
@@ -42,7 +43,7 @@
 ## 已知限制
 
 - 五種 AcroForm 欄位已完成建立 UI 與 parser round-trip 自動測試；仍待外部 GUI 閱讀器人工巡覽。
-- 尚未提供 PDF 轉 DOCX／XLSX；規劃為選裝 Office Export 外掛。
+- PDF 轉 DOCX／XLSX 已完成文字層、基本樣式、表格與逐行 fallback；複雜版面可能需要人工整理。
 - 進階內容編輯、浮水印、背景與頁面幾何工具已完成自動測試；仍待繁體／簡體 Windows 的 GUI 人工巡覽。
 - 尚未在兩台分別使用繁體中文與簡體中文 Windows 的實機上逐頁人工巡覽；目前證據是雙語 `.qm`、雙語安裝語系與本機 Windows 執行驗證。
 - 自製安裝程式尚未使用商業程式碼簽章憑證；Windows SmartScreen 可能顯示未知發行者。

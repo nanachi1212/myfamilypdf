@@ -28,6 +28,7 @@ $Targets = @(
     'SignaturePlugin',
     'FormPlugin',
     'DocumentEditPlugin',
+    'OfficeExportPlugin',
     'UnitTests',
     'UnitTestsImageOptimizer',
     'UnitTestsFontEncoding',

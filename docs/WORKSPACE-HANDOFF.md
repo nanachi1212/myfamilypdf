@@ -22,6 +22,8 @@ FamilyPDF Windows x64 家庭版已具備可安裝、可攜式與可驗證的完�
 - Tesseract 5.5.2 OCR，包含繁中、簡中與英文語言資料。
 - 繁中、簡中、英文安裝介面及 Qt 翻譯檔。
 - 可攜式 ZIP 與目前使用者範圍的 Inno Setup 安裝檔。
+- 五種標準 AcroForm 欄位建立、文件級浮水印／背景／頁面幾何編輯。
+- 內建 Office Export 外掛，可將可搜尋 PDF 匯出為 DOCX／XLSX，使用端不需 Python。
 
 ## 最終產物
 

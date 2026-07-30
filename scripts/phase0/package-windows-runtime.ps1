@@ -18,6 +18,14 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 $BuildDirectory = [IO.Path]::GetFullPath($BuildDirectory)
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 
+$officeExportSource = Join-Path $OutputDirectory 'FamilyPDF-Office-Export'
+if (-not (Test-Path -LiteralPath (
+    Join-Path $officeExportSource 'FamilyPDFOfficeExport.exe'
+) -PathType Leaf)) {
+    & (Join-Path $RepositoryRoot 'scripts\office\build-office-export-helper.ps1') `
+        -OutputDirectory $OutputDirectory
+}
+
 $QtPrefix = 'E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
 $runtimeDirectory = Join-Path $BuildDirectory 'usr\bin'
 $windeployqt = Join-Path $QtPrefix 'bin\windeployqt.exe'
@@ -64,6 +72,9 @@ if (Test-Path -LiteralPath $vcpkgBin -PathType Container) {
     Get-ChildItem -LiteralPath $vcpkgBin -Filter '*.dll' -File |
         Copy-Item -Destination $packageRoot -Force
 }
+
+$officeExportTarget = Join-Path $packageRoot 'office-export'
+Copy-Item -LiteralPath $officeExportSource -Destination $officeExportTarget -Recurse -Force
 
 # Keep the portable package runnable on clean Windows installations without
 # requiring an administrator-level VC++ Redistributable install.

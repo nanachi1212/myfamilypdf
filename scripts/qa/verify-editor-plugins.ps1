@@ -16,9 +16,10 @@ $pluginDirectory = Join-Path $PackageDirectory 'pdfplugins'
 $requiredPlugins = @(
     'EditorPlugin.dll',
     'RedactPlugin.dll',
-    'SignaturePlugin.dll'
-    'FormPlugin.dll'
-    'DocumentEditPlugin.dll'
+    'SignaturePlugin.dll',
+    'FormPlugin.dll',
+    'DocumentEditPlugin.dll',
+    'OfficeExportPlugin.dll'
 )
 
 $missingPlugins = @(
@@ -39,6 +40,13 @@ foreach ($plugin in $requiredPlugins) {
     $pluginPath = Join-Path $pluginDirectory $plugin
     $file = Get-Item -LiteralPath $pluginPath
     Write-Host ("OK {0} ({1} bytes)" -f $file.Name, $file.Length)
+}
+
+if (-not (Test-Path -LiteralPath (
+    Join-Path $PackageDirectory 'office-export\FamilyPDFOfficeExport.exe'
+) -PathType Leaf)) {
+    Write-Error 'FamilyPDF package is missing the Office export helper.'
+    exit 1
 }
 
 Write-Host "Editor plugin verification passed: $pluginDirectory"

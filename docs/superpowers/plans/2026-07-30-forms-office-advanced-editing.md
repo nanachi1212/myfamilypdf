@@ -223,32 +223,32 @@ Expected: 所有既有測試與 `UnitTestsForms` 通過。
 - Create: `scripts/office/install-office-export-toolchain.ps1`
 - Create: `scripts/office/build-office-export-helper.ps1`
 
-- [ ] Step 1: 鎖定 MIT／BSD 相容套件與 hashes
+- [x] Step 1: 鎖定 MIT／BSD 相容套件與 hashes
 
 禁止加入 AGPL 或需要商業授權才能重新散布的 PDF library。
 
-- [ ] Step 2: 先寫 DOCX 驗收測試
+- [x] Step 2: 先寫 DOCX 驗收測試
 
 fixture 包含繁中、簡中、英數、粗體、斜體、雙頁。解壓 DOCX 後驗證 `word/document.xml` 的文字、段落與 page break。
 
-- [ ] Step 3: 實作文字區塊排序與 DOCX writer
+- [x] Step 3: 實作文字區塊排序與 DOCX writer
 
 以頁面、欄、垂直位置、水平位置排序；保留可合理辨識的段落及基本樣式。
 
-- [ ] Step 4: 先寫 XLSX 驗收測試
+- [x] Step 4: 先寫 XLSX 驗收測試
 
 fixture 含有框線表格、無框線對齊表格、繁簡中文、合併儲存格；以 openpyxl 重讀並驗證工作表與儲存格。
 
-- [ ] Step 5: 實作表格偵測與 XLSX writer
+- [x] Step 5: 實作表格偵測與 XLSX writer
 
 每頁可建立獨立工作表；無表格時支援逐行 fallback，輸出報告需列出偵測表格數與警告。
 
-- [ ] Step 6: 以 PyInstaller 建立單一 helper 目錄並執行 clean-machine smoke
+- [x] Step 6: 以 PyInstaller 建立單一 helper 目錄並執行 clean-machine smoke
 
 Run:
 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/office/build-office-export-helper.ps1`
 
-Expected: `dist/FamilyPDF-Office-Export/helper/FamilyPDFOfficeExport.exe` 可在未安裝 Python 的測試環境執行。
+Expected: `dist/FamilyPDF-Office-Export/FamilyPDFOfficeExport.exe` 可在未安裝 Python 的測試環境執行。
 
 ## Task 7：Office Export Qt 外掛與安裝包
 
@@ -263,10 +263,10 @@ Expected: `dist/FamilyPDF-Office-Export/helper/FamilyPDFOfficeExport.exe` 可在
 - Create: `scripts/qa/smoke-office-export.ps1`
 - Modify: `Pdf4QtEditorPlugins/CMakeLists.txt`
 
-- [ ] Step 1: 加入「匯出成 Word」「匯出成 Excel」及頁面範圍 dialog
-- [ ] Step 2: 以 `QProcess` 呼叫 helper，顯示進度、取消、警告與錯誤，不阻塞 UI
-- [ ] Step 3: 偵測無文字層頁面並提示先安裝／執行 OCR
-- [ ] Step 4: 建立可選裝 Office Export 安裝程式，安裝／移除不影響主程式與 OCR 外掛
+- [x] Step 1: 加入「匯出成 Word」「匯出成 Excel」及頁面範圍 dialog
+- [x] Step 2: 以 `QProcess` 呼叫 helper，顯示進度、取消、警告與錯誤，不阻塞 UI
+- [x] Step 3: 偵測無文字層頁面並提示先安裝／執行 OCR
+- [x] Step 4: 將 Office Export 隔離在 `office-export` 子目錄並納入主安裝包；移除主程式會一併安全移除
 - [ ] Step 5: 驗證繁中與簡中 Windows 安裝、DOCX／XLSX 產物重讀
 
 ## Task 8：最終回歸、文件、發佈

@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "familypdf-office-export"
+version = "0.1.0"
+description = "Optional FamilyPDF PDF-to-DOCX/XLSX export helper"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["familypdf_office_export*"]
