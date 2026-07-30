@@ -39,6 +39,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 
 - [可攜式包使用方式](docs/phase1/portable-package.md)
 - [Windows 安裝檔](docs/phase1/installer.md)
+- [一鍵完整安裝程式雙語 GUI 驗證](docs/qa/full-installer-interaction.md)
 - [OCR 使用方式](docs/phase1/ocr.md)
 - [功能驗證結果](docs/phase1/functional-verification.md)
 - [1,160 頁 PDF 互動與語系驗證](docs/qa/large-pdf-interaction.md)
