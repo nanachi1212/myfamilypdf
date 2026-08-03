@@ -1,6 +1,8 @@
 # Phase 1 功能驗證結果
 
-更新日期：2026-07-29
+更新日期：2026-08-03
+
+> 本文件保留 2026-07-29 的歷史驗證紀錄；目前版本與最新可重建證據請以 `docs\\RELEASE-STATUS.md`、`docs\\REQUIREMENTS-AUDIT.md` 及 `build\\final-regression-20260803-153018\\summary.json` 為準。
 
 ## 非 OCR 完成版回歸（2026-07-29）
 
@@ -73,7 +75,7 @@
 - 從安裝後目錄執行三組單元測試：全部 exit code `0`。
 - 安裝後 Tesseract 語言列舉與完整 OCR 腳本：exit code `0`。
 
-驗證素材位於本機 `build/phase1-verification/`，未納入 Git；可重新產生，不影響原始 PDF。
+原先的 `build/phase1-verification/` 歷史素材已清理；驗證結果可由目前的 QA 腳本重新產生，不影響原始 PDF。
 
 ## GUI 註解與書籤
 
