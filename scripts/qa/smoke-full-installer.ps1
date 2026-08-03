@@ -187,9 +187,19 @@ finally {
     }
 }
 
+$installerFile = Get-Item -LiteralPath $setup
+$installerHash = (
+    Get-FileHash -Algorithm SHA256 -LiteralPath $setup
+).Hash
 $summary = [ordered]@{
     recorded_at = [DateTimeOffset]::Now.ToString('o')
-    installer = $setup
+    installer = [ordered]@{
+        path = $setup
+        bytes = $installerFile.Length
+        sha256 = $installerHash
+        temporary_verification_build = $true
+        removed_after_verification = $true
+    }
     full_install = [ordered]@{
         path = $fullRoot
         base_application = $true
@@ -211,4 +221,5 @@ $summaryPath = Join-Path $testRoot 'summary.json'
 $summary | ConvertTo-Json -Depth 6 |
     Set-Content -LiteralPath $summaryPath -Encoding UTF8
 
+Remove-Item -LiteralPath $setup -Force
 Write-Host "Full installer smoke passed: $summaryPath"

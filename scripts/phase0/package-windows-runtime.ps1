@@ -2,7 +2,8 @@
 param(
     [string]$BuildDirectory = '',
     [string]$OutputDirectory = '',
-    [switch]$SkipOcr
+    [switch]$SkipOcr,
+    [switch]$SkipOfficeBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,11 +20,14 @@ $BuildDirectory = [IO.Path]::GetFullPath($BuildDirectory)
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 
 $officeExportSource = Join-Path $OutputDirectory 'FamilyPDF-Office-Export'
+if (-not $SkipOfficeBuild) {
+    & (Join-Path $RepositoryRoot 'scripts\office\build-office-export-helper.ps1') `
+        -OutputDirectory $OutputDirectory
+}
 if (-not (Test-Path -LiteralPath (
     Join-Path $officeExportSource 'FamilyPDFOfficeExport.exe'
 ) -PathType Leaf)) {
-    & (Join-Path $RepositoryRoot 'scripts\office\build-office-export-helper.ps1') `
-        -OutputDirectory $OutputDirectory
+    throw "Office export helper was not found: $officeExportSource"
 }
 
 $QtPrefix = 'E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64'

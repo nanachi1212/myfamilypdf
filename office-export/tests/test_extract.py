@@ -61,6 +61,8 @@ class ExtractTest(unittest.TestCase):
         self.assertEqual(len(extracted.pages), 1)
         page = extracted.pages[0]
         self.assertTrue(page.has_text_layer)
+        self.assertEqual(page.column_count, 1)
+        self.assertEqual(len(page.blocks), 3)
         all_text = "\n".join(block.text for block in page.blocks)
         self.assertIn("FamilyPDF export", all_text)
         self.assertGreaterEqual(len(page.tables), 1)

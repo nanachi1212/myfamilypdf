@@ -1,14 +1,14 @@
 # FamilyPDF 目前交付狀態
 
-更新日期：2026-07-30
+更新日期：2026-08-03
 
 ## 可直接使用的產物
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,623,370 | `E45762B74D20EEC72606907309A6AFC7FDF747345557604ABDE26224027289C5` |
-| `dist\FamilyPDF-Setup-x64.exe` | 58,732,866 | `39E3E9C74BE307F0680602F5C012A70D5ACACF3868F7D42192082FB9449AEA71` |
-| `dist\FamilyPDF-windows-x64.zip` | 83,863,232 | `54526F899CEDE47D21625351B42B5345DA0A6F6BCC371C4B943FBFBC66BE7D1A` |
+| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,136,139 | `5DA1963EDD24CAD4AB4E79D9B63BD31E74BFB013F1F7C9984AB9B5A0116EBE00` |
+| `dist\FamilyPDF-Setup-x64.exe` | 58,243,337 | `2DB49564FD62C3D7652991BE247767388B96E4BAD733CC02788660DDE8C4AAE4` |
+| `dist\FamilyPDF-windows-x64.zip` | 82,853,182 | `3F38856C914D77D031F853A5F6795DDD6F9B6D36871F39218301A0F2CCD4D80D` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
@@ -16,7 +16,7 @@
 
 ## 已驗證
 
-- CTest 6/6 通過；另有 Office Export Python 單元測試 7/7 通過。
+- CTest 6/6 通過；另有 Office Export Python 單元測試 8/8 通過。
 - pypdf 獨立讀回標準 PDF outline：繁體中文標題、資料夾階層、文字顏色、粗體及頁面目的地均保留。
 - Adobe Acrobat DC 已透過官方 IAC 開啟、修改並另存 AcroForm；`pypdf` 獨立讀回確認「姓名」「同意」欄位名稱、修改值與原始預設值保留。修正過程也為 PDF writer 補上 CR／LF hexadecimal string 序列化，避免 UTF-16BE 位元組被外部閱讀器正規化。
 - Adobe Acrobat DC 已實際開啟、逐頁解析並另存浮水印／背景與頁面幾何 fixture；`pypdf` 確認頁數、MediaBox、CropBox、旋轉保留，`pypdfium2` 固定倍率逐頁 RGB 像素 SHA-256 與來源完全一致。摘要：`build\acrobat-document-edit-interop\summary.json`。
@@ -41,11 +41,12 @@
 - 修正舊 PDF4QT 設定含空白插件清單時 FamilyPDF 功能看似遺失的問題；六個正式功能插件現在會在第 2 版設定遷移時自動啟用，後續仍尊重使用者自行停用的選擇。
 - GUI 實測已確認繁中介面會顯示三個插件工具列，並可開啟「匯出至 Word」的繁中頁碼範圍對話框。
 - Viewer 與 Editor 的命令列多檔輸入已修正為載入全部檔案；兩者均以兩份一般 PDF 加一份 1,160 頁 PDF 回歸，工作階段記錄 3 份文件且維持 Responding。
-- 最終可攜包回歸摘要：`build\final-regression-20260730-140036\summary.json`（本機可重建，不提交 Git）。
+- 2026-07-30 可攜包回歸已通過；結果屬本機可重建資料，不提交 Git。
 - 最新主安裝程式再次隔離靜默安裝成功；安裝後六個插件及 Office helper 的 DOCX／XLSX 產物重讀通過。
 - 修正後的完整驗證安裝檔已重新建置；完整與精簡模式安裝通過，完整模式繁中／簡中／英文 OCR 與可搜尋 PDF 回歸通過。摘要：`build\full-installer-smoke\summary.json`。
 - 完整安裝的 405 個核心檔案與 29 個 OCR 檔案、精簡安裝的 405 個核心檔案，均與目前 `dist` 可攜包逐檔 SHA-256 相同；安裝器刻意排除僅供免安裝模式使用的 `portable.mode`。
 - Microsoft Word 16.0 已實際開啟匯出 DOCX，辨識三頁、十個段落、明確分頁、繁簡中、英文、五種字級及粗斜體；Word 原生 renderer 另輸出三頁 PNG，尺寸、非白色像素比例及 SHA-256 均已記錄，固定 fixture 巡覽未見亂碼、缺字方框、裁切或重疊。Microsoft Excel 16.0 已實際開啟匯出 XLSX，辨識三個工作表、同頁多表格、四行 fallback、UsedRange、表格值、繁簡中文、跨欄合併、各表表頭粗體及自動欄寬。驗證摘要：`build\microsoft-office-smoke\summary.json`。
+- 新增一般等寬雙欄辨識：真實雙欄 PDF 會依左欄由上到下、再右欄由上到下分組，DOCX 以無框線兩欄表格保留可編輯版面；表格頁不會被誤判為雙欄，既有單欄行也維持原段落數。來源測試、封裝 EXE 轉換及 `python-docx` 重讀皆通過。封裝 smoke 曾以舊 helper 得到 5 段而失敗，修正封裝流程預設重建 helper 後得到正確 3 段並轉為通過；四頁 Word COM fixture 已準備，但本次隔離帳號缺少互動式 Office 工作階段（HRESULT `0x80070520`），不把該項列為已通過。
 - 1,160 頁 PDF 已在繁中與簡中 GUI 分別完成第 1 → 580 → 1,160 → 1,157 頁跳轉；頁碼、主畫面與縮略圖同步，簡中視窗持續約 112 秒後仍為 Responding。
 
 ## Git
@@ -58,7 +59,7 @@
 - Office Export 虛擬環境原本仍保留 `python.exe`，但 `pyvenv.cfg` 指向已不存在的 Python 3.14.6。安裝腳本現在會實際啟動 Python 檢查健康狀態，並優先使用相同 ABI 的本機 Python 修復設定；本機已自動改用 vcpkg 內附 Python 3.14.2，`pip check` 與 Office 套件匯入均通過。
 - 新增 `scripts\qa\test-office-toolchain-repair.ps1`，覆蓋「啟動器存在、基礎 Python 遺失」的回歸案例；修復失敗時會還原原虛擬環境設定。
 - Qt 6.9.1、aqtinstall 3.3.0、vcpkg 固定版本、CMake、MSVC、六個外掛 DLL、PowerShell 腳本語法均重新檢查通過。
-- CTest 6/6、Office Export Python 7/7、OCR 橫排與直排繁簡中文、1,160 頁大檔、Viewer／Editor 三文件與繁簡中文回歸均通過。
-- 最新完整回歸摘要：`build\final-regression-20260803-104713\summary.json`（本機可重建，不提交 Git）。
+- CTest 6/6、Office Export Python 8/8、OCR 橫排與直排繁簡中文、1,160 頁大檔、Viewer／Editor 三文件與繁簡中文回歸均通過。
+- 最新完整回歸摘要：`build\final-regression-20260803-113719\summary.json`（本機可重建，不提交 Git）。
 - `run-final-regression.ps1` 成功後會自動呼叫安全的保留工具，只留下最新一份完整回歸；測試證明無關目錄不會被刪除。
-- 本次另移除 13 套已被最新版取代的安裝展開副本，釋放 1,691,093,282 bytes；保留建置樹、最新版安裝驗證及正式 `dist` 產物，並確認釋出檔 SHA-256 未改變。
+- 本次另移除 13 套已被最新版取代的安裝展開副本，釋放 1,691,093,282 bytes；保留建置樹、最新版安裝驗證及正式 `dist` 產物。加入雙欄 Office helper 後已重建三個主要產物，最新 SHA-256 如本頁表格。

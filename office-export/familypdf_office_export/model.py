@@ -16,6 +16,7 @@ class TextRun:
 @dataclass(slots=True)
 class TextBlock:
     runs: list[TextRun] = field(default_factory=list)
+    column: int = 0
 
     @property
     def text(self) -> str:
@@ -43,6 +44,7 @@ class ExtractedPage:
     tables: list[ExtractedTable] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     has_text_layer: bool = True
+    column_count: int = 1
 
 
 @dataclass(slots=True)

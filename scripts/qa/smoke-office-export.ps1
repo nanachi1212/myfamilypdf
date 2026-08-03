@@ -32,13 +32,21 @@ New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
 $inputPdf = Join-Path $smokeRoot 'office-input.pdf'
 $outputDocx = Join-Path $smokeRoot 'office-output.docx'
 $outputXlsx = Join-Path $smokeRoot 'office-output.xlsx'
+$multiColumnPdf = Join-Path $smokeRoot 'two-column-input.pdf'
+$multiColumnDocx = Join-Path $smokeRoot 'two-column-output.docx'
+$tablePdf = Join-Path $smokeRoot 'table-input.pdf'
+$tableDocx = Join-Path $smokeRoot 'table-output.docx'
 
 Push-Location (Join-Path $repositoryRoot 'office-export')
 try {
     & $venvPython -c @"
 from pathlib import Path
 from tests.test_cli import _write_two_page_pdf
+from tests.test_extract import _write_text_and_table_pdf
+from tests.test_multicolumn_export import _write_two_column_pdf
 _write_two_page_pdf(Path(r'$inputPdf'))
+_write_two_column_pdf(Path(r'$multiColumnPdf'))
+_write_text_and_table_pdf(Path(r'$tablePdf'))
 "@
 }
 finally {
@@ -59,6 +67,14 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Portable XLSX export smoke test failed.'
     }
+    & $helper --input $multiColumnPdf --output $multiColumnDocx --format docx
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Portable two-column DOCX export smoke test failed.'
+    }
+    & $helper --input $tablePdf --output $tableDocx --format docx
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Portable single-column table-page DOCX export smoke test failed.'
+    }
 }
 finally {
     $env:PATH = $savedPath
@@ -71,6 +87,12 @@ assert 'First page' in '\n'.join(p.text for p in Document(r'$outputDocx').paragr
 workbook = load_workbook(r'$outputXlsx', read_only=True)
 assert workbook.sheetnames == ['Page 2']
 assert workbook['Page 2']['A1'].value == 'Second page'
+columns = Document(r'$multiColumnDocx').tables[0].rows[0].cells
+assert columns[0].text.splitlines() == ['Left top', 'Left bottom']
+assert columns[1].text.splitlines() == ['Right top', 'Right bottom']
+table_page = Document(r'$tableDocx')
+assert len(table_page.tables) == 0
+assert len([p for p in table_page.paragraphs if p.text]) == 3
 "@
 if ($LASTEXITCODE -ne 0) {
     throw 'Office output read-back verification failed.'

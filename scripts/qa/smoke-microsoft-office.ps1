@@ -65,6 +65,8 @@ $multiSimplifiedRange = $null
 $firstPageRange = $null
 $secondPageRange = $null
 $thirdPageRange = $null
+$fourthPageRange = $null
+$columnTable = $null
 $summaryPath = Join-Path $OutputDirectory 'summary.json'
 
 function ConvertFrom-CodePoints {
@@ -207,19 +209,23 @@ try {
         $multiSimplified,
         $thirdPageTraditional,
         $thirdPageSimplified,
-        'Mixed style: editable Office output'
+        'Mixed style: editable Office output',
+        'Left column top',
+        'Left column bottom',
+        'Right column top',
+        'Right column bottom'
     )) {
         if (-not $wordText.Contains($expected)) {
             throw "Microsoft Word did not read expected text: $expected"
         }
     }
     $wordPageCount = [int]$document.ComputeStatistics(2)
-    if ($wordPageCount -ne 3) {
-        throw "Microsoft Word reported $wordPageCount pages instead of 3."
+    if ($wordPageCount -ne 4) {
+        throw "Microsoft Word reported $wordPageCount pages instead of 4."
     }
     $wordParagraphCount = [int]$document.Paragraphs.Count
-    if ($wordParagraphCount -ne 10) {
-        throw "Microsoft Word reported $wordParagraphCount paragraphs instead of 10."
+    if ($wordParagraphCount -lt 14) {
+        throw "Microsoft Word reported only $wordParagraphCount paragraphs."
     }
 
     $traditionalRange = $documentRange.Duplicate
@@ -258,6 +264,24 @@ try {
         [Math]::Abs([double]$thirdPageRange.Font.Size - 16.0) -gt 0.1) {
         throw 'Microsoft Word did not preserve the third-page heading.'
     }
+    $fourthPageRange = $documentRange.Duplicate
+    if (-not $fourthPageRange.Find.Execute('Left column top') -or
+        [int]$fourthPageRange.Information(3) -ne 4) {
+        throw 'Microsoft Word did not lay out the two-column content on page 4.'
+    }
+    if ([int]$document.Tables.Count -ne 1) {
+        throw 'Microsoft Word did not preserve the two-column layout table.'
+    }
+    $columnTable = $document.Tables.Item(1)
+    if ([int]$columnTable.Columns.Count -ne 2 -or
+        -not ([string]$columnTable.Cell(1, 1).Range.Text).Contains(
+            'Left column bottom'
+        ) -or
+        -not ([string]$columnTable.Cell(1, 2).Range.Text).Contains(
+            'Right column bottom'
+        )) {
+        throw 'Microsoft Word did not preserve the two editable columns.'
+    }
     $firstPageRange = $documentRange.Duplicate
     $firstPageRange.End = [Math]::Max(
         $firstPageRange.Start,
@@ -267,7 +291,11 @@ try {
         $secondPageRange.Start,
         $thirdPageRange.Start - 1
     )
-    $thirdPageRange.End = $documentRange.End
+    $thirdPageRange.End = [Math]::Max(
+        $thirdPageRange.Start,
+        $fourthPageRange.Start - 1
+    )
+    $fourthPageRange.End = $documentRange.End
     $wordFirstPagePreview = Save-WordRangePreview `
         -Range $firstPageRange `
         -BasePath (Join-Path $OutputDirectory 'word-page-1-preview')
@@ -277,6 +305,9 @@ try {
     $wordThirdPagePreview = Save-WordRangePreview `
         -Range $thirdPageRange `
         -BasePath (Join-Path $OutputDirectory 'word-page-3-preview')
+    $wordFourthPagePreview = Save-WordRangePreview `
+        -Range $fourthPageRange `
+        -BasePath (Join-Path $OutputDirectory 'word-page-4-preview')
 
     $excel = New-Object -ComObject Excel.Application
     $excel.Visible = $false
@@ -362,6 +393,7 @@ finally {
     }
     foreach ($comObject in @(
         $thirdPageRange,
+        $fourthPageRange,
         $secondPageRange,
         $firstPageRange,
         $multiSimplifiedRange,
@@ -369,6 +401,7 @@ finally {
         $simplifiedRange,
         $traditionalRange,
         $documentRange,
+        $columnTable,
         $thirdSheet,
         $secondSheet,
         $firstSheet,
@@ -398,9 +431,11 @@ $summary = [ordered]@{
         italic_style = $true
         page_break_layout = $true
         native_rendering = $true
+        two_column_layout = $true
         first_page_preview = $wordFirstPagePreview
         second_page_preview = $wordSecondPagePreview
         third_page_preview = $wordThirdPagePreview
+        fourth_page_preview = $wordFourthPagePreview
     }
     excel = [ordered]@{
         application = $excelApplicationName

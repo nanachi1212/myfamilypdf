@@ -25,7 +25,11 @@ def _is_italic(font_name: str) -> bool:
     return "italic" in lowered or "oblique" in lowered
 
 
-def _group_words_into_blocks(words: Iterable[dict[str, Any]]) -> list[TextBlock]:
+def _group_words_into_blocks(
+    words: Iterable[dict[str, Any]],
+    page_width: float,
+    detect_columns: bool = True,
+) -> tuple[list[TextBlock], int]:
     sorted_words = sorted(
         words,
         key=lambda item: (
@@ -45,35 +49,96 @@ def _group_words_into_blocks(words: Iterable[dict[str, Any]]) -> list[TextBlock]
         else:
             grouped_lines.append([word])
 
-    blocks: list[TextBlock] = []
+    block_positions: list[tuple[TextBlock, float, float]] = []
     for line in grouped_lines:
         line.sort(key=lambda item: float(item.get("x0", 0.0)))
-        runs: list[TextRun] = []
-        for index, word in enumerate(line):
-            text = str(word.get("text", ""))
-            if not text:
+        segments: list[list[dict[str, Any]]] = []
+        for word in line:
+            if not segments:
+                segments.append([word])
                 continue
-            if index > 0:
-                text = f" {text}"
-            font_name = str(word.get("fontname", ""))
-            size_value = word.get("size")
-            font_size = (
-                float(size_value)
-                if isinstance(size_value, (int, float))
-                else None
-            )
-            runs.append(
-                TextRun(
-                    text=text,
-                    bold=_is_bold(font_name),
-                    italic=_is_italic(font_name),
-                    font_size=font_size,
-                    font_name=font_name or None,
+            previous_x1 = float(segments[-1][-1].get("x1", 0.0))
+            gap = float(word.get("x0", 0.0)) - previous_x1
+            if gap > max(36.0, page_width * 0.12):
+                segments.append([word])
+            else:
+                segments[-1].append(word)
+
+        for segment in segments:
+            block = _create_text_block(segment)
+            if block is not None:
+                block_positions.append(
+                    (
+                        block,
+                        min(float(word.get("x0", 0.0)) for word in segment),
+                        float(segment[0].get("top", 0.0)),
+                    )
                 )
+
+    column_count = 1
+    if detect_columns and len(block_positions) >= 4:
+        starts = sorted(position[1] for position in block_positions)
+        gaps = [
+            (starts[index + 1] - starts[index], index)
+            for index in range(len(starts) - 1)
+        ]
+        largest_gap, gap_index = max(gaps, default=(0.0, 0))
+        left_count = gap_index + 1
+        right_count = len(starts) - left_count
+        if (
+            largest_gap >= page_width * 0.20
+            and left_count >= 2
+            and right_count >= 2
+        ):
+            split_x = (starts[gap_index] + starts[gap_index + 1]) / 2.0
+            column_count = 2
+            for block, x0, _ in block_positions:
+                block.column = 0 if x0 < split_x else 1
+
+    if column_count == 1:
+        block_positions = []
+        for line in grouped_lines:
+            block = _create_text_block(line)
+            if block is not None:
+                block_positions.append(
+                    (
+                        block,
+                        min(float(word.get("x0", 0.0)) for word in line),
+                        float(line[0].get("top", 0.0)),
+                    )
+                )
+
+    block_positions.sort(key=lambda item: (item[0].column, item[2], item[1]))
+    return [item[0] for item in block_positions], column_count
+
+
+def _create_text_block(
+    words: list[dict[str, Any]],
+) -> TextBlock | None:
+    runs: list[TextRun] = []
+    for index, word in enumerate(words):
+        text = str(word.get("text", ""))
+        if not text:
+            continue
+        if index > 0:
+            text = f" {text}"
+        font_name = str(word.get("fontname", ""))
+        size_value = word.get("size")
+        font_size = (
+            float(size_value)
+            if isinstance(size_value, (int, float))
+            else None
+        )
+        runs.append(
+            TextRun(
+                text=text,
+                bold=_is_bold(font_name),
+                italic=_is_italic(font_name),
+                font_size=font_size,
+                font_name=font_name or None,
             )
-        if runs:
-            blocks.append(TextBlock(runs=runs))
-    return blocks
+        )
+    return TextBlock(runs=runs) if runs else None
 
 
 def _extract_tables(page) -> list[ExtractedTable]:
@@ -125,7 +190,12 @@ def extract_document(
                 keep_blank_chars=False,
                 extra_attrs=["fontname", "size"],
             )
-            blocks = _group_words_into_blocks(words)
+            tables = _extract_tables(page)
+            blocks, column_count = _group_words_into_blocks(
+                words,
+                float(page.width),
+                detect_columns=not tables,
+            )
             has_text_layer = bool(page.chars) and bool(blocks)
             warnings: list[str] = []
             if not has_text_layer:
@@ -140,7 +210,8 @@ def extract_document(
                 ExtractedPage(
                     number=page_number,
                     blocks=blocks,
-                    tables=_extract_tables(page),
+                    column_count=column_count,
+                    tables=tables,
                     warnings=warnings,
                     has_text_layer=has_text_layer,
                 )

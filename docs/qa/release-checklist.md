@@ -5,7 +5,7 @@
 ## 自動驗證
 
 - [x] CTest 6/6：核心、圖片最佳化、字型編碼、書籤、表單、文件級編輯。
-- [x] Office Export Python 單元測試 7/7。
+- [x] Office Export Python 單元測試 8/8。
 - [x] 可攜包內六個 Editor 插件與 Office helper 存在。
 - [x] DOCX／XLSX 由封裝 helper 產生後可由 `python-docx`／`openpyxl` 重讀。
 - [x] 六個正式功能插件可由空白舊插件設定自動啟用。
@@ -101,7 +101,7 @@ Adobe Acrobat 文件級編輯互通：
 - [ ] 在簡體中文 Windows 實機長時間快速翻閱 1,160 頁 PDF。
 - [x] 用 Adobe Acrobat DC 填寫並儲存 `dist\qa\form-interop.pdf`，再以獨立 parser 驗證。
 - [ ] 由真人巡覽任意實際文件的浮水印、背景圖片、裁切及旋轉主觀品質；固定 fixture 已完成 Adobe 另存、逐頁像素等價回歸與 Poppler 視覺巡覽。
-- [ ] 使用 Microsoft Word／Excel 人工巡覽 writer 尚未支援的多欄、浮動圖片、跨頁表格、精確座標版面及特殊字型；支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。
+- [ ] 使用 Microsoft Word／Excel 人工巡覽不等寬／三欄以上、跨欄標題、浮動圖片、跨頁表格、精確座標版面及特殊字型；一般等寬雙欄已通過真實 PDF、封裝 helper 與 OOXML 重讀，支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。
 - [ ] 以正式程式碼簽章憑證簽署安裝檔；目前 SmartScreen 可能顯示未知發行者。
 
 這些未勾選項目不代表檔案結構或自動回歸失敗，而是需要任意實際文件的人工視覺判斷、不同語系實機或商業簽章憑證才能完成的驗收邊界。Adobe 表單互通已透過官方 IAC 完成；文件級編輯固定 fixture 已巡覽，仍保留實際文件驗收。

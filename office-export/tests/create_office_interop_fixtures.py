@@ -82,6 +82,28 @@ def build_docx_fixture(path: Path) -> None:
                     ),
                 ],
             ),
+            ExtractedPage(
+                number=4,
+                column_count=2,
+                blocks=[
+                    TextBlock(
+                        runs=[TextRun("Left column top")],
+                        column=0,
+                    ),
+                    TextBlock(
+                        runs=[TextRun("Left column bottom")],
+                        column=0,
+                    ),
+                    TextBlock(
+                        runs=[TextRun("Right column top")],
+                        column=1,
+                    ),
+                    TextBlock(
+                        runs=[TextRun("Right column bottom")],
+                        column=1,
+                    ),
+                ],
+            ),
         ]
     )
     write_docx(document, path)
