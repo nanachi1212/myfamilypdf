@@ -102,17 +102,62 @@ if (-not $crtDirectory) {
 Get-ChildItem -LiteralPath $crtDirectory.FullName -Filter '*.dll' -File |
     Copy-Item -Destination $packageRoot -Force
 
-$qtDeploymentFailed = $false
-foreach ($target in $targets) {
-    $executable = Join-Path $runtimeDirectory "$target.exe"
-    if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
-        Write-Warning "Skipping missing target: $target.exe"
-        continue
+# Qt 6.9.1 windeployqt can fail-fast with 0xC0000409 when the Windows SDK D3D
+# redistributable directory is added to PATH. Ask windeployqt to skip DXC
+# discovery and copy the paired SDK runtime files explicitly instead.
+$directXRuntimeDirectory =
+    'C:\Program Files (x86)\Windows Kits\10\Redist\D3D\x64'
+foreach ($directXRuntime in @('dxcompiler.dll', 'dxil.dll')) {
+    $source = Join-Path $directXRuntimeDirectory $directXRuntime
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "DirectX Shader Compiler runtime was not found: $source"
     }
-    & $windeployqt --release --dir $packageRoot --no-translations --no-system-d3d-compiler --no-opengl-sw $executable | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        $qtDeploymentFailed = $true
-        Write-Warning "windeployqt failed for $target with exit code $LASTEXITCODE."
+    Copy-Item -LiteralPath $source -Destination $packageRoot -Force
+}
+
+$qtDeploymentFailed = $false
+$previousVcInstallDir = $env:VCINSTALLDIR
+$previousVsInstallDir = $env:VSINSTALLDIR
+$env:VCINSTALLDIR = (Join-Path $visualStudioRoot 'VC') + '\'
+$env:VSINSTALLDIR = $visualStudioRoot + '\'
+try {
+    $deploymentExecutables = @()
+    foreach ($target in $targets) {
+        $executable = Join-Path $runtimeDirectory "$target.exe"
+        if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
+            Write-Warning "Skipping missing target: $target.exe"
+            continue
+        }
+        $deploymentExecutables += $executable
+    }
+    if ($deploymentExecutables.Count -gt 0) {
+        $deploymentArguments = @(
+            '--release',
+            '--dir', $packageRoot,
+            '--no-translations',
+            '--no-system-d3d-compiler',
+            '--no-system-dxc-compiler',
+            '--no-opengl-sw'
+        ) + $deploymentExecutables
+        & $windeployqt @deploymentArguments | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            $qtDeploymentFailed = $true
+            Write-Warning "windeployqt failed with exit code $LASTEXITCODE."
+        }
+    }
+}
+finally {
+    if ($null -eq $previousVcInstallDir) {
+        Remove-Item Env:VCINSTALLDIR -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:VCINSTALLDIR = $previousVcInstallDir
+    }
+    if ($null -eq $previousVsInstallDir) {
+        Remove-Item Env:VSINSTALLDIR -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:VSINSTALLDIR = $previousVsInstallDir
     }
 }
 

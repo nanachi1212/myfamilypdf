@@ -147,18 +147,31 @@ function Prepare-TestRuntime {
     Assert-File -LiteralPath $windeployqt
     New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
 
+    $testExecutables = @()
     foreach ($target in $Targets | Where-Object { $_ -like 'UnitTests*' }) {
         $executable = Join-Path $runtimeDirectory "$target.exe"
         Assert-File -LiteralPath $executable
-        & $windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw $executable 2>&1 |
-            Set-Content -LiteralPath (Join-Path $BuildDirectory "windeployqt-$target.log") -Encoding UTF8
+        $testExecutables += $executable
+    }
+    if ($testExecutables.Count -gt 0) {
+        $deploymentArguments = @(
+            '--release',
+            '--no-translations',
+            '--no-system-d3d-compiler',
+            '--no-system-dxc-compiler',
+            '--no-opengl-sw'
+        ) + $testExecutables
+        & $windeployqt @deploymentArguments 2>&1 |
+            Set-Content -LiteralPath (
+                Join-Path $BuildDirectory 'windeployqt-tests.log'
+            ) -Encoding UTF8
         if ($LASTEXITCODE -ne 0) {
             $qtCoreRuntime = Join-Path $runtimeDirectory 'Qt6Core.dll'
             if (Test-Path -LiteralPath $qtCoreRuntime -PathType Leaf) {
-                Write-Warning "windeployqt failed for $target with exit code $LASTEXITCODE; using the already deployed Qt runtime."
+                Write-Warning "windeployqt failed with exit code $LASTEXITCODE; using the already deployed Qt runtime."
             }
             else {
-                throw "windeployqt failed for $target with exit code $LASTEXITCODE and Qt6Core.dll is missing."
+                throw "windeployqt failed with exit code $LASTEXITCODE and Qt6Core.dll is missing."
             }
         }
     }

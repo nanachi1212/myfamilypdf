@@ -6,9 +6,9 @@
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,136,139 | `5DA1963EDD24CAD4AB4E79D9B63BD31E74BFB013F1F7C9984AB9B5A0116EBE00` |
-| `dist\FamilyPDF-Setup-x64.exe` | 58,243,337 | `2DB49564FD62C3D7652991BE247767388B96E4BAD733CC02788660DDE8C4AAE4` |
-| `dist\FamilyPDF-windows-x64.zip` | 82,853,182 | `3F38856C914D77D031F853A5F6795DDD6F9B6D36871F39218301A0F2CCD4D80D` |
+| `dist\FamilyPDF-Full-Setup-x64.exe` | 88,025,523 | `8B366DC0E013904B84C9AAF77D0CFFC9D99DD6176FFDD30647F7E9BE876DFDBA` |
+| `dist\FamilyPDF-Setup-x64.exe` | 77,136,063 | `58CC664F80ADE6780F07D494274412F501AF23AF153FB94AA6E61B8CE04F4615` |
+| `dist\FamilyPDF-windows-x64.zip` | 101,361,275 | `62708DBC4C91AB6D095D13CF00700C440EF30494D126EBD752DA3342C1284908` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
@@ -60,6 +60,7 @@
 - 新增 `scripts\qa\test-office-toolchain-repair.ps1`，覆蓋「啟動器存在、基礎 Python 遺失」的回歸案例；修復失敗時會還原原虛擬環境設定。
 - Qt 6.9.1、aqtinstall 3.3.0、vcpkg 固定版本、CMake、MSVC、六個外掛 DLL、PowerShell 腳本語法均重新檢查通過。
 - CTest 6/6、Office Export Python 8/8、OCR 橫排與直排繁簡中文、1,160 頁大檔、Viewer／Editor 三文件與繁簡中文回歸均通過。
-- 最新完整回歸摘要：`build\final-regression-20260803-113719\summary.json`（本機可重建，不提交 Git）。
+- 最新完整回歸摘要：`build\final-regression-20260803-120614\summary.json`（本機可重建，不提交 Git）。
 - `run-final-regression.ps1` 成功後會自動呼叫安全的保留工具，只留下最新一份完整回歸；測試證明無關目錄不會被刪除。
+- Windows 封裝與 C++ 測試 runtime 已改為單次多目標執行 `windeployqt`，並明確注入 Visual Studio 環境、排除 Qt 6.9.1 會觸發 `0xC0000409` 的 DXC 自動探索，再由 Windows SDK 複製配對的 `dxcompiler.dll`／`dxil.dll`；最終回歸未出現環境警告或 fallback。
 - 本次另移除 13 套已被最新版取代的安裝展開副本，釋放 1,691,093,282 bytes；保留建置樹、最新版安裝驗證及正式 `dist` 產物。加入雙欄 Office helper 後已重建三個主要產物，最新 SHA-256 如本頁表格。

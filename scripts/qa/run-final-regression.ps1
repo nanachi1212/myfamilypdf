@@ -98,10 +98,30 @@ $venvPython = Join-Path (
 Assert-File -LiteralPath $venvPython
 Push-Location (Join-Path $repositoryRoot 'office-export')
 try {
-    & $venvPython -m unittest discover -s tests -v
-    if ($LASTEXITCODE -ne 0) {
+    $officeTestStdout = Join-Path $qaRoot 'office-python-tests.stdout.log'
+    $officeTestStderr = Join-Path $qaRoot 'office-python-tests.stderr.log'
+    $officeTestProcess = Start-Process -FilePath $venvPython -ArgumentList @(
+        '-m', 'unittest', 'discover', '-s', 'tests', '-v'
+    ) -Wait -PassThru -NoNewWindow `
+        -RedirectStandardOutput $officeTestStdout `
+        -RedirectStandardError $officeTestStderr
+    $officeTestOutput = @(
+        Get-Content -LiteralPath $officeTestStdout -ErrorAction SilentlyContinue
+        Get-Content -LiteralPath $officeTestStderr -ErrorAction SilentlyContinue
+    )
+    $officeTestOutput | ForEach-Object { Write-Host $_ }
+    if ($officeTestProcess.ExitCode -ne 0) {
         throw 'Office Export Python tests failed.'
     }
+    $officeTestSummary = $officeTestOutput |
+        ForEach-Object { $_.ToString() } |
+        Where-Object { $_ -match '^Ran (\d+) tests? in ' } |
+        Select-Object -Last 1
+    if (-not $officeTestSummary -or
+        $officeTestSummary -notmatch '^Ran (\d+) tests? in ') {
+        throw 'Office Export Python test count was not reported.'
+    }
+    $officeTestCount = [int]$Matches[1]
 }
 finally {
     Pop-Location
@@ -242,7 +262,7 @@ $summary = [ordered]@{
     viewer_multi_file = $viewerMultiFile
     editor_multi_file = $editorMultiFile
     office_export = [ordered]@{
-        python_tests = 7
+        python_tests = $officeTestCount
         packaged_smoke = $true
         translations = @('zh_TW', 'zh_CN')
     }

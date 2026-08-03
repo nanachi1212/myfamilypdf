@@ -39,9 +39,9 @@ E:\CodexProject\FamilyPDF\dist\FamilyPDF-OCR-Plugin-windows-x64.zip
 
 | 檔案 | 大小 | SHA-256 |
 |---|---:|---|
-| `FamilyPDF-Full-Setup-x64.exe` | 69,136,139 bytes | `5DA1963EDD24CAD4AB4E79D9B63BD31E74BFB013F1F7C9984AB9B5A0116EBE00` |
-| `FamilyPDF-Setup-x64.exe` | 58,243,337 bytes | `2DB49564FD62C3D7652991BE247767388B96E4BAD733CC02788660DDE8C4AAE4` |
-| `FamilyPDF-windows-x64.zip` | 82,853,182 bytes | `3F38856C914D77D031F853A5F6795DDD6F9B6D36871F39218301A0F2CCD4D80D` |
+| `FamilyPDF-Full-Setup-x64.exe` | 88,025,523 bytes | `8B366DC0E013904B84C9AAF77D0CFFC9D99DD6176FFDD30647F7E9BE876DFDBA` |
+| `FamilyPDF-Setup-x64.exe` | 77,136,063 bytes | `58CC664F80ADE6780F07D494274412F501AF23AF153FB94AA6E61B8CE04F4615` |
+| `FamilyPDF-windows-x64.zip` | 101,361,275 bytes | `62708DBC4C91AB6D095D13CF00700C440EF30494D126EBD752DA3342C1284908` |
 | `FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 bytes | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 bytes | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
@@ -85,6 +85,6 @@ cd E:\CodexProject\FamilyPDF
 ## 2026-08-03 接續狀態
 
 - Office Export Python 環境已具備自動健康檢查與修復能力；目前使用本機 vcpkg Python 3.14.2，無須使用者手動安裝 Python。
-- 最新完整回歸：`build\final-regression-20260803-113719\summary.json`，CTest 6/6、Office Python 8/8、封裝 helper 雙欄與單欄相容回歸、OCR 繁簡中文與 1,160 頁多文件測試均通過。
+- 最新完整回歸：`build\final-regression-20260803-120614\summary.json`，CTest 6/6、Office Python 8/8、封裝 helper 雙欄與單欄相容回歸、OCR 繁簡中文與 1,160 頁多文件測試均通過；`windeployqt` 沒有環境警告或 fallback。
 - `scripts\qa\cleanup-final-regression-results.ps1` 會在成功回歸後自動只保留最新結果；舊的安裝展開副本已清除，正式釋出產物與最新版安裝驗證保留。
 - `dist\` 不提交 Git；發布時需另外上傳 ZIP 與安裝檔。
