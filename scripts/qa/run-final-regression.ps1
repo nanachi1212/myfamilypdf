@@ -70,6 +70,7 @@ function Start-ResponsiveSmoke {
 foreach ($required in @(
     (Join-Path $PackageDirectory 'Pdf4QtViewer.exe'),
     (Join-Path $PackageDirectory 'Pdf4QtEditor.exe'),
+    (Join-Path $PackageDirectory 'Pdf4QtDiff.exe'),
     (Join-Path $PackageDirectory 'PdfTool.exe'),
     $LargePdf
 )) {
@@ -86,6 +87,12 @@ Copy-Item -LiteralPath $PackageDirectory -Destination $qaPackage -Recurse
     -PackageDirectory $qaPackage
 & (Join-Path $repositoryRoot 'scripts\qa\smoke-office-export.ps1') `
     -PackageDirectory $qaPackage -SkipBuild
+$diffSmokeRoot = Join-Path $qaRoot 'pdf-diff'
+& (Join-Path $repositoryRoot 'scripts\qa\smoke-pdf-diff.ps1') `
+    -PackageDirectory $qaPackage -OutputDirectory $diffSmokeRoot
+$diffSmokeSummary = Get-Content -LiteralPath (
+    Join-Path $diffSmokeRoot 'summary.json'
+) -Raw -Encoding UTF8 | ConvertFrom-Json
 
 if (-not $SkipBuildTests) {
     & (Join-Path $repositoryRoot 'scripts\phase0\build-upstream-baseline.ps1') `
@@ -265,6 +272,12 @@ $summary = [ordered]@{
         python_tests = $officeTestCount
         packaged_smoke = $true
         translations = @('zh_TW', 'zh_CN')
+    }
+    document_compare = [ordered]@{
+        gui_responding = [bool]$diffSmokeSummary.gui.responding
+        cli_difference_type = [string](
+            $diffSmokeSummary.cli.difference_type
+        )
     }
 }
 $summaryPath = Join-Path $qaRoot 'summary.json'

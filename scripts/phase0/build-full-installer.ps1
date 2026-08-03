@@ -36,6 +36,7 @@ $requiredFiles = @(
     (Join-Path $basePackage 'Pdf4QtViewer.exe'),
     (Join-Path $basePackage 'Pdf4QtEditor.exe'),
     (Join-Path $basePackage 'Pdf4QtPageMaster.exe'),
+    (Join-Path $basePackage 'Pdf4QtDiff.exe'),
     (Join-Path $basePackage 'PdfTool.exe'),
     (Join-Path $ocrPackage 'FamilyPDF-OCR.ps1'),
     (Join-Path $ocrPackage 'ocr\tesseract.exe'),

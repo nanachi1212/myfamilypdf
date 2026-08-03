@@ -23,6 +23,7 @@ $Targets = @(
     'Pdf4QtViewer',
     'Pdf4QtEditor',
     'Pdf4QtPageMaster',
+    'Pdf4QtDiff',
     'EditorPlugin',
     'RedactPlugin',
     'SignaturePlugin',

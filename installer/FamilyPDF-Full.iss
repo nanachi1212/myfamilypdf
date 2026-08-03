@@ -55,14 +55,17 @@ chinesetraditional.WindowsIntegration=Windows 整合
 chinesetraditional.PdfShellTask=加入 PDF 右鍵「使用 FamilyPDF 開啟／編輯」及 Windows「開啟方式」
 chinesetraditional.OpenWithFamilyPDF=使用 FamilyPDF 開啟
 chinesetraditional.EditWithFamilyPDF=使用 FamilyPDF 編輯
+chinesetraditional.CompareShortcut=FamilyPDF 文件比較
 chinesesimplified.WindowsIntegration=Windows 集成
 chinesesimplified.PdfShellTask=添加 PDF 右键“使用 FamilyPDF 打开／编辑”及 Windows“打开方式”
 chinesesimplified.OpenWithFamilyPDF=使用 FamilyPDF 打开
 chinesesimplified.EditWithFamilyPDF=使用 FamilyPDF 编辑
+chinesesimplified.CompareShortcut=FamilyPDF 文档比较
 english.WindowsIntegration=Windows integration
 english.PdfShellTask=Add Open/Edit with FamilyPDF to PDF context menus and Open with
 english.OpenWithFamilyPDF=Open with FamilyPDF
 english.EditWithFamilyPDF=Edit with FamilyPDF
+english.CompareShortcut=FamilyPDF Document Compare
 
 [Types]
 Name: "full"; Description: "{cm:FullType}"
@@ -100,6 +103,7 @@ Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPD
 Name: "{group}\FamilyPDF 閱讀器"; Filename: "{app}\Pdf4QtViewer.exe"; WorkingDir: "{app}"
 Name: "{group}\FamilyPDF 編輯器"; Filename: "{app}\Pdf4QtEditor.exe"; WorkingDir: "{app}"
 Name: "{group}\FamilyPDF 頁面合併與拆分"; Filename: "{app}\Pdf4QtPageMaster.exe"; WorkingDir: "{app}"
+Name: "{group}\{cm:CompareShortcut}"; Filename: "{app}\Pdf4QtDiff.exe"; WorkingDir: "{app}"
 Name: "{group}\FamilyPDF OCR Language Repair"; Filename: "{app}\Install-FamilyPDF-OCR-Languages.cmd"; WorkingDir: "{app}"; Components: ocr
 Name: "{autodesktop}\FamilyPDF"; Filename: "{app}\Pdf4QtViewer.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 

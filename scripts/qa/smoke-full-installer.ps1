@@ -111,6 +111,7 @@ $fullRequired = @(
     'Pdf4QtViewer.exe',
     'Pdf4QtEditor.exe',
     'Pdf4QtPageMaster.exe',
+    'Pdf4QtDiff.exe',
     'PdfTool.exe',
     'FamilyPDF-OCR.cmd',
     'FamilyPDF-OCR.ps1',
@@ -133,6 +134,7 @@ foreach ($relativePath in @(
     'Pdf4QtViewer.exe',
     'Pdf4QtEditor.exe',
     'Pdf4QtPageMaster.exe',
+    'Pdf4QtDiff.exe',
     'PdfTool.exe'
 )) {
     $installedFile = Join-Path $coreRoot $relativePath
@@ -170,6 +172,13 @@ $fullOcrFileCount = Assert-PayloadMatches `
     -OcrScriptPath (Join-Path $fullRoot 'FamilyPDF-OCR.ps1')
 if ($LASTEXITCODE -ne 0) {
     throw 'Installed full-package OCR verification failed.'
+}
+
+& (Join-Path $repositoryRoot 'scripts\qa\smoke-pdf-diff.ps1') `
+    -PackageDirectory $fullRoot `
+    -OutputDirectory (Join-Path $testRoot 'pdf-diff')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Installed full-package PDF comparison verification failed.'
 }
 
 $viewer = Start-Process -FilePath (Join-Path $fullRoot 'Pdf4QtViewer.exe') -PassThru

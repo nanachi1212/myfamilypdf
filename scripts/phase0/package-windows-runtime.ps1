@@ -38,7 +38,8 @@ $targets = @(
     'PdfTool',
     'Pdf4QtViewer',
     'Pdf4QtEditor',
-    'Pdf4QtPageMaster'
+    'Pdf4QtPageMaster',
+    'Pdf4QtDiff'
 )
 # SkipOcr is retained for compatibility with older build commands. OCR is now
 # always packaged separately by scripts\ocr\build-ocr-plugin.ps1.

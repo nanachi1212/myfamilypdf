@@ -9,6 +9,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - 書籤建立、導入、自動產生、文字顏色與可收合資料夾，以及跨 Viewer／Editor 重啟保存。
 - PDF 合併與拆分；合併前可選單數頁、雙數頁或輸入 `1-3,8,10-12` 等頁碼範圍。
 - Viewer／Editor 可一次開啟多份 PDF；每份文件使用獨立視窗，所有視窗頂端都有同步文件分頁可快速切換，並支援工作階段還原、縮圖、頁碼跳轉與完整縮放操作。
+- 文件比較：`Pdf4QtDiff.exe` 可同時載入兩份 PDF，自動比對文字、圖片、向量圖形、著色與頁面移動；支援合併、左側、右側與疊加檢視、上一個／下一個差異，以及輸出標示差異的 PDF report 或 XML。
 - 安全儲存、外部檔案變更偵測、自動復原快照與最多三份隱藏備份。
 - 進階內容編輯外掛：直接編輯頁面內容、新增文字／圖形／SVG、刪除、復原／重做、永久遮蔽及電子／數位簽章。請在 `Pdf4QtEditor.exe` 的 `Editor`、`Redact`、`Signature` 選單使用；英文 action 名稱在繁體／簡體 Windows 相同。
 - 文件級進階編輯：在 `Document Edit` 選單可依全部／單數／雙數／指定頁碼加入文字浮水印、純色或圖片背景、調整頁面尺寸與裁切框、縮放內容及向左／向右旋轉。
@@ -31,6 +32,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - `Pdf4QtViewer.exe`：閱讀 PDF。
 - `Pdf4QtEditor.exe`：編輯、標記、打字與註解。
 - `Pdf4QtPageMaster.exe`：合併、拆分與頁面整理。
+- `Pdf4QtDiff.exe`：比較兩份 PDF 並巡覽或輸出差異報告。
 - `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe`：OCR 外掛安裝程式。
 - `dist\FamilyPDF-OCR-Plugin-windows-x64.zip`：OCR 外掛可攜式覆蓋包。
 
