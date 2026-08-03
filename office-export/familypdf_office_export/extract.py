@@ -125,14 +125,55 @@ def _group_words_into_blocks(
                 )
 
     if column_count > 1:
-        block_positions.sort(
-            key=lambda item: (
-                0 if item[0].column_span > 1 else 1,
-                item[0].column,
-                item[3],
-                item[1],
+        spanning_positions = sorted(
+            (
+                item
+                for item in block_positions
+                if item[0].column_span > 1
+            ),
+            key=lambda item: (item[3], item[1]),
+        )
+        column_positions = [
+            item
+            for item in block_positions
+            if item[0].column_span == 1
+        ]
+        ordered_positions: list[
+            tuple[TextBlock, float, float, float]
+        ] = []
+        previous_top = float("-inf")
+        for spanning in spanning_positions:
+            ordered_positions.extend(
+                sorted(
+                    (
+                        item
+                        for item in column_positions
+                        if previous_top <= item[3] < spanning[3]
+                    ),
+                    key=lambda item: (
+                        item[0].column,
+                        item[3],
+                        item[1],
+                    ),
+                )
+            )
+            ordered_positions.append(spanning)
+            previous_top = spanning[3]
+        ordered_positions.extend(
+            sorted(
+                (
+                    item
+                    for item in column_positions
+                    if item[3] >= previous_top
+                ),
+                key=lambda item: (
+                    item[0].column,
+                    item[3],
+                    item[1],
+                ),
             )
         )
+        block_positions = ordered_positions
     else:
         block_positions.sort(key=lambda item: (item[3], item[1]))
     return [item[0] for item in block_positions], column_count

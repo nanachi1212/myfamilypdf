@@ -40,6 +40,11 @@ BT /F1 12 Tf 40 340 Td (Left top) Tj ET
 BT /F1 12 Tf 40 300 Td (Left bottom) Tj ET
 BT /F1 12 Tf 340 340 Td (Right top) Tj ET
 BT /F1 12 Tf 340 300 Td (Right bottom) Tj ET
+BT /F1 16 Tf 220 250 Td (Middle heading) Tj ET
+BT /F1 12 Tf 40 210 Td (Left second top) Tj ET
+BT /F1 12 Tf 40 170 Td (Left second bottom) Tj ET
+BT /F1 12 Tf 340 210 Td (Right second top) Tj ET
+BT /F1 12 Tf 340 170 Td (Right second bottom) Tj ET
 """
     )
     page[NameObject("/Contents")] = writer._add_object(content)
@@ -62,13 +67,52 @@ class MultiColumnExportTest(unittest.TestCase):
         heading = extracted.pages[0].blocks[0]
         self.assertEqual(heading.text, "Full width heading")
         self.assertEqual(heading.column_span, 2)
-        self.assertEqual(document.paragraphs[0].text, "Full width heading")
-        self.assertEqual(len(document.tables), 1)
-        cells = document.tables[0].rows[0].cells
-        self.assertEqual(len(cells), 2)
-        self.assertEqual(cells[0].text.splitlines(), ["Left top", "Left bottom"])
-        self.assertEqual(cells[1].text.splitlines(), ["Right top", "Right bottom"])
-        self.assertEqual(report.paragraphs_exported, 5)
+        self.assertEqual(
+            [block.text for block in extracted.pages[0].blocks],
+            [
+                "Full width heading",
+                "Left top",
+                "Left bottom",
+                "Right top",
+                "Right bottom",
+                "Middle heading",
+                "Left second top",
+                "Left second bottom",
+                "Right second top",
+                "Right second bottom",
+            ],
+        )
+        self.assertEqual(
+            [paragraph.text for paragraph in document.paragraphs if paragraph.text],
+            ["Full width heading", "Middle heading"],
+        )
+        body_order = [
+            child.tag.rsplit("}", 1)[-1]
+            for child in document.element.body.iterchildren()
+            if child.tag.rsplit("}", 1)[-1] in {"p", "tbl"}
+        ]
+        self.assertEqual(body_order, ["p", "tbl", "p", "tbl"])
+        self.assertEqual(len(document.tables), 2)
+        first_cells = document.tables[0].rows[0].cells
+        self.assertEqual(len(first_cells), 2)
+        self.assertEqual(
+            first_cells[0].text.splitlines(),
+            ["Left top", "Left bottom"],
+        )
+        self.assertEqual(
+            first_cells[1].text.splitlines(),
+            ["Right top", "Right bottom"],
+        )
+        second_cells = document.tables[1].rows[0].cells
+        self.assertEqual(
+            second_cells[0].text.splitlines(),
+            ["Left second top", "Left second bottom"],
+        )
+        self.assertEqual(
+            second_cells[1].text.splitlines(),
+            ["Right second top", "Right second bottom"],
+        )
+        self.assertEqual(report.paragraphs_exported, 10)
 
 
 if __name__ == "__main__":

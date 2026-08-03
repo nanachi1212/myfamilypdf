@@ -89,11 +89,26 @@ assert workbook.sheetnames == ['Page 2']
 assert workbook['Page 2']['A1'].value == 'Second page'
 multi_column_page = Document(r'$multiColumnDocx')
 assert [p.text for p in multi_column_page.paragraphs if p.text] == [
-    'Full width heading'
+    'Full width heading',
+    'Middle heading',
 ]
-columns = multi_column_page.tables[0].rows[0].cells
-assert columns[0].text.splitlines() == ['Left top', 'Left bottom']
-assert columns[1].text.splitlines() == ['Right top', 'Right bottom']
+body_order = [
+    child.tag.rsplit('}', 1)[-1]
+    for child in multi_column_page.element.body.iterchildren()
+    if child.tag.rsplit('}', 1)[-1] in {'p', 'tbl'}
+]
+assert body_order == ['p', 'tbl', 'p', 'tbl']
+assert len(multi_column_page.tables) == 2
+first_columns = multi_column_page.tables[0].rows[0].cells
+assert first_columns[0].text.splitlines() == ['Left top', 'Left bottom']
+assert first_columns[1].text.splitlines() == ['Right top', 'Right bottom']
+second_columns = multi_column_page.tables[1].rows[0].cells
+assert second_columns[0].text.splitlines() == [
+    'Left second top', 'Left second bottom'
+]
+assert second_columns[1].text.splitlines() == [
+    'Right second top', 'Right second bottom'
+]
 table_page = Document(r'$tableDocx')
 assert len(table_page.tables) == 0
 assert len([p for p in table_page.paragraphs if p.text]) == 3

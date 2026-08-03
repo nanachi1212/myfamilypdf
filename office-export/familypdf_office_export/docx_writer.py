@@ -6,7 +6,7 @@ from pathlib import Path
 from docx import Document
 from docx.shared import Pt
 
-from .model import ExtractedDocument
+from .model import ExtractedDocument, TextBlock
 
 
 def _write_block(paragraph, block) -> None:
@@ -18,6 +18,27 @@ def _write_block(paragraph, block) -> None:
             run.font.size = Pt(source_run.font_size)
         if source_run.font_name:
             run.font.name = source_run.font_name
+
+
+def _write_column_table(
+    document,
+    columns: list[list[TextBlock]],
+) -> int:
+    if not any(columns):
+        return 0
+
+    table = document.add_table(rows=1, cols=len(columns))
+    paragraphs_exported = 0
+    for column_index, cell in enumerate(table.rows[0].cells):
+        for block_index, block in enumerate(columns[column_index]):
+            paragraph = (
+                cell.paragraphs[0]
+                if block_index == 0
+                else cell.add_paragraph()
+            )
+            _write_block(paragraph, block)
+            paragraphs_exported += 1
+    return paragraphs_exported
 
 
 @dataclass(slots=True, frozen=True)
@@ -38,47 +59,27 @@ def write_docx(
     paragraphs_exported = 0
     for page_index, page in enumerate(extracted.pages):
         if page.column_count > 1:
-            column_tops = [
-                block.top
-                for block in page.blocks
-                if block.column_span == 1
+            pending_columns: list[list[TextBlock]] = [
+                [] for _ in range(page.column_count)
             ]
-            first_column_top = min(column_tops, default=float("inf"))
-            leading_spanning_blocks = [
-                block
-                for block in page.blocks
-                if block.column_span > 1 and block.top <= first_column_top
-            ]
-            trailing_spanning_blocks = [
-                block
-                for block in page.blocks
-                if block.column_span > 1 and block.top > first_column_top
-            ]
-            for block in leading_spanning_blocks:
-                paragraph = document.add_paragraph()
-                _write_block(paragraph, block)
-                paragraphs_exported += 1
-
-            table = document.add_table(rows=1, cols=page.column_count)
-            for column_index, cell in enumerate(table.rows[0].cells):
-                column_blocks = [
-                    block
-                    for block in page.blocks
-                    if block.column_span == 1
-                    and block.column == column_index
-                ]
-                for block_index, block in enumerate(column_blocks):
-                    paragraph = (
-                        cell.paragraphs[0]
-                        if block_index == 0
-                        else cell.add_paragraph()
+            for block in page.blocks:
+                if block.column_span > 1:
+                    paragraphs_exported += _write_column_table(
+                        document,
+                        pending_columns,
                     )
+                    pending_columns = [
+                        [] for _ in range(page.column_count)
+                    ]
+                    paragraph = document.add_paragraph()
                     _write_block(paragraph, block)
                     paragraphs_exported += 1
-            for block in trailing_spanning_blocks:
-                paragraph = document.add_paragraph()
-                _write_block(paragraph, block)
-                paragraphs_exported += 1
+                else:
+                    pending_columns[block.column].append(block)
+            paragraphs_exported += _write_column_table(
+                document,
+                pending_columns,
+            )
         else:
             for block in page.blocks:
                 paragraph = document.add_paragraph()

@@ -6,9 +6,9 @@
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Full-Setup-x64.exe` | 88,029,006 | `9B73EAD2D48A2E872607B3297A383CBEECA5567F8E8E877A5395D14B9CDC46B2` |
-| `dist\FamilyPDF-Setup-x64.exe` | 77,143,691 | `FF11B32AF152DE40EBA53481483A55E66712236EA96324453181EC657726EF40` |
-| `dist\FamilyPDF-windows-x64.zip` | 101,363,529 | `C24E647DF194B580456916CE13A8271E28553A7221280B6C72FC1EE509A4B6D1` |
+| `dist\FamilyPDF-Full-Setup-x64.exe` | 88,033,530 | `352C52192760285AFF5EF43C89FD0476EC3115760FEAB766E9D8220525940481` |
+| `dist\FamilyPDF-Setup-x64.exe` | 77,145,223 | `F8685546F8AA13201332C7258500C29BB9EAEFE9D011C625A8C8E9C0A75F235C` |
+| `dist\FamilyPDF-windows-x64.zip` | 101,364,412 | `33022A4E5CF03CCD28EDA21836B3FB112EEF4C334A82295F8ED6F58CA1BCFA5E` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
@@ -46,7 +46,7 @@
 - 修正後的完整驗證安裝檔已重新建置；完整與精簡模式安裝通過，完整模式繁中／簡中／英文 OCR 與可搜尋 PDF 回歸通過。摘要：`build\full-installer-smoke\summary.json`。
 - 完整安裝的 405 個核心檔案與 29 個 OCR 檔案、精簡安裝的 405 個核心檔案，均與目前 `dist` 可攜包逐檔 SHA-256 相同；安裝器刻意排除僅供免安裝模式使用的 `portable.mode`。
 - Microsoft Word 16.0 已實際開啟匯出 DOCX，辨識三頁、十個段落、明確分頁、繁簡中、英文、五種字級及粗斜體；Word 原生 renderer 另輸出三頁 PNG，尺寸、非白色像素比例及 SHA-256 均已記錄，固定 fixture 巡覽未見亂碼、缺字方框、裁切或重疊。Microsoft Excel 16.0 已實際開啟匯出 XLSX，辨識三個工作表、同頁多表格、四行 fallback、UsedRange、表格值、繁簡中文、跨欄合併、各表表頭粗體及自動欄寬。驗證摘要：`build\microsoft-office-smoke\summary.json`。
-- 新增一般等寬雙欄辨識：真實雙欄 PDF 會依左欄由上到下、再右欄由上到下分組，DOCX 以無框線兩欄表格保留可編輯版面；頁頂端跨越欄間中央線的全寬標題會成為表格上方的獨立可編輯段落。表格頁不會被誤判為雙欄，既有單欄行也維持原段落數。來源測試、封裝 EXE 轉換及 `python-docx` 標題／左右欄重讀皆通過。四頁 Word COM fixture 已準備，但本次隔離帳號缺少互動式 Office 工作階段（HRESULT `0x80070520`），不把該項列為已通過。
+- 一般等寬雙欄會依「左欄由上到下、右欄由上到下」重建；跨越欄間中央線的全寬文字會依原本垂直位置分隔區段，因此頁頂端、中段與底端皆可輸出成普通可編輯段落，每個相鄰欄本文則各自成為無框線雙欄表格。真實 PDF fixture 已驗證兩個全寬標題、兩個雙欄表格、兩組左右欄及 10 個段落；來源測試、封裝 EXE 與 `python-docx` 重讀皆通過。表格頁不會被誤判為雙欄，既有單欄行也維持原段落數。四頁 Word COM fixture 已準備，但本次隔離帳號缺少互動式 Office 工作階段（HRESULT `0x80070520`），不把該項列為已通過。
 - 1,160 頁 PDF 已在繁中與簡中 GUI 分別完成第 1 → 580 → 1,160 → 1,157 頁跳轉；頁碼、主畫面與縮略圖同步，簡中視窗持續約 112 秒後仍為 Responding。
 
 ## Git
@@ -60,7 +60,7 @@
 - 新增 `scripts\qa\test-office-toolchain-repair.ps1`，覆蓋「啟動器存在、基礎 Python 遺失」的回歸案例；修復失敗時會還原原虛擬環境設定。
 - Qt 6.9.1、aqtinstall 3.3.0、vcpkg 固定版本、CMake、MSVC、六個外掛 DLL、PowerShell 腳本語法均重新檢查通過。
 - CTest 6/6、Office Export Python 8/8、OCR 橫排與直排繁簡中文、1,160 頁大檔、Viewer／Editor 三文件與繁簡中文回歸均通過。
-- 最新完整回歸摘要：`build\final-regression-20260803-122724\summary.json`（本機可重建，不提交 Git）。
+- 最新完整回歸摘要：`build\final-regression-20260803-125018\summary.json`（本機可重建，不提交 Git）。
 - `run-final-regression.ps1` 成功後會自動呼叫安全的保留工具，只留下最新一份完整回歸；測試證明無關目錄不會被刪除。
 - Windows 正式封裝以單次多目標執行 `windeployqt`，明確注入 Visual Studio 環境、排除 Qt 6.9.1 會觸發 `0xC0000409` 的 DXC 自動探索，再由 Windows SDK 複製配對的 `dxcompiler.dll`／`dxil.dll`。C++ 測試 runtime 則改用 PE import 整理出的 10 個 release Qt DLL 與 15 個外掛固定 allowlist，連續兩次 CTest 及最終回歸均未出現環境警告或 fallback。
-- 本次另移除 13 套已被最新版取代的安裝展開副本，釋放 1,691,093,282 bytes；保留建置樹、最新版安裝驗證及正式 `dist` 產物。加入全寬標題 Office helper 後已重建三個主要產物，最新 SHA-256 如本頁表格。
+- 本次另移除 13 套已被最新版取代的安裝展開副本，釋放 1,691,093,282 bytes；保留建置樹、最新版安裝驗證及正式 `dist` 產物。加入跨欄多區段 Office helper 後已重建三個主要產物，最新 SHA-256 如本頁表格。
