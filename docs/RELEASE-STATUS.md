@@ -6,9 +6,9 @@
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,188,268 | `2D52AF387B38C9511E146A75D60763C4708FF6E192253AACC2E2CD9D25478398` |
-| `dist\FamilyPDF-Setup-x64.exe` | 58,290,529 | `8C73DE95EF33A5BBC1887C9CA7E8E3DC55D7B46A2EBCC1B913AEE33A99246B0B` |
-| `dist\FamilyPDF-windows-x64.zip` | 82,922,306 | `98BD29378DA985D7EAD7D31848B2E93880C4EFA978759BD7B1E8B1850C8FBDCA` |
+| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,186,001 | `BA74E7364217FC73F8367BC81925E0CAB9B460F98DFA744554F2FC91B295048E` |
+| `dist\FamilyPDF-Setup-x64.exe` | 58,299,100 | `28A895E776851402E3A138DE523A121D370BF4BAEE3CF5CE05DDB16DCB264D3F` |
+| `dist\FamilyPDF-windows-x64.zip` | 82,924,819 | `5A19646F9E01445CBDE3D320A8A42B1484D5EC63CAFB9D6FC300D43E6D6E6B8B` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
@@ -16,7 +16,7 @@
 
 ## 已驗證
 
-- CTest 6/6 通過；另有 Office Export Python 單元測試 10/10 通過。
+- CTest 6/6 通過；另有 Office Export Python 單元測試 11/11 通過。
 - pypdf 獨立讀回標準 PDF outline：繁體中文標題、資料夾階層、文字顏色、粗體及頁面目的地均保留。
 - Adobe Acrobat DC 已透過官方 IAC 開啟、修改並另存 AcroForm；`pypdf` 獨立讀回確認「姓名」「同意」欄位名稱、修改值與原始預設值保留。修正過程也為 PDF writer 補上 CR／LF hexadecimal string 序列化，避免 UTF-16BE 位元組被外部閱讀器正規化。
 - Adobe Acrobat DC 已實際開啟、逐頁解析並另存浮水印／背景與頁面幾何 fixture；`pypdf` 確認頁數、MediaBox、CropBox、旋轉保留，`pypdfium2` 固定倍率逐頁 RGB 像素 SHA-256 與來源完全一致。摘要：`build\acrobat-document-edit-interop\summary.json`。
@@ -46,8 +46,8 @@
 - 修正後的完整驗證安裝檔已重新建置；完整與精簡模式安裝通過，完整模式繁中／簡中／英文 OCR 與可搜尋 PDF 回歸通過。摘要：`build\full-installer-smoke\summary.json`。
 - 完整安裝的 406 個核心檔案與 29 個 OCR 檔案、精簡安裝的 406 個核心檔案，均與目前 `dist` 可攜包逐檔 SHA-256 相同；安裝器刻意排除僅供免安裝模式使用的 `portable.mode`。
 - Microsoft Word 16.0 已實際開啟匯出 DOCX，辨識三頁、十個段落、明確分頁、繁簡中、英文、五種字級及粗斜體；Word 原生 renderer 另輸出三頁 PNG，尺寸、非白色像素比例及 SHA-256 均已記錄，固定 fixture 巡覽未見亂碼、缺字方框、裁切或重疊。Microsoft Excel 16.0 已實際開啟匯出 XLSX，辨識三個工作表、同頁多表格、四行 fallback、UsedRange、表格值、繁簡中文、跨欄合併、各表表頭粗體及自動欄寬。驗證摘要：`build\microsoft-office-smoke\summary.json`。
-- 一般等寬與不等寬雙欄會依「左欄由上到下、右欄由上到下」重建；欄寬由左右欄文字起點推導，跨欄文字則依同一分界保留為普通可編輯段落。固定不等寬真實 PDF 為約 73/27 欄寬，封裝 EXE 產出的 DOCX 已重讀左欄寬大於右欄兩倍、兩欄文字、兩張欄內圖片及跨欄標題。既有等寬 fixture 的兩個全寬標題、兩個雙欄表格、10 個段落與圖片順序仍通過。表格頁不會被誤判為雙欄。四頁 Word COM fixture 已準備，但本次隔離帳號缺少互動式 Office 工作階段（HRESULT `0x80070520`），不把該項列為已通過。
-- DOCX 新增非重疊 raster 圖片：`pdfplumber` 以既有 `pypdfium2` 後端在 144 DPI 渲染並依 PDF bounding box 裁成 PNG；單欄圖片、雙欄儲存格內圖片及跨欄圖片均依文字閱讀順序輸出並自動限制寬度。真實 fixture、來源 writer 與封裝 helper 已重讀兩個 inline shapes、欄內空白圖片段落、跨欄 body 順序及 `images_exported: 2`；純文字匯出回報 `images_exported: 0`。
+- 一般等寬／不等寬雙欄與三欄會依「各欄由上到下，再由左到右」重建；欄寬由重複文字起點聚類推導，跨越全部欄位的文字則保留為普通可編輯段落。固定三欄真實 PDF 已由來源測試與封裝 EXE 重讀一個三欄表格、六個欄內段落、三張欄內圖片及跨全頁標題；約 73/27 不等寬雙欄、既有等寬雙欄的多區段與圖片順序仍通過。表格頁不會被誤判為多欄。四頁 Word COM fixture 已準備，但本次隔離帳號缺少互動式 Office 工作階段（HRESULT `0x80070520`），不把該項列為已通過。
+- DOCX 新增非重疊 raster 圖片：`pdfplumber` 以既有 `pypdfium2` 後端在 144 DPI 渲染並依 PDF bounding box 裁成 PNG；單欄、雙欄、三欄儲存格內圖片及跨欄圖片均依文字閱讀順序輸出並自動限制寬度。封裝 helper 的三欄 fixture 回報 `images_exported: 3`，既有雙欄回報 `2`，純文字匯出回報 `0`。
 - `Pdf4QtDiff.exe` 已正式納入固定 build target、可攜包、基礎／完整安裝器與繁簡英開始功能表捷徑。真實一頁 fixture 由 `PdfTool diff` 讀回 `text-replaced`（移除 `A`、加入 `B`），可攜版及完整安裝版比較 GUI 以兩份 PDF 自動啟動後均保持 Responding；完整回歸摘要已記錄 `document_compare.gui_responding: true`。
 - 1,160 頁 PDF 已在繁中與簡中 GUI 分別完成第 1 → 580 → 1,160 → 1,157 頁跳轉；頁碼、主畫面與縮略圖同步，簡中視窗持續約 112 秒後仍為 Responding。
 
@@ -61,8 +61,8 @@
 - Office Export 虛擬環境原本仍保留 `python.exe`，但 `pyvenv.cfg` 指向已不存在的 Python 3.14.6。安裝腳本現在會實際啟動 Python 檢查健康狀態，並優先使用相同 ABI 的本機 Python 修復設定；本機已自動改用 vcpkg 內附 Python 3.14.2，`pip check` 與 Office 套件匯入均通過。
 - 新增 `scripts\qa\test-office-toolchain-repair.ps1`，覆蓋「啟動器存在、基礎 Python 遺失」的回歸案例；修復失敗時會還原原虛擬環境設定。
 - Qt 6.9.1、aqtinstall 3.3.0、vcpkg 固定版本、CMake、MSVC、六個外掛 DLL、PowerShell 腳本語法均重新檢查通過。
-- CTest 6/6、Office Export Python 10/10、封裝後不等寬雙欄、PDF 文件比較 CLI／GUI、OCR 橫排與直排繁簡中文、1,160 頁大檔、Viewer／Editor 三文件與繁簡中文回歸均通過。
-- 最新完整回歸摘要：`build\final-regression-20260803-143539\summary.json`（本機可重建，不提交 Git）。
+- CTest 6/6、Office Export Python 11/11、封裝後等寬／不等寬雙欄與三欄、PDF 文件比較 CLI／GUI、OCR 橫排與直排繁簡中文、1,160 頁大檔、Viewer／Editor 三文件與繁簡中文回歸均通過。
+- 最新完整回歸摘要：`build\final-regression-20260803-150406\summary.json`（本機可重建，不提交 Git）。
 - 可攜版封裝完全不再執行 Qt 6.9.1 `windeployqt`；10 個 release Qt modules、15 個 plugins、DXC 與 VC runtime 改為逐檔存在檢查及固定複製。專用環境測試、完整回歸、完整／精簡隔離安裝均無 `0xC0000409` 或 fallback 警告，三個正式產物合計減少 56,400,797 bytes。
 - `run-final-regression.ps1` 成功後會自動呼叫安全的保留工具，只留下最新一份完整回歸；測試證明無關目錄不會被刪除。
 - Windows 正式封裝以單次多目標執行 `windeployqt`，明確注入 Visual Studio 環境、排除 Qt 6.9.1 會觸發 `0xC0000409` 的 DXC 自動探索，再由 Windows SDK 複製配對的 `dxcompiler.dll`／`dxil.dll`。C++ 測試 runtime 則改用 PE import 整理出的 10 個 release Qt DLL 與 15 個外掛固定 allowlist，連續兩次 CTest 及最終回歸均未出現環境警告或 fallback。

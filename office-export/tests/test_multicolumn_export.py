@@ -109,6 +109,44 @@ BT /F1 12 Tf 440 300 Td (Narrow right bottom) Tj ET
         writer.write(stream)
 
 
+def _write_three_column_pdf(path: Path) -> None:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=600, height=400)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_reference = writer._add_object(font)
+    page[NameObject("/Resources")] = DictionaryObject(
+        {
+            NameObject("/Font"): DictionaryObject(
+                {NameObject("/F1"): font_reference}
+            )
+        }
+    )
+    content = DecodedStreamObject()
+    content.set_data(
+        b"""
+BT /F1 18 Tf 70 375 Td (Three column heading across the full page width) Tj ET
+BT /F1 12 Tf 40 340 Td (Column one top) Tj ET
+BT /F1 12 Tf 40 300 Td (Column one bottom) Tj ET
+BT /F1 12 Tf 220 340 Td (Column two top) Tj ET
+BT /F1 12 Tf 220 300 Td (Column two bottom) Tj ET
+BT /F1 12 Tf 420 340 Td (Column three top) Tj ET
+BT /F1 12 Tf 420 300 Td (Column three bottom) Tj ET
+"""
+    )
+    page[NameObject("/Contents")] = writer._add_object(content)
+    _merge_raster_image(page, (60, 20), (30, 90, 220), 100, 240)
+    _merge_raster_image(page, (60, 20), (30, 180, 90), 280, 240)
+    _merge_raster_image(page, (60, 20), (220, 40, 60), 470, 240)
+    with path.open("wb") as stream:
+        writer.write(stream)
+
+
 def _write_single_column_image_pdf(path: Path) -> None:
     writer = PdfWriter()
     page = writer.add_blank_page(width=600, height=400)
@@ -312,6 +350,45 @@ class MultiColumnExportTest(unittest.TestCase):
         self.assertEqual(len(document.inline_shapes), 2)
         self.assertEqual(report.paragraphs_exported, 5)
         self.assertEqual(report.images_exported, 2)
+
+    def test_preserves_three_pdf_columns_as_editable_docx_columns(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "three-columns.pdf"
+            target = Path(directory) / "three-columns.docx"
+            _write_three_column_pdf(source)
+
+            extracted = extract_document(source)
+            report = write_docx(extracted, target)
+            document = Document(target)
+
+        page = extracted.pages[0]
+        self.assertEqual(page.column_count, 3)
+        self.assertEqual(len(page.column_width_ratios), 3)
+        self.assertAlmostEqual(sum(page.column_width_ratios), 1.0)
+        self.assertEqual([image.column for image in page.images], [0, 1, 2])
+        self.assertEqual([image.column_span for image in page.images], [1, 1, 1])
+        self.assertEqual(
+            [paragraph.text for paragraph in document.paragraphs if paragraph.text],
+            ["Three column heading across the full page width"],
+        )
+        self.assertEqual(len(document.tables), 1)
+        cells = document.tables[0].rows[0].cells
+        self.assertEqual(len(cells), 3)
+        self.assertEqual(
+            [paragraph.text for paragraph in cells[0].paragraphs],
+            ["Column one top", "Column one bottom", ""],
+        )
+        self.assertEqual(
+            [paragraph.text for paragraph in cells[1].paragraphs],
+            ["Column two top", "Column two bottom", ""],
+        )
+        self.assertEqual(
+            [paragraph.text for paragraph in cells[2].paragraphs],
+            ["Column three top", "Column three bottom", ""],
+        )
+        self.assertEqual(len(document.inline_shapes), 3)
+        self.assertEqual(report.paragraphs_exported, 7)
+        self.assertEqual(report.images_exported, 3)
 
 
 if __name__ == "__main__":

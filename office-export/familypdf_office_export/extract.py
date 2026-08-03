@@ -28,11 +28,82 @@ def _is_italic(font_name: str) -> bool:
     return "italic" in lowered or "oblique" in lowered
 
 
+def _cluster_column_starts(
+    block_positions: Sequence[tuple[TextBlock, float, float, float]],
+    page_width: float,
+) -> list[tuple[float, int]]:
+    tolerance = page_width * 0.06
+    clusters: list[list[float]] = []
+    for start in sorted(position[1] for position in block_positions):
+        if not clusters or abs(start - sum(clusters[-1]) / len(clusters[-1])) > tolerance:
+            clusters.append([start])
+        else:
+            clusters[-1].append(start)
+    return [
+        (sum(cluster) / len(cluster), len(cluster))
+        for cluster in clusters
+        if len(cluster) >= 2
+    ]
+
+
+def _detect_column_starts(
+    block_positions: Sequence[tuple[TextBlock, float, float, float]],
+    page_width: float,
+) -> list[float]:
+    clusters = _cluster_column_starts(block_positions, page_width)
+    if len(clusters) >= 3:
+        three_candidates = sorted(
+            sorted(clusters, key=lambda cluster: cluster[1], reverse=True)[:3],
+            key=lambda cluster: cluster[0],
+        )
+        if all(
+            three_candidates[index + 1][0] - three_candidates[index][0]
+            >= page_width * 0.22
+            for index in range(2)
+        ):
+            return [candidate[0] for candidate in three_candidates]
+
+    pairs = [
+        (left, right)
+        for left_index, left in enumerate(clusters)
+        for right in clusters[left_index + 1 :]
+        if right[0] - left[0] >= page_width * 0.20
+    ]
+    if not pairs:
+        return []
+    left, right = max(
+        pairs,
+        key=lambda pair: (
+            pair[0][1] + pair[1][1],
+            pair[1][0] - pair[0][0],
+        ),
+    )
+    return [left[0], right[0]]
+
+
+def _assign_layout_column(
+    x0: float,
+    x1: float,
+    column_count: int,
+    column_boundaries: Sequence[float],
+) -> tuple[int, int]:
+    if (
+        column_count > 1
+        and column_boundaries
+        and x0 < column_boundaries[0]
+        and x1 > column_boundaries[-1]
+    ):
+        return 0, column_count
+    midpoint = (x0 + x1) / 2.0
+    column = sum(midpoint >= boundary for boundary in column_boundaries)
+    return min(column, column_count - 1), 1
+
+
 def _group_words_into_blocks(
     words: Iterable[dict[str, Any]],
     page_width: float,
     detect_columns: bool = True,
-) -> tuple[list[TextBlock], int, list[float], float | None]:
+) -> tuple[list[TextBlock], int, list[float], list[float]]:
     sorted_words = sorted(
         words,
         key=lambda item: (
@@ -88,46 +159,45 @@ def _group_words_into_blocks(
 
     column_count = 1
     column_width_ratios = [1.0]
-    column_split_x = None
-    page_center = page_width / 2.0
-    column_candidates = [
-        position
-        for position in block_positions
-        if not (position[1] < page_center < position[2])
-    ]
-    if detect_columns and len(column_candidates) >= 4:
-        starts = sorted(position[1] for position in column_candidates)
-        gaps = [
-            (starts[index + 1] - starts[index], index)
-            for index in range(len(starts) - 1)
+    column_boundaries: list[float] = []
+    column_starts = (
+        _detect_column_starts(block_positions, page_width)
+        if detect_columns
+        else []
+    )
+    if len(column_starts) in (2, 3):
+        left_edge = column_starts[0]
+        inferred_right_edge = page_width - left_edge
+        column_boundaries = [
+            start - page_width * 0.03
+            for start in column_starts[1:]
         ]
-        largest_gap, gap_index = max(gaps, default=(0.0, 0))
-        left_count = gap_index + 1
-        right_count = len(starts) - left_count
-        if (
-            largest_gap >= page_width * 0.20
-            and left_count >= 2
-            and right_count >= 2
-        ):
-            left_edge = starts[0]
-            right_start = starts[gap_index + 1]
-            inferred_right_edge = page_width - left_edge
-            usable_width = inferred_right_edge - left_edge
-            split_x = right_start - page_width * 0.03
-            if usable_width > 0.0:
-                left_ratio = (split_x - left_edge) / usable_width
-                left_ratio = min(0.8, max(0.2, left_ratio))
-                column_width_ratios = [left_ratio, 1.0 - left_ratio]
-            else:
-                column_width_ratios = [0.5, 0.5]
-            column_split_x = split_x
-            column_count = 2
-            for block, x0, x1, _ in block_positions:
-                if x0 < split_x < x1:
-                    block.column = 0
-                    block.column_span = 2
-                else:
-                    block.column = 0 if x0 < split_x else 1
+        width_edges = [
+            left_edge,
+            *column_boundaries,
+            inferred_right_edge,
+        ]
+        column_widths = [
+            width_edges[index + 1] - width_edges[index]
+            for index in range(len(width_edges) - 1)
+        ]
+        width_total = sum(column_widths)
+        if width_total > 0.0 and all(width > 0.0 for width in column_widths):
+            column_width_ratios = [
+                width / width_total for width in column_widths
+            ]
+        else:
+            column_width_ratios = [
+                1.0 / len(column_starts) for _ in column_starts
+            ]
+        column_count = len(column_starts)
+        for block, x0, x1, _ in block_positions:
+            block.column, block.column_span = _assign_layout_column(
+                x0,
+                x1,
+                column_count,
+                column_boundaries,
+            )
 
     if column_count == 1:
         block_positions = []
@@ -155,7 +225,7 @@ def _group_words_into_blocks(
         _order_layout_items(blocks, column_count),
         column_count,
         column_width_ratios,
-        column_split_x,
+        column_boundaries,
     )
 
 
@@ -202,7 +272,7 @@ def _order_layout_items(
 def _extract_images(
     page,
     column_count: int,
-    column_split_x: float | None,
+    column_boundaries: Sequence[float],
     page_number: int,
 ) -> tuple[list[ExtractedImage], list[str]]:
     if not page.images:
@@ -218,7 +288,6 @@ def _extract_images(
     images: list[ExtractedImage] = []
     warnings: list[str] = []
     scale = 2.0
-    split_x = column_split_x or float(page.width) / 2.0
     for image_index, source in enumerate(page.images, start=1):
         try:
             x0 = float(source.get("x0", 0.0))
@@ -245,10 +314,12 @@ def _extract_images(
             column = 0
             column_span = 1
             if column_count > 1:
-                if x0 < split_x < x1:
-                    column_span = column_count
-                else:
-                    column = 0 if (x0 + x1) / 2.0 < split_x else 1
+                column, column_span = _assign_layout_column(
+                    x0,
+                    x1,
+                    column_count,
+                    column_boundaries,
+                )
             images.append(
                 ExtractedImage(
                     data=buffer.getvalue(),
@@ -351,7 +422,7 @@ def extract_document(
                 blocks,
                 column_count,
                 column_width_ratios,
-                column_split_x,
+                column_boundaries,
             ) = _group_words_into_blocks(
                 words,
                 float(page.width),
@@ -360,7 +431,7 @@ def extract_document(
             images, image_warnings = _extract_images(
                 page,
                 column_count,
-                column_split_x,
+                column_boundaries,
                 page_number,
             )
             layout_items = _order_layout_items(
@@ -386,7 +457,7 @@ def extract_document(
                     layout_items=layout_items,
                     column_count=column_count,
                     column_width_ratios=column_width_ratios,
-                    column_split_x=column_split_x,
+                    column_boundaries=column_boundaries,
                     tables=tables,
                     warnings=warnings,
                     has_text_layer=has_text_layer,

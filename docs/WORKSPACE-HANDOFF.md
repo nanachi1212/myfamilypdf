@@ -23,7 +23,7 @@ FamilyPDF Windows x64 家庭版已具備可安裝、可攜式與可驗證的完�
 - 繁中、簡中、英文安裝介面及 Qt 翻譯檔。
 - 可攜式 ZIP、基礎安裝檔、預設包含 OCR 的一鍵完整安裝檔，以及獨立 OCR 外掛安裝檔。
 - 五種標準 AcroForm 欄位建立、文件級浮水印／背景／頁面幾何編輯。
-- 內建 Office Export 外掛，可將可搜尋 PDF 匯出為 DOCX／XLSX，使用端不需 Python。
+- 內建 Office Export 外掛，可將可搜尋 PDF 匯出為 DOCX／XLSX；DOCX 支援一般等寬／不等寬雙欄與三欄，使用端不需 Python。
 - 文件比較可自動比對兩份 PDF 的文字、圖片、向量、著色與頁面移動，支援差異巡覽、左右／疊加檢視與 PDF／XML report。
 
 ## 最終產物
@@ -40,15 +40,15 @@ E:\CodexProject\FamilyPDF\dist\FamilyPDF-OCR-Plugin-windows-x64.zip
 
 | 檔案 | 大小 | SHA-256 |
 |---|---:|---|
-| `FamilyPDF-Full-Setup-x64.exe` | 69,188,268 bytes | `2D52AF387B38C9511E146A75D60763C4708FF6E192253AACC2E2CD9D25478398` |
-| `FamilyPDF-Setup-x64.exe` | 58,290,529 bytes | `8C73DE95EF33A5BBC1887C9CA7E8E3DC55D7B46A2EBCC1B913AEE33A99246B0B` |
-| `FamilyPDF-windows-x64.zip` | 82,922,306 bytes | `98BD29378DA985D7EAD7D31848B2E93880C4EFA978759BD7B1E8B1850C8FBDCA` |
+| `FamilyPDF-Full-Setup-x64.exe` | 69,186,001 bytes | `BA74E7364217FC73F8367BC81925E0CAB9B460F98DFA744554F2FC91B295048E` |
+| `FamilyPDF-Setup-x64.exe` | 58,299,100 bytes | `28A895E776851402E3A138DE523A121D370BF4BAEE3CF5CE05DDB16DCB264D3F` |
+| `FamilyPDF-windows-x64.zip` | 82,924,819 bytes | `5A19646F9E01445CBDE3D320A8A42B1484D5EC63CAFB9D6FC300D43E6D6E6B8B` |
 | `FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 bytes | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 bytes | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
 ## 已通過驗證
 
-- CTest 6/6 與 Office Export Python 單元測試 10/10 通過。
+- CTest 6/6 與 Office Export Python 單元測試 11/11 通過。
 - 基礎、完整與精簡安裝流程 exit code `0`；完整模式包含 OCR，精簡模式不含 OCR。
 - Tesseract `--version`、`--list-langs` 與完整 OCR：exit code `0`。
 - OCR 能辨識繁體中文、簡體中文與英文，並輸出保留頁數的可搜尋 PDF 及 UTF-8 文字。
@@ -81,14 +81,14 @@ cd E:\CodexProject\FamilyPDF
 ## 已知限制
 
 - 尚未在繁中與簡中兩套 Windows 實機進行完整人工巡覽。
-- 文件級編輯固定 fixture 已完成真人巡覽，仍需以任意實際文件判斷浮水印透明度、背景圖片裁切與複雜內容品質；Office writer 支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。等寬／不等寬雙欄、全寬文字與非重疊 raster 圖片已完成真實 PDF、封裝 helper 與 OOXML 重讀；向量圖形、透明遮罩精確重建、文字環繞／重疊浮動物件、三欄以上、跨頁表格及精確座標版面目前未重建。
+- 文件級編輯固定 fixture 已完成真人巡覽，仍需以任意實際文件判斷浮水印透明度、背景圖片裁切與複雜內容品質；Office writer 支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。等寬／不等寬雙欄、三欄、全寬文字與非重疊 raster 圖片已完成真實 PDF、封裝 helper 與 OOXML 重讀；向量圖形、透明遮罩精確重建、文字環繞／重疊浮動物件、四欄以上、部分跨欄、跨頁表格及精確座標版面目前未重建。
 - 安裝檔沒有商業程式碼簽章，SmartScreen 可能顯示未知發行者。
 - 文件比較固定 fixture 尚未涵蓋複雜透明混合、DRM／密碼文件或大型工程圖，這些文件仍需人工判讀結果。
 
 ## 2026-08-03 接續狀態
 
 - Office Export Python 環境已具備自動健康檢查與修復能力；目前使用本機 vcpkg Python 3.14.2，無須使用者手動安裝 Python。
-- 最新完整回歸：`build\final-regression-20260803-143539\summary.json`，CTest 6/6、Office Python 10/10、封裝 helper raster 圖片／跨欄多區段／等寬與不等寬雙欄／單欄相容回歸、PDF 文件比較 CLI／GUI、OCR 繁簡中文與 1,160 頁多文件測試均通過；安裝隔離摘要為 `build\full-installer-smoke\summary.json`，完整與精簡模式分別逐檔驗證 406 個核心檔案，完整模式另驗證 29 個 OCR 檔案。
+- 最新完整回歸：`build\final-regression-20260803-150406\summary.json`，CTest 6/6、Office Python 11/11、封裝 helper raster 圖片／跨欄多區段／等寬與不等寬雙欄／三欄／單欄相容回歸、PDF 文件比較 CLI／GUI、OCR 繁簡中文與 1,160 頁多文件測試均通過；安裝隔離摘要為 `build\full-installer-smoke\summary.json`，完整與精簡模式分別逐檔驗證 406 個核心檔案，完整模式另驗證 29 個 OCR 檔案。
 - 正式可攜包不再啟動 `windeployqt`；10 個 Qt modules、15 個 plugins、DXC 與 VC runtime 皆固定部署並逐檔檢查。環境契約、正式封裝、完整回歸與隔離安裝均未出現 Qt fallback 警告；移除未使用的自動部署內容後，三個主要產物合計縮小 56,400,797 bytes。
 - `scripts\qa\cleanup-final-regression-results.ps1` 會在成功回歸後自動只保留最新結果；舊的安裝展開副本已清除，正式釋出產物與最新版安裝驗證保留。
 - `dist\` 不提交 Git；發布時需另外上傳 ZIP 與安裝檔。

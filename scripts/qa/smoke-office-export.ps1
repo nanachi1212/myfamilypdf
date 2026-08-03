@@ -36,6 +36,8 @@ $multiColumnPdf = Join-Path $smokeRoot 'two-column-input.pdf'
 $multiColumnDocx = Join-Path $smokeRoot 'two-column-output.docx'
 $unequalColumnPdf = Join-Path $smokeRoot 'unequal-column-input.pdf'
 $unequalColumnDocx = Join-Path $smokeRoot 'unequal-column-output.docx'
+$threeColumnPdf = Join-Path $smokeRoot 'three-column-input.pdf'
+$threeColumnDocx = Join-Path $smokeRoot 'three-column-output.docx'
 $tablePdf = Join-Path $smokeRoot 'table-input.pdf'
 $tableDocx = Join-Path $smokeRoot 'table-output.docx'
 
@@ -46,12 +48,14 @@ from pathlib import Path
 from tests.test_cli import _write_two_page_pdf
 from tests.test_extract import _write_text_and_table_pdf
 from tests.test_multicolumn_export import (
+    _write_three_column_pdf,
     _write_two_column_pdf,
     _write_unequal_two_column_pdf,
 )
 _write_two_page_pdf(Path(r'$inputPdf'))
 _write_two_column_pdf(Path(r'$multiColumnPdf'))
 _write_unequal_two_column_pdf(Path(r'$unequalColumnPdf'))
+_write_three_column_pdf(Path(r'$threeColumnPdf'))
 _write_text_and_table_pdf(Path(r'$tablePdf'))
 "@
 }
@@ -94,6 +98,16 @@ try {
         throw 'Portable unequal-column image export smoke test failed.'
     }
     Write-Host $unequalColumnReportJson
+    $threeColumnReportJson = (& $helper --input $threeColumnPdf `
+            --output $threeColumnDocx --format docx | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Portable three-column DOCX export smoke test failed.'
+    }
+    $threeColumnReport = $threeColumnReportJson | ConvertFrom-Json
+    if ($threeColumnReport.images_exported -ne 3) {
+        throw 'Portable three-column image export smoke test failed.'
+    }
+    Write-Host $threeColumnReportJson
     & $helper --input $tablePdf --output $tableDocx --format docx
     if ($LASTEXITCODE -ne 0) {
         throw 'Portable single-column table-page DOCX export smoke test failed.'
@@ -149,6 +163,23 @@ assert unequal_cells[0].text.splitlines() == [
 ]
 assert unequal_cells[1].text.splitlines() == [
     'Narrow right top', 'Narrow right bottom'
+]
+three_column_page = Document(r'$threeColumnDocx')
+assert [p.text for p in three_column_page.paragraphs if p.text] == [
+    'Three column heading across the full page width'
+]
+assert len(three_column_page.inline_shapes) == 3
+assert len(three_column_page.tables) == 1
+three_cells = three_column_page.tables[0].rows[0].cells
+assert len(three_cells) == 3
+assert three_cells[0].text.splitlines() == [
+    'Column one top', 'Column one bottom'
+]
+assert three_cells[1].text.splitlines() == [
+    'Column two top', 'Column two bottom'
+]
+assert three_cells[2].text.splitlines() == [
+    'Column three top', 'Column three bottom'
 ]
 table_page = Document(r'$tableDocx')
 assert len(table_page.tables) == 0

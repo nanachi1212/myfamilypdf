@@ -65,7 +65,7 @@ class ExtractedPage:
     has_text_layer: bool = True
     column_count: int = 1
     column_width_ratios: list[float] = field(default_factory=lambda: [1.0])
-    column_split_x: float | None = None
+    column_boundaries: list[float] = field(default_factory=list)
 
 
 @dataclass(slots=True)
