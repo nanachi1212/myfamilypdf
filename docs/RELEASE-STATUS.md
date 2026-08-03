@@ -52,3 +52,12 @@
 
 - 分支：`codex/phase0-baseline`
 - push 目標：`origin/codex/phase0-baseline`
+
+## 2026-08-03 環境修復與最新回歸
+
+- Office Export 虛擬環境原本仍保留 `python.exe`，但 `pyvenv.cfg` 指向已不存在的 Python 3.14.6。安裝腳本現在會實際啟動 Python 檢查健康狀態，並優先使用相同 ABI 的本機 Python 修復設定；本機已自動改用 vcpkg 內附 Python 3.14.2，`pip check` 與 Office 套件匯入均通過。
+- 新增 `scripts\qa\test-office-toolchain-repair.ps1`，覆蓋「啟動器存在、基礎 Python 遺失」的回歸案例；修復失敗時會還原原虛擬環境設定。
+- Qt 6.9.1、aqtinstall 3.3.0、vcpkg 固定版本、CMake、MSVC、六個外掛 DLL、PowerShell 腳本語法均重新檢查通過。
+- CTest 6/6、Office Export Python 7/7、OCR 橫排與直排繁簡中文、1,160 頁大檔、Viewer／Editor 三文件與繁簡中文回歸均通過。
+- 最新完整回歸摘要：`build\final-regression-20260803-103020\summary.json`（本機可重建，不提交 Git）。
+- 已移除舊的重複建置與驗證輸出，保留最新成功回歸及正式 `dist` 產物；已確認釋出檔 SHA-256 未改變。

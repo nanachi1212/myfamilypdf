@@ -81,4 +81,10 @@ cd E:\CodexProject\FamilyPDF
 - 尚未在繁中與簡中兩套 Windows 實機進行完整人工巡覽。
 - 文件級編輯固定 fixture 已完成真人巡覽，仍需以任意實際文件判斷浮水印透明度、背景圖片裁切與複雜內容品質；Office writer 支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。多欄、浮動圖片、跨頁表格及精確座標版面目前未重建，不能視為已驗證。
 - 安裝檔沒有商業程式碼簽章，SmartScreen 可能顯示未知發行者。
+
+## 2026-08-03 接續狀態
+
+- Office Export Python 環境已具備自動健康檢查與修復能力；目前使用本機 vcpkg Python 3.14.2，無須使用者手動安裝 Python。
+- 最新完整回歸：`build\final-regression-20260803-103020\summary.json`，CTest 6/6、Office Python 7/7、OCR 繁簡中文與 1,160 頁多文件測試均通過。
+- 本機建置資料只保留最新成功回歸與正式釋出產物；舊的可重建驗證輸出已清除。
 - `dist\` 不提交 Git；發布時需另外上傳 ZIP 與安裝檔。

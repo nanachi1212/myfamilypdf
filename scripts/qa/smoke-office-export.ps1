@@ -25,9 +25,7 @@ if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) {
 $venvPython = Join-Path (
     Split-Path $repositoryRoot -Parent
 ) 'FamilyPDF-tools\office-export-venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
-    & (Join-Path $repositoryRoot 'scripts\office\install-office-export-toolchain.ps1')
-}
+& (Join-Path $repositoryRoot 'scripts\office\install-office-export-toolchain.ps1')
 
 $smokeRoot = Join-Path $repositoryRoot 'build\office-export-smoke'
 New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null

@@ -35,3 +35,9 @@
 - 安裝器內容不是只檢查檔名：完整模式 405 個核心檔案及 29 個 OCR 檔案、精簡模式 405 個核心檔案，已逐檔與可攜包比對 SHA-256。
 - PDF-XChange 包含大量商業進階功能；FamilyPDF 的「相近」是指本表列出的家庭常用核心功能。
 - Office Export 第一版目前不重建多欄、浮動圖片、跨頁表格或精確座標版面；這些不得由上述複合 fixture 的通過結果推論為已支援。
+
+## 2026-08-03 環境健康補充
+
+- Office Export 工具鏈不再只以 `Scripts\python.exe` 是否存在判斷可用性；每次 QA 會驗證直譯器能否啟動，壞掉時自動尋找相同 Python major/minor 的本機工具鏈並修復。
+- 本次實際修復 Python 3.14 虛擬環境後，依賴完整性、DOCX／XLSX helper、Microsoft Office smoke 與最終回歸均通過。
+- OCR 五種語言模型、Qt／CMake／MSVC／vcpkg 建置鏈和所有 PowerShell QA 腳本也已重新稽核，未發現其他待修復的套件或 DLL 缺失。

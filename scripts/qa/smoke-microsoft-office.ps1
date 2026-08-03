@@ -16,9 +16,7 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $venvPython = Join-Path (
     Split-Path $repositoryRoot -Parent
 ) 'FamilyPDF-tools\office-export-venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
-    & (Join-Path $repositoryRoot 'scripts\office\install-office-export-toolchain.ps1')
-}
+& (Join-Path $repositoryRoot 'scripts\office\install-office-export-toolchain.ps1')
 if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
     throw "Office Export test Python was not found: $venvPython"
 }
