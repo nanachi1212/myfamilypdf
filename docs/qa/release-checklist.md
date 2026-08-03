@@ -24,6 +24,7 @@
 - [x] Adobe Acrobat DC 實際開啟、修改並另存 AcroForm；`pypdf` 重讀確認中文欄位名稱、修改值與預設值均保留。
 - [x] PDF writer 遇到 CR／LF 的 Unicode 位元組時改用 hexadecimal string，避免外部閱讀器正規化造成中文欄位名稱變異。
 - [x] Adobe Acrobat DC 實際開啟、逐頁解析並另存浮水印／背景與頁面幾何 fixture；`pypdf` 結構及 `pypdfium2` 逐頁 RGB 渲染雜湊均保留。
+- [x] Poppler 以 144 DPI 重新渲染含頁碼、方向箭頭、外框與四色角標的五頁 fixture；逐頁巡覽確認背景、繁中浮水印、裁切及 90 度旋轉均正確。
 - [x] 完整安裝的 405 個核心檔案與 29 個 OCR 檔案、精簡安裝的 405 個核心檔案，均與目前可攜包逐檔 SHA-256 相同；僅排除安裝版不應攜帶的 `portable.mode`。
 
 執行：
@@ -98,8 +99,8 @@ Adobe Acrobat 文件級編輯互通：
 - [ ] 在繁體中文 Windows 實機長時間快速翻閱 1,160 頁 PDF。
 - [ ] 在簡體中文 Windows 實機長時間快速翻閱 1,160 頁 PDF。
 - [x] 用 Adobe Acrobat DC 填寫並儲存 `dist\qa\form-interop.pdf`，再以獨立 parser 驗證。
-- [ ] 由真人巡覽不同內容下的浮水印、背景、裁切及旋轉視覺品質；固定 fixture 已完成 Adobe 另存與逐頁像素等價回歸。
+- [ ] 由真人巡覽任意實際文件的浮水印、背景圖片、裁切及旋轉主觀品質；固定 fixture 已完成 Adobe 另存、逐頁像素等價回歸與 Poppler 視覺巡覽。
 - [ ] 使用 Microsoft Word／Excel 人工巡覽 writer 尚未支援的多欄、浮動圖片、跨頁表格、精確座標版面及特殊字型；支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。
 - [ ] 以正式程式碼簽章憑證簽署安裝檔；目前 SmartScreen 可能顯示未知發行者。
 
-這些未勾選項目不代表檔案結構或自動回歸失敗，而是需要人工視覺判斷、不同語系實機或商業簽章憑證才能完成的驗收邊界。Adobe 表單互通已透過官方 IAC 完成；文件級編輯成果仍保留人工視覺巡覽。
+這些未勾選項目不代表檔案結構或自動回歸失敗，而是需要任意實際文件的人工視覺判斷、不同語系實機或商業簽章憑證才能完成的驗收邊界。Adobe 表單互通已透過官方 IAC 完成；文件級編輯固定 fixture 已巡覽，仍保留實際文件驗收。

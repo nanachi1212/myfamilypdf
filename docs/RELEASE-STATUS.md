@@ -20,6 +20,7 @@
 - pypdf 獨立讀回標準 PDF outline：繁體中文標題、資料夾階層、文字顏色、粗體及頁面目的地均保留。
 - Adobe Acrobat DC 已透過官方 IAC 開啟、修改並另存 AcroForm；`pypdf` 獨立讀回確認「姓名」「同意」欄位名稱、修改值與原始預設值保留。修正過程也為 PDF writer 補上 CR／LF hexadecimal string 序列化，避免 UTF-16BE 位元組被外部閱讀器正規化。
 - Adobe Acrobat DC 已實際開啟、逐頁解析並另存浮水印／背景與頁面幾何 fixture；`pypdf` 確認頁數、MediaBox、CropBox、旋轉保留，`pypdfium2` 固定倍率逐頁 RGB 像素 SHA-256 與來源完全一致。摘要：`build\acrobat-document-edit-interop\summary.json`。
+- 文件級編輯 fixture 已補上頁碼、方向箭頭、外框與四色角標；2026-08-03 以 Poppler 144 DPI 重新渲染五頁並逐頁巡覽，確認單數頁背景、第 2 頁繁中浮水印與 90 度旋轉頁均可讀且無裁切。
 - 標準 Highlight、Underline、StrikeOut、Square、FreeText、Text 六種註解由 FamilyPDF 嚴格模式重開及 pypdf 交叉驗證通過。
 - 繁體及簡體中文驗證安裝各為 exit code `0`；安裝後 Viewer、Editor、PageMaster 同時載入中文檔名與 1,160 頁 PDF，15 秒後全部為 Responding。
 - 單數頁、雙數頁及 `10-20` 範圍輸出經獨立引擎驗證為 29、29、11 頁；合併 58 頁及大型 1,160 頁檔案頁數亦正確。

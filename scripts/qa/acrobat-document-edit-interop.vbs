@@ -8,6 +8,7 @@ Dim pdDoc
 Dim page
 Dim pageCount
 Dim pageIndex
+Dim acquireAttempt
 Dim saved
 Dim exitCode
 
@@ -39,13 +40,21 @@ End If
 ' Acquire every page before saving. This forces page-tree parsing instead of
 ' only proving that Acrobat can open the document container.
 For pageIndex = 0 To pageCount - 1
-    Set page = pdDoc.AcquirePage(pageIndex)
+    Set page = Nothing
+    For acquireAttempt = 1 To 20
+        Set page = pdDoc.AcquirePage(pageIndex)
+        If Not page Is Nothing Then
+            Exit For
+        End If
+        WScript.Sleep 500
+    Next
     If page Is Nothing Then
         avDoc.Close True
         app.Exit
         WScript.Echo "Acrobat could not acquire page " & pageIndex & "."
         WScript.Quit 5
     End If
+    Set page = Nothing
 Next
 
 saved = pdDoc.Save(1, outputPath)

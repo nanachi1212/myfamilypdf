@@ -69,6 +69,55 @@ std::vector<pdf::PDFObjectReference> getPageContentReferences(
     return references;
 }
 
+bool drawVisualFixtureContent(
+        pdf::PDFDocumentBuilder* builder,
+        pdf::PDFObjectReference page,
+        int pageNumber)
+{
+    pdf::PDFPageContentStreamBuilder contentBuilder(
+        builder,
+        pdf::PDFContentStreamBuilder::CoordinateSystem::PDF,
+        pdf::PDFPageContentStreamBuilder::Mode::Replace);
+    QPainter* painter = contentBuilder.begin(page);
+    if (!painter)
+    {
+        return false;
+    }
+
+    painter->setPen(QPen(QColor(40, 80, 160), 3.0));
+    painter->drawRect(QRectF(20.0, 20.0, 260.0, 360.0));
+    painter->fillRect(QRectF(25.0, 335.0, 25.0, 25.0), QColor(210, 40, 40));
+    painter->fillRect(QRectF(250.0, 335.0, 25.0, 25.0), QColor(30, 150, 70));
+    painter->fillRect(QRectF(25.0, 40.0, 25.0, 25.0), QColor(40, 90, 210));
+    painter->fillRect(QRectF(250.0, 40.0, 25.0, 25.0), Qt::black);
+
+    QFont heading(QStringLiteral("Arial"));
+    heading.setPointSizeF(18.0);
+    heading.setBold(true);
+    painter->save();
+    painter->translate(0.0, 400.0);
+    painter->scale(1.0, -1.0);
+    painter->setFont(heading);
+    painter->setPen(Qt::black);
+    painter->drawText(
+        QPointF(65.0, 90.0),
+        QStringLiteral("PAGE %1 CONTENT").arg(pageNumber));
+
+    QFont direction(QStringLiteral("Arial"));
+    direction.setPointSizeF(22.0);
+    direction.setBold(true);
+    painter->setFont(direction);
+    painter->drawText(QPointF(125.0, 215.0), QStringLiteral("UP"));
+    painter->restore();
+    painter->setPen(QPen(Qt::black, 5.0));
+    painter->drawLine(QPointF(150.0, 100.0), QPointF(150.0, 260.0));
+    painter->drawLine(QPointF(150.0, 260.0), QPointF(125.0, 225.0));
+    painter->drawLine(QPointF(150.0, 260.0), QPointF(175.0, 225.0));
+
+    contentBuilder.end(painter);
+    return true;
+}
+
 } // namespace
 
 void DocumentEditTest::decorationsRespectPageSelectionAndLayerOrder()
@@ -83,14 +132,7 @@ void DocumentEditTest::decorationsRespectPageSelectionAndLayerOrder()
     {
         const pdf::PDFObjectReference page =
             builder.appendPage(QRectF(0.0, 0.0, 300.0, 400.0));
-        pdf::PDFPageContentStreamBuilder contentBuilder(
-            &builder,
-            pdf::PDFContentStreamBuilder::CoordinateSystem::PDF,
-            pdf::PDFPageContentStreamBuilder::Mode::Replace);
-        QPainter* painter = contentBuilder.begin(page);
-        QVERIFY(painter);
-        painter->fillRect(QRectF(20.0, 20.0, 20.0, 20.0), Qt::black);
-        contentBuilder.end(painter);
+        QVERIFY(drawVisualFixtureContent(&builder, page, pageIndex + 1));
     }
 
     pdf::PDFDocument document = builder.build();
@@ -223,9 +265,15 @@ void DocumentEditTest::pageGeometryAndRotationRoundTrip()
     QVERIFY(directory.isValid());
 
     pdf::PDFDocumentBuilder builder;
-    builder.appendPage(QRectF(0.0, 0.0, 300.0, 400.0));
-    builder.appendPage(QRectF(0.0, 0.0, 300.0, 400.0));
+    for (int pageIndex = 0; pageIndex < 2; ++pageIndex)
+    {
+        const pdf::PDFObjectReference page =
+            builder.appendPage(QRectF(0.0, 0.0, 300.0, 400.0));
+        QVERIFY(drawVisualFixtureContent(&builder, page, pageIndex + 1));
+    }
     pdf::PDFDocument document = builder.build();
+    QCOMPARE(getPageContentReferences(document, 0).size(), std::size_t(1));
+    QCOMPARE(getPageContentReferences(document, 1).size(), std::size_t(1));
 
     pdf::PDFPageGeometrySettings settings;
     settings.pageRange = QStringLiteral("2");
@@ -264,6 +312,8 @@ void DocumentEditTest::pageGeometryAndRotationRoundTrip()
     const pdf::PDFPage* secondPage = restored.getCatalog()->getPage(1);
     QVERIFY(firstPage);
     QVERIFY(secondPage);
+    QCOMPARE(getPageContentReferences(restored, 0).size(), std::size_t(1));
+    QCOMPARE(getPageContentReferences(restored, 1).size(), std::size_t(1));
     QCOMPARE(firstPage->getPageRotation(), pdf::PageRotation::None);
     QCOMPARE(secondPage->getPageRotation(), pdf::PageRotation::Rotate90);
     QVERIFY(qAbs(secondPage->getMediaBox().size().width() -

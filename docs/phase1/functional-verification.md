@@ -125,6 +125,14 @@
 - 測試會拒絕干擾已開啟的使用者 Acrobat 工作階段，完成後也不留下測試建立的 Acrobat 行程。
 - `scripts\qa\smoke-acrobat-document-edit.ps1` 可重跑，摘要位於 `build\acrobat-document-edit-interop\summary.json`。
 
+## 文件級編輯視覺 fixture（2026-08-03）
+
+- 裝飾與頁面幾何 fixture 已加入頁碼、`UP` 方向箭頭、藍色外框及紅／綠／藍／黑角標，不再以空白頁像素等價代替內容保留驗證。
+- `UnitTestsDocumentEdit` 重開檔案後同時檢查頁面幾何與內容串流，完整 CTest 6/6 通過。
+- Poppler 以 144 DPI 重新渲染三頁裝飾文件與兩頁幾何文件；逐頁巡覽確認單數頁淡色背景、第 2 頁「家庭測試」浮水印、頁碼與方向均可辨識。
+- 90 度旋轉的 A5 頁面完整顯示外框、四色角標、箭頭與文字，未見裁切、重疊、缺字方框或不可讀內容。
+- 本次 Codex 沙箱的 Windows Script Host 輸入設定存取遭拒，因此未覆寫 2026-07-30 的 Adobe IAC 證據；後續可在一般使用者工作階段重跑既有 smoke script。
+
 ## 1,160 頁 GUI 跳轉（2026-07-30）
 
 - 最終可攜版 Viewer 在繁中與簡中設定下均正確顯示對應語系選單、頁碼、縮略圖及側欄文字。
