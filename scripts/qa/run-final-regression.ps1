@@ -93,6 +93,12 @@ $diffSmokeRoot = Join-Path $qaRoot 'pdf-diff'
 $diffSmokeSummary = Get-Content -LiteralPath (
     Join-Path $diffSmokeRoot 'summary.json'
 ) -Raw -Encoding UTF8 | ConvertFrom-Json
+$securitySmokeRoot = Join-Path $qaRoot 'pdf-security'
+& (Join-Path $repositoryRoot 'scripts\qa\smoke-pdf-security.ps1') `
+    -PackageDirectory $qaPackage -OutputDirectory $securitySmokeRoot
+$securitySmokeSummary = Get-Content -LiteralPath (
+    Join-Path $securitySmokeRoot 'summary.json'
+) -Raw -Encoding UTF8 | ConvertFrom-Json
 
 if (-not $SkipBuildTests) {
     & (Join-Path $repositoryRoot 'scripts\phase0\build-upstream-baseline.ps1') `
@@ -278,6 +284,18 @@ $summary = [ordered]@{
         cli_difference_type = [string](
             $diffSmokeSummary.cli.difference_type
         )
+    }
+    pdf_security = [ordered]@{
+        algorithm = [string]$securitySmokeSummary.algorithm
+        revision = [int]$securitySmokeSummary.revision
+        pages = [int]$securitySmokeSummary.pages
+        wrong_password_rejected = [bool]$securitySmokeSummary.wrong_password_rejected
+        user_password_accepted = [bool]$securitySmokeSummary.user_password_accepted
+        owner_password_accepted = [bool]$securitySmokeSummary.owner_password_accepted
+        permissions_restricted = [bool]$securitySmokeSummary.permissions_restricted
+        decrypted_text_preserved = [bool]$securitySmokeSummary.decrypted_text_preserved
+        decrypted_render_preserved = [bool]$securitySmokeSummary.decrypted_render_preserved
+        gui_responding = [bool]$securitySmokeSummary.gui_responding
     }
 }
 $summaryPath = Join-Path $qaRoot 'summary.json'

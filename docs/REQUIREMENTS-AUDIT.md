@@ -19,6 +19,7 @@
 | PDF 轉 Word／Excel | 已完成第一版並支援一般 2–3 欄 | `Office Export` 外掛支援全部或指定頁碼；DOCX 基本文字樣式、分頁、等寬／不等寬雙欄、三欄、全寬文字及非重疊 raster 圖片；XLSX 表格與逐行 fallback 均有重讀測試，使用端不需 Python。真實 PDF、封裝 helper 及 DOCX 已重讀三欄文字／圖片／全頁標題、約 73/27 欄寬、多標題／多表格／左右欄、單欄圖片、欄內圖片與跨欄圖片；既有 Microsoft Word／Excel 三頁複合 fixture 仍驗證十個段落、五種字級、同頁多表格、UsedRange、跨欄合併、表頭樣式與欄寬。 |
 | 表單填寫與建立 | 已完成第一版 | 支援既有 AcroForm 填寫，以及文字框、核取方塊、單選群組、下拉與清單建立；Adobe Acrobat DC 實際修改另存後，由 `pypdf` 確認中文欄位名稱、值與預設值保留。 |
 | 進階編輯 | 已完成家庭常用範圍 | 包含直接頁面內容編輯、遮蔽、簽章、浮水印、背景、頁面尺寸／裁切及旋轉；固定 fixture 經 Adobe Acrobat DC 逐頁解析、另存後，獨立 parser 結構與逐頁 RGB 渲染雜湊均保留，並已用 Poppler 巡覽含方向、邊界與頁碼的五頁內容。 |
+| PDF 密碼與權限安全 | 已完成目前家庭版範圍 | `PdfTool.exe encrypt` 以 AES-256／Revision 6 建立使用者與擁有者密碼及限制權限；錯誤密碼拒絕、兩種正確密碼、解密後文字／渲染、來源雜湊及 Editor GUI 啟動均由獨立 smoke 驗證。 |
 
 ## OCR 外掛
 

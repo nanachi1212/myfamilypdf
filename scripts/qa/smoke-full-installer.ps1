@@ -181,6 +181,19 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Installed full-package PDF comparison verification failed.'
 }
 
+& (Join-Path $repositoryRoot 'scripts\qa\smoke-pdf-security.ps1') `
+    -PackageDirectory $fullRoot `
+    -OutputDirectory (Join-Path $testRoot 'pdf-security-full')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Installed full-package PDF security verification failed.'
+}
+& (Join-Path $repositoryRoot 'scripts\qa\smoke-pdf-security.ps1') `
+    -PackageDirectory $coreRoot `
+    -OutputDirectory (Join-Path $testRoot 'pdf-security-core')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Installed core-only PDF security verification failed.'
+}
+
 $viewer = Start-Process -FilePath (Join-Path $fullRoot 'Pdf4QtViewer.exe') -PassThru
 try {
     Start-Sleep -Seconds 5
@@ -216,6 +229,7 @@ $summary = [ordered]@{
         languages = @('eng', 'chi_tra', 'chi_sim', 'chi_tra_vert', 'chi_sim_vert')
         horizontal_ocr = $true
         viewer_responding = $true
+        pdf_security = $true
         core_payload_files_verified = $fullCoreFileCount
         ocr_payload_files_verified = $fullOcrFileCount
     }
@@ -223,6 +237,7 @@ $summary = [ordered]@{
         path = $coreRoot
         base_application = $true
         ocr = $false
+        pdf_security = $true
         core_payload_files_verified = $coreOnlyFileCount
     }
 }

@@ -25,6 +25,7 @@ FamilyPDF Windows x64 家庭版已具備可安裝、可攜式與可驗證的完�
 - 五種標準 AcroForm 欄位建立、文件級浮水印／背景／頁面幾何編輯。
 - 內建 Office Export 外掛，可將可搜尋 PDF 匯出為 DOCX／XLSX；DOCX 支援一般等寬／不等寬雙欄與三欄，使用端不需 Python。
 - 文件比較可自動比對兩份 PDF 的文字、圖片、向量、著色與頁面移動，支援差異巡覽、左右／疊加檢視與 PDF／XML report。
+- PDF 密碼安全：支援 AES-256、使用者／擁有者密碼及權限限制，並可用擁有者密碼解密；忘記密碼不提供繞過機制。
 
 ## 最終產物
 
@@ -61,6 +62,7 @@ E:\CodexProject\FamilyPDF\dist\FamilyPDF-OCR-Plugin-windows-x64.zip
 - 文件級編輯 fixture 已加入頁碼、方向箭頭、外框與四色角標；2026-08-03 的 Poppler 五頁巡覽確認背景、繁中浮水印、裁切與 90 度旋轉均正確。
 - Microsoft Word／Excel 16.0 實際開啟三頁複合匯出產物，十個段落、五種字級、分頁、粗斜體、三工作表、同頁多表格、四行 fallback、UsedRange、多語文字、跨欄合併、各表表頭樣式與欄寬通過；Word 原生 renderer 另產生三頁 PNG，固定 fixture 巡覽未見亂碼、缺字方框、裁切或重疊。
 - 完整／精簡安裝後的核心與 OCR payload 已逐檔比對目前可攜包 SHA-256。
+- AES-256 PDF 密碼安全 smoke 已通過，結果見 `build\\pdf-security-smoke\\summary.json`；已接入最終回歸及 Full/Core 安裝驗證。
 
 完整證據見 `docs\RELEASE-STATUS.md`、`docs\REQUIREMENTS-AUDIT.md` 與 `docs\qa\release-checklist.md`。
 
@@ -88,7 +90,7 @@ cd E:\CodexProject\FamilyPDF
 ## 2026-08-03 接續狀態
 
 - Office Export Python 環境已具備自動健康檢查與修復能力；目前使用本機 vcpkg Python 3.14.2，無須使用者手動安裝 Python。
-- 最新完整回歸：`build\final-regression-20260803-150406\summary.json`，CTest 6/6、Office Python 11/11、封裝 helper raster 圖片／跨欄多區段／等寬與不等寬雙欄／三欄／單欄相容回歸、PDF 文件比較 CLI／GUI、OCR 繁簡中文與 1,160 頁多文件測試均通過；安裝隔離摘要為 `build\full-installer-smoke\summary.json`，完整與精簡模式分別逐檔驗證 406 個核心檔案，完整模式另驗證 29 個 OCR 檔案。
+- 最新完整回歸：`build\final-regression-20260803-153018\summary.json`，CTest 6/6、Office Python 11/11、封裝 helper raster 圖片／跨欄多區段／等寬與不等寬雙欄／三欄／單欄相容回歸、PDF 文件比較 CLI／GUI、AES-256 密碼安全、OCR 繁簡中文與 1,160 頁多文件測試均通過；安裝隔離摘要為 `build\full-installer-smoke\summary.json`，完整與精簡模式分別逐檔驗證 406 個核心檔案，完整模式另驗證 29 個 OCR 檔案，兩種安裝均通過密碼安全 smoke。
 - 正式可攜包不再啟動 `windeployqt`；10 個 Qt modules、15 個 plugins、DXC 與 VC runtime 皆固定部署並逐檔檢查。環境契約、正式封裝、完整回歸與隔離安裝均未出現 Qt fallback 警告；移除未使用的自動部署內容後，三個主要產物合計縮小 56,400,797 bytes。
 - `scripts\qa\cleanup-final-regression-results.ps1` 會在成功回歸後自動只保留最新結果；舊的安裝展開副本已清除，正式釋出產物與最新版安裝驗證保留。
 - `dist\` 不提交 Git；發布時需另外上傳 ZIP 與安裝檔。

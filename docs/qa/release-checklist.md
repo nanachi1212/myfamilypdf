@@ -25,7 +25,8 @@
 - [x] PDF writer 遇到 CR／LF 的 Unicode 位元組時改用 hexadecimal string，避免外部閱讀器正規化造成中文欄位名稱變異。
 - [x] Adobe Acrobat DC 實際開啟、逐頁解析並另存浮水印／背景與頁面幾何 fixture；`pypdf` 結構及 `pypdfium2` 逐頁 RGB 渲染雜湊均保留。
 - [x] Poppler 以 144 DPI 重新渲染含頁碼、方向箭頭、外框與四色角標的五頁 fixture；逐頁巡覽確認背景、繁中浮水印、裁切及 90 度旋轉均正確。
-- [x] 完整安裝的 405 個核心檔案與 29 個 OCR 檔案、精簡安裝的 405 個核心檔案，均與目前可攜包逐檔 SHA-256 相同；僅排除安裝版不應攜帶的 `portable.mode`。
+- [x] 完整安裝的 406 個核心檔案與 29 個 OCR 檔案、精簡安裝的 406 個核心檔案，均與目前可攜包逐檔 SHA-256 相同；僅排除安裝版不應攜帶的 `portable.mode`。
+- [x] PDF 密碼安全 smoke：AES-256／Revision 6、使用者／擁有者密碼、限制權限、錯誤密碼拒絕、解密後文字與逐頁渲染保留，且加密 PDF 可由 Editor 開啟並保持 Responding。
 - [x] 最終回歸成功後自動只保留最新結果；保留策略測試確認不會刪除無關目錄。
 
 執行：

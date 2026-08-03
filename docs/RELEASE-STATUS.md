@@ -22,6 +22,7 @@
 - Adobe Acrobat DC 已實際開啟、逐頁解析並另存浮水印／背景與頁面幾何 fixture；`pypdf` 確認頁數、MediaBox、CropBox、旋轉保留，`pypdfium2` 固定倍率逐頁 RGB 像素 SHA-256 與來源完全一致。摘要：`build\acrobat-document-edit-interop\summary.json`。
 - 文件級編輯 fixture 已補上頁碼、方向箭頭、外框與四色角標；2026-08-03 以 Poppler 144 DPI 重新渲染五頁並逐頁巡覽，確認單數頁背景、第 2 頁繁中浮水印與 90 度旋轉頁均可讀且無裁切。
 - 標準 Highlight、Underline、StrikeOut、Square、FreeText、Text 六種註解由 FamilyPDF 嚴格模式重開及 pypdf 交叉驗證通過。
+- PDF 密碼安全 smoke 已通過：`PdfTool.exe` 建立 AES-256／Revision 6 文件，驗證使用者／擁有者密碼、限制權限、錯誤密碼拒絕、解密後文字與逐頁渲染保留、來源檔案雜湊不變，且加密文件由 Editor 開啟後保持 Responding。摘要：`build\\pdf-security-smoke\\summary.json`。
 - 繁體及簡體中文驗證安裝各為 exit code `0`；安裝後 Viewer、Editor、PageMaster 同時載入中文檔名與 1,160 頁 PDF，15 秒後全部為 Responding。
 - 單數頁、雙數頁及 `10-20` 範圍輸出經獨立引擎驗證為 29、29、11 頁；合併 58 頁及大型 1,160 頁檔案頁數亦正確。
 - 基礎封裝不含 Tesseract、語言模型、測試 EXE 或 Qt 除錯 DLL。
@@ -41,8 +42,8 @@
 - 修正舊 PDF4QT 設定含空白插件清單時 FamilyPDF 功能看似遺失的問題；六個正式功能插件現在會在第 2 版設定遷移時自動啟用，後續仍尊重使用者自行停用的選擇。
 - GUI 實測已確認繁中介面會顯示三個插件工具列，並可開啟「匯出至 Word」的繁中頁碼範圍對話框。
 - Viewer 與 Editor 的命令列多檔輸入已修正為載入全部檔案；兩者均以兩份一般 PDF 加一份 1,160 頁 PDF 回歸，工作階段記錄 3 份文件且維持 Responding。
-- 2026-07-30 可攜包回歸已通過；結果屬本機可重建資料，不提交 Git。
-- 最新主安裝程式再次隔離靜默安裝成功；安裝後六個插件及 Office helper 的 DOCX／XLSX 產物重讀通過。
+- 2026-08-03 最新可攜包回歸已通過；結果屬本機可重建資料，不提交 Git。摘要：`build\final-regression-20260803-153018\summary.json`。
+- 最新主安裝程式再次隔離靜默安裝成功；安裝後六個插件、Office helper 及 Full/Core PDF 密碼安全 smoke 均通過。
 - 修正後的完整驗證安裝檔已重新建置；完整與精簡模式安裝通過，完整模式繁中／簡中／英文 OCR 與可搜尋 PDF 回歸通過。摘要：`build\full-installer-smoke\summary.json`。
 - 完整安裝的 406 個核心檔案與 29 個 OCR 檔案、精簡安裝的 406 個核心檔案，均與目前 `dist` 可攜包逐檔 SHA-256 相同；安裝器刻意排除僅供免安裝模式使用的 `portable.mode`。
 - Microsoft Word 16.0 已實際開啟匯出 DOCX，辨識三頁、十個段落、明確分頁、繁簡中、英文、五種字級及粗斜體；Word 原生 renderer 另輸出三頁 PNG，尺寸、非白色像素比例及 SHA-256 均已記錄，固定 fixture 巡覽未見亂碼、缺字方框、裁切或重疊。Microsoft Excel 16.0 已實際開啟匯出 XLSX，辨識三個工作表、同頁多表格、四行 fallback、UsedRange、表格值、繁簡中文、跨欄合併、各表表頭粗體及自動欄寬。驗證摘要：`build\microsoft-office-smoke\summary.json`。
