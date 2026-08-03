@@ -1,6 +1,6 @@
 # PDF Password Security Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** 已完成本機實作與驗證；GitHub 推送待 TCP 443 恢復。
 
 **Goal:** 將 FamilyPDF 既有的 PDF 密碼保護、AES-256、擁有者權限與解密能力納入正式家庭版交付及自動回歸。
 
@@ -22,11 +22,11 @@
 **Files:**
 - Create: `scripts/qa/smoke-pdf-security.ps1`
 
-- [ ] **Step 1: 建立固定兩頁 PDF**
+- [x] **Step 1: 建立固定兩頁 PDF**
 
 使用 Office Export venv 與既有 `_write_two_page_pdf` 建立含 `First page`、`Second page` 的兩頁來源 PDF；複製成 encryption target，來源檔永不直接修改。
 
-- [ ] **Step 2: 以 AES-256 加密複本**
+- [x] **Step 2: 以 AES-256 加密複本**
 
 ```powershell
 & $pdfTool encrypt --enc-algorithm aes-256 --enc-contents all `
@@ -37,15 +37,15 @@
 
 Expected: exit code `0`；來源 SHA-256 不變，加密目標 SHA-256 改變。
 
-- [ ] **Step 3: 獨立驗證密碼與權限**
+- [x] **Step 3: 獨立驗證密碼與權限**
 
 以 `pypdf` 驗證：`is_encrypted`、`/V = 5`、`/R = 6`、錯誤密碼回傳 `NOT_DECRYPTED`、使用者與擁有者密碼均可解鎖、頁數為 2、文字仍含 `First page`／`Second page`，且 `/P` 未授予列印、修改、複製及表單權限。
 
-- [ ] **Step 4: 驗證 Editor 密碼流程與安全解密**
+- [x] **Step 4: 驗證 Editor 密碼流程與安全解密**
 
 啟動 `Pdf4QtEditor.exe encrypted.pdf`，等待密碼視窗／主程序可回應後安全結束；再複製 encrypted PDF，以 `PdfTool.exe decrypt --pswd <owner>` 解密複本，獨立確認 `is_encrypted = false`、頁數與文字均保留。
 
-- [ ] **Step 5: 輸出 JSON summary 並執行單一 smoke**
+- [x] **Step 5: 輸出 JSON summary 並執行單一 smoke**
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\qa\smoke-pdf-security.ps1
@@ -59,15 +59,15 @@ Expected: exit code `0`；summary 包含 `algorithm: AES-256`、`pages: 2`、`wr
 - Modify: `scripts/qa/run-final-regression.ps1`
 - Modify: `scripts/qa/smoke-full-installer.ps1`
 
-- [ ] **Step 1: 整合最終回歸**
+- [x] **Step 1: 整合最終回歸**
 
 在 `run-final-regression.ps1` 對最新 portable staging 呼叫 security smoke，並把六個 security 欄位寫入最終 `summary.json`。
 
-- [ ] **Step 2: 整合完整／精簡安裝回歸**
+- [x] **Step 2: 整合完整／精簡安裝回歸**
 
 對 full 與 core-only 安裝目錄各執行 security smoke；summary 記錄兩種模式 `pdf_security: true`。不得把任何測試密碼或 fixture 放進正式安裝包。
 
-- [ ] **Step 3: 執行完整回歸與隔離安裝**
+- [x] **Step 3: 執行完整回歸與隔離安裝**
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\qa\run-final-regression.ps1
@@ -84,15 +84,15 @@ Expected: CTest 6/6、Office 11/11、PDF security、OCR、PDF 比較、多文件
 - Modify: `docs/RELEASE-STATUS.md`
 - Modify: `docs/WORKSPACE-HANDOFF.md`
 
-- [ ] **Step 1: 更新家庭版功能與驗證邊界**
+- [x] **Step 1: 更新家庭版功能與驗證邊界**
 
 記錄 Editor 可設定 AES-256、使用者／擁有者密碼、內容範圍及權限；說明忘記擁有者密碼無法繞過，DRM／憑證互通仍需實際文件驗證。
 
-- [ ] **Step 2: 提交前重新驗證**
+- [x] **Step 2: 提交前重新驗證**
 
 重新執行 security smoke、PowerShell parser、`git diff --check`，並確認三個正式產物 bytes／SHA-256 未因純 QA／文件變更而改變。
 
-- [ ] **Step 3: 提交並檢查 GitHub 網路**
+- [x] **Step 3: 提交並檢查 GitHub 網路**
 
 ```powershell
 git add scripts README.md docs
