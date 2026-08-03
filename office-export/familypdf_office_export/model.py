@@ -17,6 +17,8 @@ class TextRun:
 class TextBlock:
     runs: list[TextRun] = field(default_factory=list)
     column: int = 0
+    column_span: int = 1
+    top: float = 0.0
 
     @property
     def text(self) -> str:

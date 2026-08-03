@@ -143,38 +143,67 @@ function Get-DirectorySizeBytes {
 
 function Prepare-TestRuntime {
     $runtimeDirectory = Join-Path $BuildDirectory 'usr\bin'
-    $windeployqt = Join-Path $QtPrefix 'bin\windeployqt.exe'
-    Assert-File -LiteralPath $windeployqt
     New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
 
-    $testExecutables = @()
     foreach ($target in $Targets | Where-Object { $_ -like 'UnitTests*' }) {
         $executable = Join-Path $runtimeDirectory "$target.exe"
         Assert-File -LiteralPath $executable
-        $testExecutables += $executable
     }
-    if ($testExecutables.Count -gt 0) {
-        $deploymentArguments = @(
-            '--release',
-            '--no-translations',
-            '--no-system-d3d-compiler',
-            '--no-system-dxc-compiler',
-            '--no-opengl-sw'
-        ) + $testExecutables
-        & $windeployqt @deploymentArguments 2>&1 |
-            Set-Content -LiteralPath (
-                Join-Path $BuildDirectory 'windeployqt-tests.log'
-            ) -Encoding UTF8
-        if ($LASTEXITCODE -ne 0) {
-            $qtCoreRuntime = Join-Path $runtimeDirectory 'Qt6Core.dll'
-            if (Test-Path -LiteralPath $qtCoreRuntime -PathType Leaf) {
-                Write-Warning "windeployqt failed with exit code $LASTEXITCODE; using the already deployed Qt runtime."
-            }
-            else {
-                throw "windeployqt failed with exit code $LASTEXITCODE and Qt6Core.dll is missing."
-            }
-        }
+
+    # Qt 6.9.1 windeployqt can fail-fast intermittently with 0xC0000409,
+    # even when its output directory is empty. The test executables use this
+    # fixed release runtime allowlist, derived from their PE import tables.
+    $requiredQtModules = @(
+        'Qt6Core.dll',
+        'Qt6Gui.dll',
+        'Qt6Multimedia.dll',
+        'Qt6Network.dll',
+        'Qt6PrintSupport.dll',
+        'Qt6Svg.dll',
+        'Qt6Test.dll',
+        'Qt6TextToSpeech.dll',
+        'Qt6Widgets.dll',
+        'Qt6Xml.dll'
+    )
+    $requiredQtPlugins = @(
+        'iconengines\qsvgicon.dll',
+        'imageformats\qgif.dll',
+        'imageformats\qico.dll',
+        'imageformats\qjpeg.dll',
+        'imageformats\qsvg.dll',
+        'multimedia\ffmpegmediaplugin.dll',
+        'multimedia\windowsmediaplugin.dll',
+        'networkinformation\qnetworklistmanager.dll',
+        'platforms\qwindows.dll',
+        'styles\qmodernwindowsstyle.dll',
+        'texttospeech\qtexttospeech_mock.dll',
+        'texttospeech\qtexttospeech_sapi.dll',
+        'texttospeech\qtexttospeech_winrt.dll',
+        'tls\qcertonlybackend.dll',
+        'tls\qschannelbackend.dll'
+    )
+    $copiedQtRuntime = @()
+    foreach ($module in $requiredQtModules) {
+        $source = Join-Path $QtPrefix "bin\$module"
+        Assert-File -LiteralPath $source
+        Copy-Item -LiteralPath $source -Destination $runtimeDirectory -Force
+        $copiedQtRuntime += $module
     }
+    foreach ($plugin in $requiredQtPlugins) {
+        $source = Join-Path $QtPrefix "plugins\$plugin"
+        Assert-File -LiteralPath $source
+        $destination = Join-Path $runtimeDirectory $plugin
+        New-Item -ItemType Directory -Path (Split-Path $destination) -Force |
+            Out-Null
+        Copy-Item -LiteralPath $source -Destination $destination -Force
+        $copiedQtRuntime += $plugin
+    }
+    $copiedQtRuntime | Set-Content -LiteralPath (
+        Join-Path $BuildDirectory 'qt-test-runtime.log'
+    ) -Encoding UTF8
+    Remove-Item -LiteralPath (
+        Join-Path $BuildDirectory 'windeployqt-tests.log'
+    ) -Force -ErrorAction SilentlyContinue
 
     $vcpkgBin = Join-Path $BuildDirectory 'vcpkg_installed\x64-windows\bin'
     if (Test-Path -LiteralPath $vcpkgBin -PathType Container) {

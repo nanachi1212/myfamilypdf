@@ -49,7 +49,7 @@ def _group_words_into_blocks(
         else:
             grouped_lines.append([word])
 
-    block_positions: list[tuple[TextBlock, float, float]] = []
+    block_positions: list[tuple[TextBlock, float, float, float]] = []
     for line in grouped_lines:
         line.sort(key=lambda item: float(item.get("x0", 0.0)))
         segments: list[list[dict[str, Any]]] = []
@@ -67,17 +67,26 @@ def _group_words_into_blocks(
         for segment in segments:
             block = _create_text_block(segment)
             if block is not None:
+                top = float(segment[0].get("top", 0.0))
+                block.top = top
                 block_positions.append(
                     (
                         block,
                         min(float(word.get("x0", 0.0)) for word in segment),
-                        float(segment[0].get("top", 0.0)),
+                        max(float(word.get("x1", 0.0)) for word in segment),
+                        top,
                     )
                 )
 
     column_count = 1
-    if detect_columns and len(block_positions) >= 4:
-        starts = sorted(position[1] for position in block_positions)
+    page_center = page_width / 2.0
+    column_candidates = [
+        position
+        for position in block_positions
+        if not (position[1] < page_center < position[2])
+    ]
+    if detect_columns and len(column_candidates) >= 4:
+        starts = sorted(position[1] for position in column_candidates)
         gaps = [
             (starts[index + 1] - starts[index], index)
             for index in range(len(starts) - 1)
@@ -92,23 +101,40 @@ def _group_words_into_blocks(
         ):
             split_x = (starts[gap_index] + starts[gap_index + 1]) / 2.0
             column_count = 2
-            for block, x0, _ in block_positions:
-                block.column = 0 if x0 < split_x else 1
+            for block, x0, x1, _ in block_positions:
+                if x0 < page_center < x1:
+                    block.column = 0
+                    block.column_span = 2
+                else:
+                    block.column = 0 if x0 < split_x else 1
 
     if column_count == 1:
         block_positions = []
         for line in grouped_lines:
             block = _create_text_block(line)
             if block is not None:
+                top = float(line[0].get("top", 0.0))
+                block.top = top
                 block_positions.append(
                     (
                         block,
                         min(float(word.get("x0", 0.0)) for word in line),
-                        float(line[0].get("top", 0.0)),
+                        max(float(word.get("x1", 0.0)) for word in line),
+                        top,
                     )
                 )
 
-    block_positions.sort(key=lambda item: (item[0].column, item[2], item[1]))
+    if column_count > 1:
+        block_positions.sort(
+            key=lambda item: (
+                0 if item[0].column_span > 1 else 1,
+                item[0].column,
+                item[3],
+                item[1],
+            )
+        )
+    else:
+        block_positions.sort(key=lambda item: (item[3], item[1]))
     return [item[0] for item in block_positions], column_count
 
 

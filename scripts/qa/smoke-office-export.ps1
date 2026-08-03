@@ -87,7 +87,11 @@ assert 'First page' in '\n'.join(p.text for p in Document(r'$outputDocx').paragr
 workbook = load_workbook(r'$outputXlsx', read_only=True)
 assert workbook.sheetnames == ['Page 2']
 assert workbook['Page 2']['A1'].value == 'Second page'
-columns = Document(r'$multiColumnDocx').tables[0].rows[0].cells
+multi_column_page = Document(r'$multiColumnDocx')
+assert [p.text for p in multi_column_page.paragraphs if p.text] == [
+    'Full width heading'
+]
+columns = multi_column_page.tables[0].rows[0].cells
 assert columns[0].text.splitlines() == ['Left top', 'Left bottom']
 assert columns[1].text.splitlines() == ['Right top', 'Right bottom']
 table_page = Document(r'$tableDocx')

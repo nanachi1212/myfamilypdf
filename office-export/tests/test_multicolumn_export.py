@@ -35,6 +35,7 @@ def _write_two_column_pdf(path: Path) -> None:
     content = DecodedStreamObject()
     content.set_data(
         b"""
+BT /F1 18 Tf 220 375 Td (Full width heading) Tj ET
 BT /F1 12 Tf 40 340 Td (Left top) Tj ET
 BT /F1 12 Tf 40 300 Td (Left bottom) Tj ET
 BT /F1 12 Tf 340 340 Td (Right top) Tj ET
@@ -54,15 +55,20 @@ class MultiColumnExportTest(unittest.TestCase):
             _write_two_column_pdf(source)
 
             extracted = extract_document(source)
-            write_docx(extracted, target)
+            report = write_docx(extracted, target)
             document = Document(target)
 
         self.assertEqual(extracted.pages[0].column_count, 2)
+        heading = extracted.pages[0].blocks[0]
+        self.assertEqual(heading.text, "Full width heading")
+        self.assertEqual(heading.column_span, 2)
+        self.assertEqual(document.paragraphs[0].text, "Full width heading")
         self.assertEqual(len(document.tables), 1)
         cells = document.tables[0].rows[0].cells
         self.assertEqual(len(cells), 2)
         self.assertEqual(cells[0].text.splitlines(), ["Left top", "Left bottom"])
         self.assertEqual(cells[1].text.splitlines(), ["Right top", "Right bottom"])
+        self.assertEqual(report.paragraphs_exported, 5)
 
 
 if __name__ == "__main__":

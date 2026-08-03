@@ -39,9 +39,9 @@ E:\CodexProject\FamilyPDF\dist\FamilyPDF-OCR-Plugin-windows-x64.zip
 
 | 檔案 | 大小 | SHA-256 |
 |---|---:|---|
-| `FamilyPDF-Full-Setup-x64.exe` | 88,025,523 bytes | `8B366DC0E013904B84C9AAF77D0CFFC9D99DD6176FFDD30647F7E9BE876DFDBA` |
-| `FamilyPDF-Setup-x64.exe` | 77,136,063 bytes | `58CC664F80ADE6780F07D494274412F501AF23AF153FB94AA6E61B8CE04F4615` |
-| `FamilyPDF-windows-x64.zip` | 101,361,275 bytes | `62708DBC4C91AB6D095D13CF00700C440EF30494D126EBD752DA3342C1284908` |
+| `FamilyPDF-Full-Setup-x64.exe` | 88,029,006 bytes | `9B73EAD2D48A2E872607B3297A383CBEECA5567F8E8E877A5395D14B9CDC46B2` |
+| `FamilyPDF-Setup-x64.exe` | 77,143,691 bytes | `FF11B32AF152DE40EBA53481483A55E66712236EA96324453181EC657726EF40` |
+| `FamilyPDF-windows-x64.zip` | 101,363,529 bytes | `C24E647DF194B580456916CE13A8271E28553A7221280B6C72FC1EE509A4B6D1` |
 | `FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 bytes | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 bytes | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
@@ -79,12 +79,12 @@ cd E:\CodexProject\FamilyPDF
 ## 已知限制
 
 - 尚未在繁中與簡中兩套 Windows 實機進行完整人工巡覽。
-- 文件級編輯固定 fixture 已完成真人巡覽，仍需以任意實際文件判斷浮水印透明度、背景圖片裁切與複雜內容品質；Office writer 支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。一般等寬雙欄已完成真實 PDF、封裝 helper 與 OOXML 重讀；不等寬／三欄以上、跨欄標題、浮動圖片、跨頁表格及精確座標版面目前未重建。
+- 文件級編輯固定 fixture 已完成真人巡覽，仍需以任意實際文件判斷浮水印透明度、背景圖片裁切與複雜內容品質；Office writer 支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。一般等寬雙欄及頁頂端全寬標題已完成真實 PDF、封裝 helper 與 OOXML 重讀；不等寬／三欄以上、頁面中段跨欄區塊、浮動圖片、跨頁表格及精確座標版面目前未重建。
 - 安裝檔沒有商業程式碼簽章，SmartScreen 可能顯示未知發行者。
 
 ## 2026-08-03 接續狀態
 
 - Office Export Python 環境已具備自動健康檢查與修復能力；目前使用本機 vcpkg Python 3.14.2，無須使用者手動安裝 Python。
-- 最新完整回歸：`build\final-regression-20260803-120614\summary.json`，CTest 6/6、Office Python 8/8、封裝 helper 雙欄與單欄相容回歸、OCR 繁簡中文與 1,160 頁多文件測試均通過；`windeployqt` 沒有環境警告或 fallback。
+- 最新完整回歸：`build\final-regression-20260803-122724\summary.json`，CTest 6/6、Office Python 8/8、封裝 helper 全寬標題／雙欄／單欄相容回歸、OCR 繁簡中文與 1,160 頁多文件測試均通過；Qt runtime 沒有環境警告或 fallback。
 - `scripts\qa\cleanup-final-regression-results.ps1` 會在成功回歸後自動只保留最新結果；舊的安裝展開副本已清除，正式釋出產物與最新版安裝驗證保留。
 - `dist\` 不提交 Git；發布時需另外上傳 ZIP 與安裝檔。
