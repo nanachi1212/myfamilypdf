@@ -74,6 +74,41 @@ BT /F1 12 Tf 340 170 Td (Right second bottom) Tj ET
         writer.write(stream)
 
 
+def _write_unequal_two_column_pdf(path: Path) -> None:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=600, height=400)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_reference = writer._add_object(font)
+    page[NameObject("/Resources")] = DictionaryObject(
+        {
+            NameObject("/Font"): DictionaryObject(
+                {NameObject("/F1"): font_reference}
+            )
+        }
+    )
+    content = DecodedStreamObject()
+    content.set_data(
+        b"""
+BT /F1 18 Tf 160 375 Td (Unequal columns heading across page) Tj ET
+BT /F1 12 Tf 40 340 Td (Wide left top) Tj ET
+BT /F1 12 Tf 40 300 Td (Wide left bottom with extended editable text) Tj ET
+BT /F1 12 Tf 440 340 Td (Narrow right top) Tj ET
+BT /F1 12 Tf 440 300 Td (Narrow right bottom) Tj ET
+"""
+    )
+    page[NameObject("/Contents")] = writer._add_object(content)
+    _merge_raster_image(page, (80, 20), (30, 90, 220), 310, 240)
+    _merge_raster_image(page, (60, 20), (220, 40, 60), 460, 240)
+    with path.open("wb") as stream:
+        writer.write(stream)
+
+
 def _write_single_column_image_pdf(path: Path) -> None:
     writer = PdfWriter()
     page = writer.add_blank_page(width=600, height=400)
@@ -230,6 +265,52 @@ class MultiColumnExportTest(unittest.TestCase):
             ["Right second top", "Right second bottom"],
         )
         self.assertEqual(report.paragraphs_exported, 10)
+        self.assertEqual(report.images_exported, 2)
+
+    def test_preserves_unequal_pdf_column_widths_in_docx(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "unequal-columns.pdf"
+            target = Path(directory) / "unequal-columns.docx"
+            _write_unequal_two_column_pdf(source)
+
+            extracted = extract_document(source)
+            report = write_docx(extracted, target)
+            document = Document(target)
+
+        page = extracted.pages[0]
+        self.assertEqual(page.column_count, 2)
+        self.assertGreater(page.column_width_ratios[0], 0.65)
+        self.assertLess(page.column_width_ratios[1], 0.35)
+        self.assertAlmostEqual(sum(page.column_width_ratios), 1.0)
+        self.assertEqual([image.column for image in page.images], [0, 1])
+        self.assertEqual(len(document.tables), 1)
+        cells = document.tables[0].rows[0].cells
+        self.assertGreater(int(cells[0].width), int(cells[1].width) * 2)
+        self.assertEqual(
+            cells[0].text.splitlines(),
+            [
+                "Wide left top",
+                "Wide left bottom with extended editable text",
+            ],
+        )
+        self.assertEqual(
+            cells[1].text.splitlines(),
+            ["Narrow right top", "Narrow right bottom"],
+        )
+        self.assertEqual(
+            [paragraph.text for paragraph in cells[0].paragraphs],
+            [
+                "Wide left top",
+                "Wide left bottom with extended editable text",
+                "",
+            ],
+        )
+        self.assertEqual(
+            [paragraph.text for paragraph in cells[1].paragraphs],
+            ["Narrow right top", "Narrow right bottom", ""],
+        )
+        self.assertEqual(len(document.inline_shapes), 2)
+        self.assertEqual(report.paragraphs_exported, 5)
         self.assertEqual(report.images_exported, 2)
 
 

@@ -34,6 +34,8 @@ $outputDocx = Join-Path $smokeRoot 'office-output.docx'
 $outputXlsx = Join-Path $smokeRoot 'office-output.xlsx'
 $multiColumnPdf = Join-Path $smokeRoot 'two-column-input.pdf'
 $multiColumnDocx = Join-Path $smokeRoot 'two-column-output.docx'
+$unequalColumnPdf = Join-Path $smokeRoot 'unequal-column-input.pdf'
+$unequalColumnDocx = Join-Path $smokeRoot 'unequal-column-output.docx'
 $tablePdf = Join-Path $smokeRoot 'table-input.pdf'
 $tableDocx = Join-Path $smokeRoot 'table-output.docx'
 
@@ -43,9 +45,13 @@ try {
 from pathlib import Path
 from tests.test_cli import _write_two_page_pdf
 from tests.test_extract import _write_text_and_table_pdf
-from tests.test_multicolumn_export import _write_two_column_pdf
+from tests.test_multicolumn_export import (
+    _write_two_column_pdf,
+    _write_unequal_two_column_pdf,
+)
 _write_two_page_pdf(Path(r'$inputPdf'))
 _write_two_column_pdf(Path(r'$multiColumnPdf'))
+_write_unequal_two_column_pdf(Path(r'$unequalColumnPdf'))
 _write_text_and_table_pdf(Path(r'$tablePdf'))
 "@
 }
@@ -78,6 +84,16 @@ try {
         throw 'Portable DOCX raster image export smoke test failed.'
     }
     Write-Host $multiColumnReportJson
+    $unequalColumnReportJson = (& $helper --input $unequalColumnPdf `
+            --output $unequalColumnDocx --format docx | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Portable unequal-column DOCX export smoke test failed.'
+    }
+    $unequalColumnReport = $unequalColumnReportJson | ConvertFrom-Json
+    if ($unequalColumnReport.images_exported -ne 2) {
+        throw 'Portable unequal-column image export smoke test failed.'
+    }
+    Write-Host $unequalColumnReportJson
     & $helper --input $tablePdf --output $tableDocx --format docx
     if ($LASTEXITCODE -ne 0) {
         throw 'Portable single-column table-page DOCX export smoke test failed.'
@@ -119,6 +135,20 @@ assert second_columns[0].text.splitlines() == [
 ]
 assert second_columns[1].text.splitlines() == [
     'Right second top', 'Right second bottom'
+]
+unequal_column_page = Document(r'$unequalColumnDocx')
+assert [p.text for p in unequal_column_page.paragraphs if p.text] == [
+    'Unequal columns heading across page'
+]
+assert len(unequal_column_page.inline_shapes) == 2
+assert len(unequal_column_page.tables) == 1
+unequal_cells = unequal_column_page.tables[0].rows[0].cells
+assert int(unequal_cells[0].width) > int(unequal_cells[1].width) * 2
+assert unequal_cells[0].text.splitlines() == [
+    'Wide left top', 'Wide left bottom with extended editable text'
+]
+assert unequal_cells[1].text.splitlines() == [
+    'Narrow right top', 'Narrow right bottom'
 ]
 table_page = Document(r'$tableDocx')
 assert len(table_page.tables) == 0

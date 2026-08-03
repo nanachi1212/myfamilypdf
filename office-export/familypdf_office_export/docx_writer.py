@@ -41,11 +41,13 @@ def _write_image(
 def _write_column_table(
     document,
     columns: list[list[LayoutItem]],
+    column_width_ratios: list[float],
 ) -> tuple[int, int]:
     if not any(columns):
         return 0, 0
 
     table = document.add_table(rows=1, cols=len(columns))
+    table.autofit = False
     paragraphs_exported = 0
     images_exported = 0
     section = document.sections[-1]
@@ -54,8 +56,23 @@ def _write_column_table(
         - section.left_margin
         - section.right_margin
     )
-    column_width_emu = int(usable_width_emu / len(columns) * 0.9)
+    ratio_total = sum(column_width_ratios)
+    if (
+        len(column_width_ratios) != len(columns)
+        or ratio_total <= 0.0
+        or any(ratio <= 0.0 for ratio in column_width_ratios)
+    ):
+        normalized_ratios = [1.0 / len(columns) for _ in columns]
+    else:
+        normalized_ratios = [
+            ratio / ratio_total for ratio in column_width_ratios
+        ]
     for column_index, cell in enumerate(table.rows[0].cells):
+        column_width_emu = int(
+            usable_width_emu * normalized_ratios[column_index]
+        )
+        table.columns[column_index].width = Emu(column_width_emu)
+        cell.width = Emu(column_width_emu)
         for item_index, item in enumerate(columns[column_index]):
             paragraph = (
                 cell.paragraphs[0]
@@ -66,7 +83,11 @@ def _write_column_table(
                 _write_block(paragraph, item)
                 paragraphs_exported += 1
             else:
-                _write_image(paragraph, item, column_width_emu)
+                _write_image(
+                    paragraph,
+                    item,
+                    int(column_width_emu * 0.9),
+                )
                 images_exported += 1
     return paragraphs_exported, images_exported
 
@@ -100,6 +121,7 @@ def write_docx(
                     table_paragraphs, table_images = _write_column_table(
                         document,
                         pending_columns,
+                        page.column_width_ratios,
                     )
                     paragraphs_exported += table_paragraphs
                     images_exported += table_images
@@ -124,6 +146,7 @@ def write_docx(
             table_paragraphs, table_images = _write_column_table(
                 document,
                 pending_columns,
+                page.column_width_ratios,
             )
             paragraphs_exported += table_paragraphs
             images_exported += table_images

@@ -40,15 +40,15 @@ E:\CodexProject\FamilyPDF\dist\FamilyPDF-OCR-Plugin-windows-x64.zip
 
 | 檔案 | 大小 | SHA-256 |
 |---|---:|---|
-| `FamilyPDF-Full-Setup-x64.exe` | 88,089,244 bytes | `C05D6338E5CA14398445E1EB00CA6E355515CAC30CAEA7A6CE92851B027EBBE7` |
-| `FamilyPDF-Setup-x64.exe` | 77,198,447 bytes | `E1CD7694E960382DF34F1C6E59962F47E79502C3B7E70264C71728DA2D836362` |
-| `FamilyPDF-windows-x64.zip` | 101,477,931 bytes | `E4DA8A0CB4172C47E3F93A1BE026FB104D06C8861AE113FB1EB334D2764575DA` |
+| `FamilyPDF-Full-Setup-x64.exe` | 88,107,385 bytes | `0B346DA8248A6596EE6012ACE0E7E6C310F70C9DEF2FB61D118F70F553C94C44` |
+| `FamilyPDF-Setup-x64.exe` | 77,214,439 bytes | `C0A80CDE6AE38B0BD002BC16288CE4CAE08687C109574BCD22CF192451E98ACE` |
+| `FamilyPDF-windows-x64.zip` | 101,480,076 bytes | `BCBDB5491316BCAFA8F4AC93A018775EE95C8F16EB81D351A6882CB063E87ACF` |
 | `FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 bytes | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 bytes | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
 ## 已通過驗證
 
-- CTest 6/6 與 Office Export Python 單元測試 9/9 通過。
+- CTest 6/6 與 Office Export Python 單元測試 10/10 通過。
 - 基礎、完整與精簡安裝流程 exit code `0`；完整模式包含 OCR，精簡模式不含 OCR。
 - Tesseract `--version`、`--list-langs` 與完整 OCR：exit code `0`。
 - OCR 能辨識繁體中文、簡體中文與英文，並輸出保留頁數的可搜尋 PDF 及 UTF-8 文字。
@@ -81,13 +81,13 @@ cd E:\CodexProject\FamilyPDF
 ## 已知限制
 
 - 尚未在繁中與簡中兩套 Windows 實機進行完整人工巡覽。
-- 文件級編輯固定 fixture 已完成真人巡覽，仍需以任意實際文件判斷浮水印透明度、背景圖片裁切與複雜內容品質；Office writer 支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。一般等寬雙欄、全寬文字與非重疊 raster 圖片已完成真實 PDF、封裝 helper 與 OOXML 重讀；向量圖形、透明遮罩精確重建、文字環繞／重疊浮動物件、不等寬／三欄以上、跨頁表格及精確座標版面目前未重建。
+- 文件級編輯固定 fixture 已完成真人巡覽，仍需以任意實際文件判斷浮水印透明度、背景圖片裁切與複雜內容品質；Office writer 支援範圍內的三頁複合 fixture 已完成 Office 本體解析、Word 原生渲染與巡覽。等寬／不等寬雙欄、全寬文字與非重疊 raster 圖片已完成真實 PDF、封裝 helper 與 OOXML 重讀；向量圖形、透明遮罩精確重建、文字環繞／重疊浮動物件、三欄以上、跨頁表格及精確座標版面目前未重建。
 - 安裝檔沒有商業程式碼簽章，SmartScreen 可能顯示未知發行者。
 - 文件比較固定 fixture 尚未涵蓋複雜透明混合、DRM／密碼文件或大型工程圖，這些文件仍需人工判讀結果。
 
 ## 2026-08-03 接續狀態
 
 - Office Export Python 環境已具備自動健康檢查與修復能力；目前使用本機 vcpkg Python 3.14.2，無須使用者手動安裝 Python。
-- 最新完整回歸：`build\final-regression-20260803-135541\summary.json`，CTest 6/6、Office Python 9/9、封裝 helper raster 圖片／跨欄多區段／雙欄／單欄相容回歸、PDF 文件比較 CLI／GUI、OCR 繁簡中文與 1,160 頁多文件測試均通過；Qt runtime 沒有環境警告或 fallback。
+- 最新完整回歸：`build\final-regression-20260803-142158\summary.json`，CTest 6/6、Office Python 10/10、封裝 helper raster 圖片／跨欄多區段／等寬與不等寬雙欄／單欄相容回歸、PDF 文件比較 CLI／GUI、OCR 繁簡中文與 1,160 頁多文件測試均通過；安裝隔離摘要為 `build\full-installer-smoke\summary.json`，完整與精簡模式分別逐檔驗證 406 個核心檔案，完整模式另驗證 29 個 OCR 檔案。
 - `scripts\qa\cleanup-final-regression-results.ps1` 會在成功回歸後自動只保留最新結果；舊的安裝展開副本已清除，正式釋出產物與最新版安裝驗證保留。
 - `dist\` 不提交 Git；發布時需另外上傳 ZIP 與安裝檔。

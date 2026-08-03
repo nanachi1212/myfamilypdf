@@ -32,7 +32,7 @@ def _group_words_into_blocks(
     words: Iterable[dict[str, Any]],
     page_width: float,
     detect_columns: bool = True,
-) -> tuple[list[TextBlock], int]:
+) -> tuple[list[TextBlock], int, list[float], float | None]:
     sorted_words = sorted(
         words,
         key=lambda item: (
@@ -87,6 +87,8 @@ def _group_words_into_blocks(
                 )
 
     column_count = 1
+    column_width_ratios = [1.0]
+    column_split_x = None
     page_center = page_width / 2.0
     column_candidates = [
         position
@@ -107,10 +109,21 @@ def _group_words_into_blocks(
             and left_count >= 2
             and right_count >= 2
         ):
-            split_x = (starts[gap_index] + starts[gap_index + 1]) / 2.0
+            left_edge = starts[0]
+            right_start = starts[gap_index + 1]
+            inferred_right_edge = page_width - left_edge
+            usable_width = inferred_right_edge - left_edge
+            split_x = right_start - page_width * 0.03
+            if usable_width > 0.0:
+                left_ratio = (split_x - left_edge) / usable_width
+                left_ratio = min(0.8, max(0.2, left_ratio))
+                column_width_ratios = [left_ratio, 1.0 - left_ratio]
+            else:
+                column_width_ratios = [0.5, 0.5]
+            column_split_x = split_x
             column_count = 2
             for block, x0, x1, _ in block_positions:
-                if x0 < page_center < x1:
+                if x0 < split_x < x1:
                     block.column = 0
                     block.column_span = 2
                 else:
@@ -138,7 +151,12 @@ def _group_words_into_blocks(
                 )
 
     blocks = [item[0] for item in block_positions]
-    return _order_layout_items(blocks, column_count), column_count
+    return (
+        _order_layout_items(blocks, column_count),
+        column_count,
+        column_width_ratios,
+        column_split_x,
+    )
 
 
 def _order_layout_items(
@@ -184,6 +202,7 @@ def _order_layout_items(
 def _extract_images(
     page,
     column_count: int,
+    column_split_x: float | None,
     page_number: int,
 ) -> tuple[list[ExtractedImage], list[str]]:
     if not page.images:
@@ -199,7 +218,7 @@ def _extract_images(
     images: list[ExtractedImage] = []
     warnings: list[str] = []
     scale = 2.0
-    page_center = float(page.width) / 2.0
+    split_x = column_split_x or float(page.width) / 2.0
     for image_index, source in enumerate(page.images, start=1):
         try:
             x0 = float(source.get("x0", 0.0))
@@ -226,10 +245,10 @@ def _extract_images(
             column = 0
             column_span = 1
             if column_count > 1:
-                if x0 < page_center < x1:
+                if x0 < split_x < x1:
                     column_span = column_count
                 else:
-                    column = 0 if (x0 + x1) / 2.0 < page_center else 1
+                    column = 0 if (x0 + x1) / 2.0 < split_x else 1
             images.append(
                 ExtractedImage(
                     data=buffer.getvalue(),
@@ -328,7 +347,12 @@ def extract_document(
                 extra_attrs=["fontname", "size"],
             )
             tables = _extract_tables(page)
-            blocks, column_count = _group_words_into_blocks(
+            (
+                blocks,
+                column_count,
+                column_width_ratios,
+                column_split_x,
+            ) = _group_words_into_blocks(
                 words,
                 float(page.width),
                 detect_columns=not tables,
@@ -336,6 +360,7 @@ def extract_document(
             images, image_warnings = _extract_images(
                 page,
                 column_count,
+                column_split_x,
                 page_number,
             )
             layout_items = _order_layout_items(
@@ -360,6 +385,8 @@ def extract_document(
                     images=images,
                     layout_items=layout_items,
                     column_count=column_count,
+                    column_width_ratios=column_width_ratios,
+                    column_split_x=column_split_x,
                     tables=tables,
                     warnings=warnings,
                     has_text_layer=has_text_layer,
