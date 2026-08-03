@@ -251,4 +251,9 @@ $summaryPath = Join-Path $qaRoot 'summary.json'
 $summary | ConvertTo-Json -Depth 6 |
     Set-Content -LiteralPath $summaryPath -Encoding UTF8
 
+& (Join-Path $PSScriptRoot 'cleanup-final-regression-results.ps1') `
+    -BuildRoot (Join-Path $repositoryRoot 'build') `
+    -Keep 1 `
+    -CurrentResult $qaRoot
+
 Write-Host "Final regression passed: $summaryPath"

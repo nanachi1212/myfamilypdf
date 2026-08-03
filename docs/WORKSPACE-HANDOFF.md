@@ -85,6 +85,6 @@ cd E:\CodexProject\FamilyPDF
 ## 2026-08-03 接續狀態
 
 - Office Export Python 環境已具備自動健康檢查與修復能力；目前使用本機 vcpkg Python 3.14.2，無須使用者手動安裝 Python。
-- 最新完整回歸：`build\final-regression-20260803-103020\summary.json`，CTest 6/6、Office Python 7/7、OCR 繁簡中文與 1,160 頁多文件測試均通過。
-- 本機建置資料只保留最新成功回歸與正式釋出產物；舊的可重建驗證輸出已清除。
+- 最新完整回歸：`build\final-regression-20260803-104713\summary.json`，CTest 6/6、Office Python 7/7、OCR 繁簡中文與 1,160 頁多文件測試均通過。
+- `scripts\qa\cleanup-final-regression-results.ps1` 會在成功回歸後自動只保留最新結果；舊的安裝展開副本已清除，正式釋出產物與最新版安裝驗證保留。
 - `dist\` 不提交 Git；發布時需另外上傳 ZIP 與安裝檔。

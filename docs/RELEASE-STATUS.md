@@ -59,5 +59,6 @@
 - 新增 `scripts\qa\test-office-toolchain-repair.ps1`，覆蓋「啟動器存在、基礎 Python 遺失」的回歸案例；修復失敗時會還原原虛擬環境設定。
 - Qt 6.9.1、aqtinstall 3.3.0、vcpkg 固定版本、CMake、MSVC、六個外掛 DLL、PowerShell 腳本語法均重新檢查通過。
 - CTest 6/6、Office Export Python 7/7、OCR 橫排與直排繁簡中文、1,160 頁大檔、Viewer／Editor 三文件與繁簡中文回歸均通過。
-- 最新完整回歸摘要：`build\final-regression-20260803-103020\summary.json`（本機可重建，不提交 Git）。
-- 已移除舊的重複建置與驗證輸出，保留最新成功回歸及正式 `dist` 產物；已確認釋出檔 SHA-256 未改變。
+- 最新完整回歸摘要：`build\final-regression-20260803-104713\summary.json`（本機可重建，不提交 Git）。
+- `run-final-regression.ps1` 成功後會自動呼叫安全的保留工具，只留下最新一份完整回歸；測試證明無關目錄不會被刪除。
+- 本次另移除 13 套已被最新版取代的安裝展開副本，釋放 1,691,093,282 bytes；保留建置樹、最新版安裝驗證及正式 `dist` 產物，並確認釋出檔 SHA-256 未改變。
