@@ -6,9 +6,9 @@
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Full-Setup-x64.exe` | 88,107,385 | `0B346DA8248A6596EE6012ACE0E7E6C310F70C9DEF2FB61D118F70F553C94C44` |
-| `dist\FamilyPDF-Setup-x64.exe` | 77,214,439 | `C0A80CDE6AE38B0BD002BC16288CE4CAE08687C109574BCD22CF192451E98ACE` |
-| `dist\FamilyPDF-windows-x64.zip` | 101,480,076 | `BCBDB5491316BCAFA8F4AC93A018775EE95C8F16EB81D351A6882CB063E87ACF` |
+| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,188,268 | `2D52AF387B38C9511E146A75D60763C4708FF6E192253AACC2E2CD9D25478398` |
+| `dist\FamilyPDF-Setup-x64.exe` | 58,290,529 | `8C73DE95EF33A5BBC1887C9CA7E8E3DC55D7B46A2EBCC1B913AEE33A99246B0B` |
+| `dist\FamilyPDF-windows-x64.zip` | 82,922,306 | `98BD29378DA985D7EAD7D31848B2E93880C4EFA978759BD7B1E8B1850C8FBDCA` |
 | `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
@@ -62,7 +62,8 @@
 - 新增 `scripts\qa\test-office-toolchain-repair.ps1`，覆蓋「啟動器存在、基礎 Python 遺失」的回歸案例；修復失敗時會還原原虛擬環境設定。
 - Qt 6.9.1、aqtinstall 3.3.0、vcpkg 固定版本、CMake、MSVC、六個外掛 DLL、PowerShell 腳本語法均重新檢查通過。
 - CTest 6/6、Office Export Python 10/10、封裝後不等寬雙欄、PDF 文件比較 CLI／GUI、OCR 橫排與直排繁簡中文、1,160 頁大檔、Viewer／Editor 三文件與繁簡中文回歸均通過。
-- 最新完整回歸摘要：`build\final-regression-20260803-142158\summary.json`（本機可重建，不提交 Git）。
+- 最新完整回歸摘要：`build\final-regression-20260803-143539\summary.json`（本機可重建，不提交 Git）。
+- 可攜版封裝完全不再執行 Qt 6.9.1 `windeployqt`；10 個 release Qt modules、15 個 plugins、DXC 與 VC runtime 改為逐檔存在檢查及固定複製。專用環境測試、完整回歸、完整／精簡隔離安裝均無 `0xC0000409` 或 fallback 警告，三個正式產物合計減少 56,400,797 bytes。
 - `run-final-regression.ps1` 成功後會自動呼叫安全的保留工具，只留下最新一份完整回歸；測試證明無關目錄不會被刪除。
 - Windows 正式封裝以單次多目標執行 `windeployqt`，明確注入 Visual Studio 環境、排除 Qt 6.9.1 會觸發 `0xC0000409` 的 DXC 自動探索，再由 Windows SDK 複製配對的 `dxcompiler.dll`／`dxil.dll`。C++ 測試 runtime 則改用 PE import 整理出的 10 個 release Qt DLL 與 15 個外掛固定 allowlist，連續兩次 CTest 及最終回歸均未出現環境警告或 fallback。
 - 本次另移除 13 套已被最新版取代的安裝展開副本，釋放 1,691,093,282 bytes；保留建置樹、最新版安裝驗證及正式 `dist` 產物。加入 raster 圖片 Office helper 與 PDF 文件比較後已重建三個主要產物，最新 SHA-256 如本頁表格。

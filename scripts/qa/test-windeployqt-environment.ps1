@@ -16,6 +16,11 @@ if (-not (Test-Path -LiteralPath $officeExportSource -PathType Container)) {
     throw "Office export helper was not found: $officeExportSource"
 }
 
+$packageScriptText = Get-Content -LiteralPath $packageScript -Raw
+if ($packageScriptText -match '(?im)^\s*&\s+\$windeployqt\b') {
+    throw 'Packaging must not execute the unstable Qt 6.9.1 windeployqt.'
+}
+
 Remove-Item -LiteralPath $testRoot -Recurse -Force `
     -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
@@ -32,6 +37,7 @@ try {
     foreach ($unexpected in @(
             'VCINSTALLDIR is not set',
             'Cannot find any version of the dxcompiler.dll and dxil.dll',
+            'windeployqt failed with exit code',
             'Using the explicit release Qt runtime fallback'
         )) {
         if ($output -match [regex]::Escape($unexpected)) {

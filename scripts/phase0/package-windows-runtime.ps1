@@ -32,7 +32,6 @@ if (-not (Test-Path -LiteralPath (
 
 $QtPrefix = 'E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
 $runtimeDirectory = Join-Path $BuildDirectory 'usr\bin'
-$windeployqt = Join-Path $QtPrefix 'bin\windeployqt.exe'
 $vcpkgBin = Join-Path $BuildDirectory 'vcpkg_installed\x64-windows\bin'
 $targets = @(
     'PdfTool',
@@ -44,9 +43,13 @@ $targets = @(
 # SkipOcr is retained for compatibility with older build commands. OCR is now
 # always packaged separately by scripts\ocr\build-ocr-plugin.ps1.
 
-foreach ($path in @($windeployqt, $runtimeDirectory)) {
-    if (-not (Test-Path -LiteralPath $path)) {
-        throw "Required path was not found: $path"
+if (-not (Test-Path -LiteralPath $runtimeDirectory -PathType Container)) {
+    throw "Required path was not found: $runtimeDirectory"
+}
+foreach ($target in $targets) {
+    $targetExecutable = Join-Path $runtimeDirectory "$target.exe"
+    if (-not (Test-Path -LiteralPath $targetExecutable -PathType Leaf)) {
+        throw "Required application was not found: $targetExecutable"
     }
 }
 
@@ -58,8 +61,8 @@ if (Test-Path -LiteralPath $packageRoot) {
 New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 Set-Content -LiteralPath (Join-Path $packageRoot 'portable.mode') -Value 'FamilyPDF portable data mode' -Encoding ASCII
 
-# Start from a clean staging directory. Copy application and third-party files,
-# then let windeployqt calculate the actually required release Qt runtime.
+# Start from a clean staging directory, then copy application, third-party and
+# explicitly verified release Qt runtime files.
 Get-ChildItem -LiteralPath $runtimeDirectory -File |
     Where-Object {
         $_.Name -notlike 'Qt6*.dll' -and
@@ -103,9 +106,7 @@ if (-not $crtDirectory) {
 Get-ChildItem -LiteralPath $crtDirectory.FullName -Filter '*.dll' -File |
     Copy-Item -Destination $packageRoot -Force
 
-# Qt 6.9.1 windeployqt can fail-fast with 0xC0000409 when the Windows SDK D3D
-# redistributable directory is added to PATH. Ask windeployqt to skip DXC
-# discovery and copy the paired SDK runtime files explicitly instead.
+# Copy the paired Windows SDK DirectX Shader Compiler runtime explicitly.
 $directXRuntimeDirectory =
     'C:\Program Files (x86)\Windows Kits\10\Redist\D3D\x64'
 foreach ($directXRuntime in @('dxcompiler.dll', 'dxil.dll')) {
@@ -116,100 +117,51 @@ foreach ($directXRuntime in @('dxcompiler.dll', 'dxil.dll')) {
     Copy-Item -LiteralPath $source -Destination $packageRoot -Force
 }
 
-$qtDeploymentFailed = $false
-$previousVcInstallDir = $env:VCINSTALLDIR
-$previousVsInstallDir = $env:VSINSTALLDIR
-$env:VCINSTALLDIR = (Join-Path $visualStudioRoot 'VC') + '\'
-$env:VSINSTALLDIR = $visualStudioRoot + '\'
-try {
-    $deploymentExecutables = @()
-    foreach ($target in $targets) {
-        $executable = Join-Path $runtimeDirectory "$target.exe"
-        if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
-            Write-Warning "Skipping missing target: $target.exe"
-            continue
-        }
-        $deploymentExecutables += $executable
+$requiredQtModules = @(
+    'Qt6Concurrent.dll',
+    'Qt6Core.dll',
+    'Qt6Gui.dll',
+    'Qt6Multimedia.dll',
+    'Qt6Network.dll',
+    'Qt6PrintSupport.dll',
+    'Qt6Svg.dll',
+    'Qt6TextToSpeech.dll',
+    'Qt6Widgets.dll',
+    'Qt6Xml.dll'
+)
+foreach ($module in $requiredQtModules) {
+    $source = Join-Path $QtPrefix "bin\$module"
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "Required release Qt module was not found: $source"
     }
-    if ($deploymentExecutables.Count -gt 0) {
-        $deploymentArguments = @(
-            '--release',
-            '--dir', $packageRoot,
-            '--no-translations',
-            '--no-system-d3d-compiler',
-            '--no-system-dxc-compiler',
-            '--no-opengl-sw'
-        ) + $deploymentExecutables
-        & $windeployqt @deploymentArguments | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            $qtDeploymentFailed = $true
-            Write-Warning "windeployqt failed with exit code $LASTEXITCODE."
-        }
-    }
-}
-finally {
-    if ($null -eq $previousVcInstallDir) {
-        Remove-Item Env:VCINSTALLDIR -ErrorAction SilentlyContinue
-    }
-    else {
-        $env:VCINSTALLDIR = $previousVcInstallDir
-    }
-    if ($null -eq $previousVsInstallDir) {
-        Remove-Item Env:VSINSTALLDIR -ErrorAction SilentlyContinue
-    }
-    else {
-        $env:VSINSTALLDIR = $previousVsInstallDir
-    }
+    Copy-Item -LiteralPath $source -Destination $packageRoot -Force
 }
 
-if ($qtDeploymentFailed) {
-    Write-Warning 'Using the explicit release Qt runtime fallback.'
-    $requiredQtModules = @(
-        'Qt6Concurrent.dll',
-        'Qt6Core.dll',
-        'Qt6Gui.dll',
-        'Qt6Multimedia.dll',
-        'Qt6Network.dll',
-        'Qt6PrintSupport.dll',
-        'Qt6Svg.dll',
-        'Qt6TextToSpeech.dll',
-        'Qt6Widgets.dll',
-        'Qt6Xml.dll'
-    )
-    foreach ($module in $requiredQtModules) {
-        $source = Join-Path $QtPrefix "bin\$module"
-        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
-            throw "Required release Qt module was not found: $source"
-        }
-        Copy-Item -LiteralPath $source -Destination $packageRoot -Force
+$requiredPlugins = @(
+    'platforms\qwindows.dll',
+    'iconengines\qsvgicon.dll',
+    'imageformats\qgif.dll',
+    'imageformats\qico.dll',
+    'imageformats\qjpeg.dll',
+    'imageformats\qsvg.dll',
+    'styles\qmodernwindowsstyle.dll',
+    'texttospeech\qtexttospeech_mock.dll',
+    'texttospeech\qtexttospeech_sapi.dll',
+    'texttospeech\qtexttospeech_winrt.dll',
+    'multimedia\ffmpegmediaplugin.dll',
+    'multimedia\windowsmediaplugin.dll',
+    'networkinformation\qnetworklistmanager.dll',
+    'tls\qcertonlybackend.dll',
+    'tls\qschannelbackend.dll'
+)
+foreach ($plugin in $requiredPlugins) {
+    $source = Join-Path $QtPrefix "plugins\$plugin"
+    $destination = Join-Path $packageRoot $plugin
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "Required release Qt plugin was not found: $source"
     }
-
-    $requiredPlugins = @(
-        'platforms\qwindows.dll',
-        'iconengines\qsvgicon.dll',
-        'imageformats\qgif.dll',
-        'imageformats\qico.dll',
-        'imageformats\qjpeg.dll',
-        'imageformats\qsvg.dll',
-        'styles\qmodernwindowsstyle.dll',
-        'texttospeech\qtexttospeech_mock.dll',
-        'texttospeech\qtexttospeech_sapi.dll',
-        'texttospeech\qtexttospeech_winrt.dll',
-        'multimedia\ffmpegmediaplugin.dll',
-        'multimedia\windowsmediaplugin.dll',
-        'networkinformation\qnetworklistmanager.dll',
-        'tls\qcertonlybackend.dll',
-        'tls\qschannelbackend.dll'
-    )
-    foreach ($plugin in $requiredPlugins) {
-        $source = Join-Path $QtPrefix "plugins\$plugin"
-        $destination = Join-Path $packageRoot $plugin
-        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
-            throw "Required release Qt plugin was not found: $source"
-        }
-        New-Item -ItemType Directory -Path (Split-Path $destination) -Force | Out-Null
-        Copy-Item -LiteralPath $source -Destination $destination -Force
-    }
+    New-Item -ItemType Directory -Path (Split-Path $destination) -Force | Out-Null
+    Copy-Item -LiteralPath $source -Destination $destination -Force
 }
 
 $zipPath = Join-Path $OutputDirectory 'FamilyPDF-windows-x64.zip'

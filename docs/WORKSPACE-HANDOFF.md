@@ -40,9 +40,9 @@ E:\CodexProject\FamilyPDF\dist\FamilyPDF-OCR-Plugin-windows-x64.zip
 
 | 檔案 | 大小 | SHA-256 |
 |---|---:|---|
-| `FamilyPDF-Full-Setup-x64.exe` | 88,107,385 bytes | `0B346DA8248A6596EE6012ACE0E7E6C310F70C9DEF2FB61D118F70F553C94C44` |
-| `FamilyPDF-Setup-x64.exe` | 77,214,439 bytes | `C0A80CDE6AE38B0BD002BC16288CE4CAE08687C109574BCD22CF192451E98ACE` |
-| `FamilyPDF-windows-x64.zip` | 101,480,076 bytes | `BCBDB5491316BCAFA8F4AC93A018775EE95C8F16EB81D351A6882CB063E87ACF` |
+| `FamilyPDF-Full-Setup-x64.exe` | 69,188,268 bytes | `2D52AF387B38C9511E146A75D60763C4708FF6E192253AACC2E2CD9D25478398` |
+| `FamilyPDF-Setup-x64.exe` | 58,290,529 bytes | `8C73DE95EF33A5BBC1887C9CA7E8E3DC55D7B46A2EBCC1B913AEE33A99246B0B` |
+| `FamilyPDF-windows-x64.zip` | 82,922,306 bytes | `98BD29378DA985D7EAD7D31848B2E93880C4EFA978759BD7B1E8B1850C8FBDCA` |
 | `FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 bytes | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
 | `FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,879,477 bytes | `C855BB0911C6CFD376A2F11CDCBE5885AACB942A2584272194F6ECE930029BD4` |
 
@@ -88,6 +88,7 @@ cd E:\CodexProject\FamilyPDF
 ## 2026-08-03 接續狀態
 
 - Office Export Python 環境已具備自動健康檢查與修復能力；目前使用本機 vcpkg Python 3.14.2，無須使用者手動安裝 Python。
-- 最新完整回歸：`build\final-regression-20260803-142158\summary.json`，CTest 6/6、Office Python 10/10、封裝 helper raster 圖片／跨欄多區段／等寬與不等寬雙欄／單欄相容回歸、PDF 文件比較 CLI／GUI、OCR 繁簡中文與 1,160 頁多文件測試均通過；安裝隔離摘要為 `build\full-installer-smoke\summary.json`，完整與精簡模式分別逐檔驗證 406 個核心檔案，完整模式另驗證 29 個 OCR 檔案。
+- 最新完整回歸：`build\final-regression-20260803-143539\summary.json`，CTest 6/6、Office Python 10/10、封裝 helper raster 圖片／跨欄多區段／等寬與不等寬雙欄／單欄相容回歸、PDF 文件比較 CLI／GUI、OCR 繁簡中文與 1,160 頁多文件測試均通過；安裝隔離摘要為 `build\full-installer-smoke\summary.json`，完整與精簡模式分別逐檔驗證 406 個核心檔案，完整模式另驗證 29 個 OCR 檔案。
+- 正式可攜包不再啟動 `windeployqt`；10 個 Qt modules、15 個 plugins、DXC 與 VC runtime 皆固定部署並逐檔檢查。環境契約、正式封裝、完整回歸與隔離安裝均未出現 Qt fallback 警告；移除未使用的自動部署內容後，三個主要產物合計縮小 56,400,797 bytes。
 - `scripts\qa\cleanup-final-regression-results.ps1` 會在成功回歸後自動只保留最新結果；舊的安裝展開副本已清除，正式釋出產物與最新版安裝驗證保留。
 - `dist\` 不提交 Git；發布時需另外上傳 ZIP 與安裝檔。

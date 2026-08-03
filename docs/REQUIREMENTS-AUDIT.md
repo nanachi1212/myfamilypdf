@@ -43,4 +43,4 @@
 - Office Export 工具鏈不再只以 `Scripts\python.exe` 是否存在判斷可用性；每次 QA 會驗證直譯器能否啟動，壞掉時自動尋找相同 Python major/minor 的本機工具鏈並修復。
 - 本次實際修復 Python 3.14 虛擬環境後，依賴完整性、DOCX／XLSX helper、Microsoft Office smoke 與最終回歸均通過。
 - OCR 五種語言模型、Qt／CMake／MSVC／vcpkg 建置鏈和所有 PowerShell QA 腳本也已重新稽核，未發現其他待修復的套件或 DLL 缺失。
-- C++ 測試 runtime 不再依賴 Qt 6.9.1 會偶發 `0xC0000409` 的 `windeployqt`；改由 PE import 實際依賴整理的 10 個 release Qt DLL 與 15 個外掛固定複製，連續兩次 CTest 6/6 及最新完整回歸均無警告或 fallback。
+- C++ 測試與正式可攜包都不再執行 Qt 6.9.1 會偶發 `0xC0000409` 的 `windeployqt`；改由 PE import 實際依賴整理的 10 個 release Qt DLL 與 15 個外掛固定複製。專用封裝契約、CTest 6/6、完整回歸及完整／精簡隔離安裝均無 Qt 環境警告或 fallback。
