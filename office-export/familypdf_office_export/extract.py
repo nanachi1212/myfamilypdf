@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -8,8 +9,10 @@ import pdfplumber
 
 from .model import (
     ExtractedDocument,
+    ExtractedImage,
     ExtractedPage,
     ExtractedTable,
+    LayoutItem,
     TextBlock,
     TextRun,
 )
@@ -68,11 +71,16 @@ def _group_words_into_blocks(
             block = _create_text_block(segment)
             if block is not None:
                 top = float(segment[0].get("top", 0.0))
+                left = min(
+                    float(word.get("x0", 0.0))
+                    for word in segment
+                )
                 block.top = top
+                block.left = left
                 block_positions.append(
                     (
                         block,
-                        min(float(word.get("x0", 0.0)) for word in segment),
+                        left,
                         max(float(word.get("x1", 0.0)) for word in segment),
                         top,
                     )
@@ -114,69 +122,131 @@ def _group_words_into_blocks(
             block = _create_text_block(line)
             if block is not None:
                 top = float(line[0].get("top", 0.0))
+                left = min(
+                    float(word.get("x0", 0.0))
+                    for word in line
+                )
                 block.top = top
+                block.left = left
                 block_positions.append(
                     (
                         block,
-                        min(float(word.get("x0", 0.0)) for word in line),
+                        left,
                         max(float(word.get("x1", 0.0)) for word in line),
                         top,
                     )
                 )
 
-    if column_count > 1:
-        spanning_positions = sorted(
-            (
-                item
-                for item in block_positions
-                if item[0].column_span > 1
-            ),
-            key=lambda item: (item[3], item[1]),
-        )
-        column_positions = [
-            item
-            for item in block_positions
-            if item[0].column_span == 1
-        ]
-        ordered_positions: list[
-            tuple[TextBlock, float, float, float]
-        ] = []
-        previous_top = float("-inf")
-        for spanning in spanning_positions:
-            ordered_positions.extend(
-                sorted(
-                    (
-                        item
-                        for item in column_positions
-                        if previous_top <= item[3] < spanning[3]
-                    ),
-                    key=lambda item: (
-                        item[0].column,
-                        item[3],
-                        item[1],
-                    ),
-                )
-            )
-            ordered_positions.append(spanning)
-            previous_top = spanning[3]
-        ordered_positions.extend(
+    blocks = [item[0] for item in block_positions]
+    return _order_layout_items(blocks, column_count), column_count
+
+
+def _order_layout_items(
+    items: Sequence[LayoutItem],
+    column_count: int,
+) -> list[LayoutItem]:
+    if column_count <= 1:
+        return sorted(items, key=lambda item: (item.top, item.left))
+
+    spanning_items = sorted(
+        (item for item in items if item.column_span > 1),
+        key=lambda item: (item.top, item.left),
+    )
+    column_items = [item for item in items if item.column_span == 1]
+    ordered_items: list[LayoutItem] = []
+    previous_top = float("-inf")
+    for spanning in spanning_items:
+        ordered_items.extend(
             sorted(
                 (
                     item
-                    for item in column_positions
-                    if item[3] >= previous_top
+                    for item in column_items
+                    if previous_top <= item.top < spanning.top
                 ),
-                key=lambda item: (
-                    item[0].column,
-                    item[3],
-                    item[1],
-                ),
+                key=lambda item: (item.column, item.top, item.left),
             )
         )
-        block_positions = ordered_positions
-    else:
-        block_positions.sort(key=lambda item: (item[3], item[1]))
-    return [item[0] for item in block_positions], column_count
+        ordered_items.append(spanning)
+        previous_top = spanning.top
+    ordered_items.extend(
+        sorted(
+            (
+                item
+                for item in column_items
+                if item.top >= previous_top
+            ),
+            key=lambda item: (item.column, item.top, item.left),
+        )
+    )
+    return ordered_items
+
+
+def _extract_images(
+    page,
+    column_count: int,
+    page_number: int,
+) -> tuple[list[ExtractedImage], list[str]]:
+    if not page.images:
+        return [], []
+
+    try:
+        rendered = page.to_image(resolution=144).original.convert("RGB")
+    except Exception as error:
+        return [], [
+            f"Page {page_number} images could not be rendered: {error}"
+        ]
+
+    images: list[ExtractedImage] = []
+    warnings: list[str] = []
+    scale = 2.0
+    page_center = float(page.width) / 2.0
+    for image_index, source in enumerate(page.images, start=1):
+        try:
+            x0 = float(source.get("x0", 0.0))
+            x1 = float(source.get("x1", 0.0))
+            top = float(source.get("top", 0.0))
+            bottom = float(source.get("bottom", 0.0))
+            width = x1 - x0
+            height = bottom - top
+            if width < 12.0 or height < 12.0:
+                continue
+
+            crop_box = (
+                max(0, round(x0 * scale)),
+                max(0, round(top * scale)),
+                min(rendered.width, round(x1 * scale)),
+                min(rendered.height, round(bottom * scale)),
+            )
+            if crop_box[0] >= crop_box[2] or crop_box[1] >= crop_box[3]:
+                continue
+            crop = rendered.crop(crop_box)
+            buffer = BytesIO()
+            crop.save(buffer, format="PNG")
+
+            column = 0
+            column_span = 1
+            if column_count > 1:
+                if x0 < page_center < x1:
+                    column_span = column_count
+                else:
+                    column = 0 if (x0 + x1) / 2.0 < page_center else 1
+            images.append(
+                ExtractedImage(
+                    data=buffer.getvalue(),
+                    top=top,
+                    left=x0,
+                    width_points=width,
+                    height_points=height,
+                    column=column,
+                    column_span=column_span,
+                )
+            )
+        except Exception as error:
+            warnings.append(
+                f"Page {page_number} image {image_index} was skipped: {error}"
+            )
+    images.sort(key=lambda image: (image.top, image.left))
+    return images, warnings
 
 
 def _create_text_block(
@@ -263,8 +333,18 @@ def extract_document(
                 float(page.width),
                 detect_columns=not tables,
             )
+            images, image_warnings = _extract_images(
+                page,
+                column_count,
+                page_number,
+            )
+            layout_items = _order_layout_items(
+                [*blocks, *images],
+                column_count,
+            )
             has_text_layer = bool(page.chars) and bool(blocks)
-            warnings: list[str] = []
+            warnings = list(image_warnings)
+            document_warnings.extend(image_warnings)
             if not has_text_layer:
                 warning = (
                     f"Page {page_number} has no searchable text layer; "
@@ -277,6 +357,8 @@ def extract_document(
                 ExtractedPage(
                     number=page_number,
                     blocks=blocks,
+                    images=images,
+                    layout_items=layout_items,
                     column_count=column_count,
                     tables=tables,
                     warnings=warnings,

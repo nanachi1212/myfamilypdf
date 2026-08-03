@@ -19,10 +19,25 @@ class TextBlock:
     column: int = 0
     column_span: int = 1
     top: float = 0.0
+    left: float = 0.0
 
     @property
     def text(self) -> str:
         return "".join(run.text for run in self.runs)
+
+
+@dataclass(slots=True)
+class ExtractedImage:
+    data: bytes
+    top: float
+    left: float
+    width_points: float
+    height_points: float
+    column: int = 0
+    column_span: int = 1
+
+
+LayoutItem = TextBlock | ExtractedImage
 
 
 @dataclass(slots=True, frozen=True)
@@ -43,6 +58,8 @@ class ExtractedTable:
 class ExtractedPage:
     number: int
     blocks: list[TextBlock] = field(default_factory=list)
+    images: list[ExtractedImage] = field(default_factory=list)
+    layout_items: list[LayoutItem] = field(default_factory=list)
     tables: list[ExtractedTable] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     has_text_layer: bool = True

@@ -67,10 +67,17 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Portable XLSX export smoke test failed.'
     }
-    & $helper --input $multiColumnPdf --output $multiColumnDocx --format docx
+    $multiColumnReportJson = (& $helper --input $multiColumnPdf `
+            --output $multiColumnDocx --format docx | Out-String).Trim()
     if ($LASTEXITCODE -ne 0) {
         throw 'Portable two-column DOCX export smoke test failed.'
     }
+    $multiColumnReport = $multiColumnReportJson | ConvertFrom-Json
+    if (-not ($multiColumnReport.PSObject.Properties.Name -contains `
+            'images_exported') -or $multiColumnReport.images_exported -ne 2) {
+        throw 'Portable DOCX raster image export smoke test failed.'
+    }
+    Write-Host $multiColumnReportJson
     & $helper --input $tablePdf --output $tableDocx --format docx
     if ($LASTEXITCODE -ne 0) {
         throw 'Portable single-column table-page DOCX export smoke test failed.'
@@ -97,10 +104,14 @@ body_order = [
     for child in multi_column_page.element.body.iterchildren()
     if child.tag.rsplit('}', 1)[-1] in {'p', 'tbl'}
 ]
-assert body_order == ['p', 'tbl', 'p', 'tbl']
+assert body_order == ['p', 'tbl', 'p', 'tbl', 'p']
+assert len(multi_column_page.inline_shapes) == 2
 assert len(multi_column_page.tables) == 2
 first_columns = multi_column_page.tables[0].rows[0].cells
-assert first_columns[0].text.splitlines() == ['Left top', 'Left bottom']
+assert first_columns[0].text.splitlines() == ['Left top', '', 'Left bottom']
+assert [p.text for p in first_columns[0].paragraphs] == [
+    'Left top', '', 'Left bottom'
+]
 assert first_columns[1].text.splitlines() == ['Right top', 'Right bottom']
 second_columns = multi_column_page.tables[1].rows[0].cells
 assert second_columns[0].text.splitlines() == [

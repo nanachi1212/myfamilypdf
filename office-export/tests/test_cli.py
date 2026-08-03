@@ -80,6 +80,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(report["status"], "ok")
         self.assertEqual(report["pages_exported"], 1)
+        self.assertEqual(report["images_exported"], 0)
         self.assertIn("Second page", "\n".join(p.text for p in document.paragraphs))
         self.assertNotIn("First page", "\n".join(p.text for p in document.paragraphs))
 
