@@ -123,6 +123,7 @@ $fullRequired = @(
     'THIRD-PARTY-LICENSES\OCR\tessdata.txt',
     'THIRD-PARTY-LICENSES\Base\openssl.txt',
     'ocr\tesseract.exe',
+    'ocr\tessdata-manifest.json',
     'ocr\tessdata\eng.traineddata',
     'ocr\tessdata\chi_tra.traineddata',
     'ocr\tessdata\chi_sim.traineddata',

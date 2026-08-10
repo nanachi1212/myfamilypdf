@@ -136,6 +136,13 @@ try {
                 OutputText = $outputText
                 OutputReport = $outputText
             }
+        },
+        [pscustomobject]@{
+            Name = 'OutputText/PageImages'
+            Parameters = @{
+                OutputText = "$outputPdf.pages"
+                KeepPageImages = $true
+            }
         }
     )) {
         $collisionRejected = $false
@@ -190,6 +197,10 @@ try {
     if ($report.schemaVersion -ne 1 -or $report.mode -ne 'Auto') {
         throw 'FamilyPDF auto OCR report has an invalid schema or mode.'
     }
+    if ($report.PSObject.Properties.Name -contains 'inputFile' -or
+        $report.PSObject.Properties.Name -contains 'outputFile') {
+        throw 'FamilyPDF auto OCR report disclosed input or output file names.'
+    }
     if (@($report.pages).Count -ne 4) {
         throw "FamilyPDF auto OCR report expected 4 pages, got $(@($report.pages).Count)."
     }
@@ -216,6 +227,31 @@ try {
         if (@($page.candidates).Count -lt 2) {
             throw "Page $($page.page) did not report both automatic language candidates."
         }
+    }
+
+    $partialPdf = Join-Path $testRoot 'partial-searchable.pdf'
+    $partialReport = Join-Path $testRoot 'partial-searchable.ocr-report.json'
+    & $OcrScriptPath `
+        -InputPdf $sourcePdf `
+        -OutputPdf $partialPdf `
+        -OutputReport $partialReport `
+        -Mode Auto `
+        -Pages '1-2' `
+        -KeepPageImages `
+        -Dpi 240 `
+        -PdfToolPath $PdfToolPath `
+        -TesseractPath $TesseractPath `
+        -TessdataPath $TessdataPath
+    if ($LASTEXITCODE -ne 0) {
+        throw 'FamilyPDF partial-page OCR pipeline failed.'
+    }
+    $partial = Get-Content -LiteralPath $partialReport -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+    $pageImageDirectory = "$partialPdf.pages"
+    if ($partial.summary.pages -ne 2 -or
+        @($partial.pages).Count -ne 2 -or
+        @(Get-ChildItem -LiteralPath $pageImageDirectory -Filter '*.png' -File).Count -ne 2) {
+        throw 'Partial-page OCR did not preserve two report entries and two page images.'
     }
 
     Write-Host 'FamilyPDF automatic Traditional/Simplified selection test passed.'

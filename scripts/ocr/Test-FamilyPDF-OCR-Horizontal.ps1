@@ -148,12 +148,41 @@ try {
     $sourcePdf = "$sourceBase.pdf"
     $outputPdf = Join-Path $testRoot 'horizontal-searchable.pdf'
     $outputText = Join-Path $testRoot 'horizontal-searchable.txt'
+    $outputReport = Join-Path $testRoot 'horizontal-searchable.ocr-report.json'
     $sourceHash = (Get-FileHash -LiteralPath $sourcePdf -Algorithm SHA256).Hash
+
+    $failedOutputPdf = Join-Path $testRoot 'must-not-exist.pdf'
+    $invalidTextTarget = Join-Path $testRoot 'text-target-is-a-directory'
+    New-Item -ItemType Directory -Path $invalidTextTarget | Out-Null
+    $invalidTargetRejected = $false
+    try {
+        & $OcrScriptPath `
+            -InputPdf $sourcePdf `
+            -OutputPdf $failedOutputPdf `
+            -OutputText $invalidTextTarget `
+            -Mode Traditional `
+            -PdfToolPath $PdfToolPath `
+            -TesseractPath $TesseractPath `
+            -TessdataPath $TessdataPath
+    }
+    catch {
+        $invalidTargetRejected = $_.Exception.Message -match 'directory'
+    }
+    if (-not $invalidTargetRejected) {
+        throw 'FamilyPDF OCR did not reject an output path that is a directory.'
+    }
+    if (Test-Path -LiteralPath $failedOutputPdf) {
+        throw 'FamilyPDF OCR left a PDF after rejecting an invalid sidecar target.'
+    }
+    if ((Get-FileHash -LiteralPath $sourcePdf -Algorithm SHA256).Hash -ne $sourceHash) {
+        throw 'FamilyPDF OCR changed its source while rejecting an invalid target.'
+    }
 
     & $OcrScriptPath `
         -InputPdf $sourcePdf `
         -OutputPdf $outputPdf `
         -OutputText $outputText `
+        -OutputReport $outputReport `
         -Languages 'chi_tra+chi_sim+eng' `
         -PageSegmentationMode 6 `
         -Dpi 240 `
@@ -168,8 +197,9 @@ try {
         throw 'FamilyPDF horizontal OCR changed its source PDF.'
     }
     if (-not (Test-Path -LiteralPath $outputPdf -PathType Leaf) -or
-        -not (Test-Path -LiteralPath $outputText -PathType Leaf)) {
-        throw 'FamilyPDF horizontal OCR did not create both output files.'
+        -not (Test-Path -LiteralPath $outputText -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $outputReport -PathType Leaf)) {
+        throw 'FamilyPDF horizontal OCR did not create every requested output file.'
     }
     if ((Get-PdfPageCount -Tool $PdfToolPath -Path $sourcePdf) -ne
         (Get-PdfPageCount -Tool $PdfToolPath -Path $outputPdf)) {
@@ -204,6 +234,100 @@ try {
         if (-not $plainText.Contains($expected)) {
             throw "The horizontal OCR text output is missing '$expected'."
         }
+    }
+
+    $report = Get-Content -LiteralPath $outputReport -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+    if (@($report.pages).Count -ne 1) {
+        throw 'Fixed-language OCR report did not include its processed page.'
+    }
+    if ($report.pages[0].languages -ne 'chi_tra+chi_sim+eng' -or
+        $report.pages[0].psm -ne 6) {
+        throw 'Fixed-language OCR report did not record its language and PSM.'
+    }
+    if ($report.PSObject.Properties.Name -contains 'inputFile' -or
+        $report.PSObject.Properties.Name -contains 'outputFile') {
+        throw 'OCR report disclosed input or output file names.'
+    }
+
+    $repairRoot = Join-Path $testRoot 'corrupt-model-repair'
+    $repairOcrRoot = Join-Path $repairRoot 'ocr'
+    $repairData = Join-Path $repairOcrRoot 'tessdata'
+    $repairSource = Join-Path $repairRoot 'verified-source'
+    New-Item -ItemType Directory -Path $repairData -Force | Out-Null
+    New-Item -ItemType Directory -Path $repairSource -Force | Out-Null
+    Copy-Item -LiteralPath $OcrScriptPath `
+        -Destination (Join-Path $repairRoot 'FamilyPDF-OCR.ps1')
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'ocr-spike\download-tessdata.ps1') `
+        -Destination (Join-Path $repairOcrRoot 'Install-OCR-Languages.ps1')
+    foreach ($language in @('eng', 'chi_tra')) {
+        Copy-Item -LiteralPath (Join-Path $TessdataPath "$language.traineddata") `
+            -Destination $repairSource
+        Copy-Item -LiteralPath (Join-Path $TessdataPath "$language.traineddata") `
+            -Destination $repairData
+    }
+    $corruptTraditional = Join-Path $repairData 'chi_tra.traineddata'
+    $corruptStream = [IO.File]::Open($corruptTraditional, [IO.FileMode]::Open)
+    try {
+        $corruptStream.SetLength($corruptStream.Length - 1)
+    }
+    finally {
+        $corruptStream.Dispose()
+    }
+    $repairLanguages = [ordered]@{}
+    foreach ($language in @('eng', 'chi_tra')) {
+        $model = Get-Item -LiteralPath (Join-Path $repairSource "$language.traineddata")
+        $repairLanguages[$language] = [ordered]@{
+            bytes = $model.Length
+            sha256 = (Get-FileHash -LiteralPath $model.FullName -Algorithm SHA256).Hash
+        }
+    }
+    $repairManifest = [ordered]@{
+        schemaVersion = 1
+        repository = 'local-test-fixture'
+        commit = 'test-fixture-commit'
+        baseUrl = $repairSource
+        languages = $repairLanguages
+    }
+    $repairManifest | ConvertTo-Json -Depth 5 |
+        Set-Content -LiteralPath (Join-Path $repairOcrRoot 'tessdata-manifest.json') `
+            -Encoding UTF8
+    $repairOutput = Join-Path $testRoot 'repaired-model-output.pdf'
+    & (Join-Path $repairRoot 'FamilyPDF-OCR.ps1') `
+        -InputPdf $sourcePdf `
+        -OutputPdf $repairOutput `
+        -Mode Traditional `
+        -Dpi 240 `
+        -PdfToolPath $PdfToolPath `
+        -TesseractPath $TesseractPath `
+        -TessdataPath $repairData
+    if ($LASTEXITCODE -ne 0 -or
+        -not (Test-Path -LiteralPath $repairOutput -PathType Leaf)) {
+        throw 'FamilyPDF OCR did not repair a corrupt language model.'
+    }
+    $verifiedTraditional = Join-Path $repairSource 'chi_tra.traineddata'
+    if ((Get-FileHash -LiteralPath $corruptTraditional -Algorithm SHA256).Hash -ne
+        (Get-FileHash -LiteralPath $verifiedTraditional -Algorithm SHA256).Hash) {
+        throw 'FamilyPDF OCR did not replace the corrupt language model.'
+    }
+
+    $customData = Join-Path $testRoot 'custom-tessdata'
+    New-Item -ItemType Directory -Path $customData | Out-Null
+    Copy-Item -LiteralPath (Join-Path $TessdataPath 'eng.traineddata') `
+        -Destination (Join-Path $customData 'family_eng.traineddata')
+    $customOutput = Join-Path $testRoot 'custom-language-output.pdf'
+    & $OcrScriptPath `
+        -InputPdf $sourcePdf `
+        -OutputPdf $customOutput `
+        -Languages family_eng `
+        -PageSegmentationMode 6 `
+        -Dpi 240 `
+        -PdfToolPath $PdfToolPath `
+        -TesseractPath $TesseractPath `
+        -TessdataPath $customData
+    if ($LASTEXITCODE -ne 0 -or
+        -not (Test-Path -LiteralPath $customOutput -PathType Leaf)) {
+        throw 'FamilyPDF OCR rejected an installed custom language model.'
     }
 
     Write-Host 'FamilyPDF horizontal Traditional/Simplified searchable PDF test passed.'

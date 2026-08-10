@@ -359,6 +359,11 @@ if (-not [string]::IsNullOrWhiteSpace($textOutputPath)) {
 if (-not [string]::IsNullOrWhiteSpace($reportOutputPath)) {
     $namedPaths.OutputReport = $reportOutputPath
 }
+$imageOutputPath = ''
+if ($KeepPageImages) {
+    $imageOutputPath = "$outputPath.pages"
+    $namedPaths.PageImages = $imageOutputPath
+}
 $pathNames = @($namedPaths.Keys)
 for ($leftIndex = 0; $leftIndex -lt $pathNames.Count; $leftIndex++) {
     for ($rightIndex = $leftIndex + 1; $rightIndex -lt $pathNames.Count; $rightIndex++) {
@@ -372,6 +377,15 @@ for ($leftIndex = 0; $leftIndex -lt $pathNames.Count; $leftIndex++) {
             throw "$leftName and $rightName must use different paths. No OCR output may overwrite another file."
         }
     }
+}
+foreach ($outputName in @($namedPaths.Keys | Where-Object { $_ -ne 'InputPdf' })) {
+    $candidatePath = $namedPaths[$outputName]
+    if (Test-Path -LiteralPath $candidatePath -PathType Container) {
+        throw "$outputName points to an existing directory, not an output file: $candidatePath"
+    }
+}
+if ($KeepPageImages -and (Test-Path -LiteralPath $imageOutputPath)) {
+    throw "Cannot preserve page images because the target already exists: $imageOutputPath"
 }
 
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -407,25 +421,65 @@ if (-not $tessdata) {
 
 $languageRequest = if ($autoMode) { 'chi_tra+chi_sim+eng' } else { $Languages }
 $requestedLanguages = @($languageRequest.Split('+', [StringSplitOptions]::RemoveEmptyEntries))
-$missingLanguages = @(
+$languageManifestPath = Resolve-FirstExistingFile @(
+    (Join-Path $PSScriptRoot 'ocr\tessdata-manifest.json'),
+    (Join-Path ([IO.Path]::GetDirectoryName($tessdata)) 'tessdata-manifest.json'),
+    (Join-Path $repositoryRoot 'ocr-spike\tessdata-manifest.json')
+)
+$languageManifest = if ($languageManifestPath) {
+    Get-Content -LiteralPath $languageManifestPath -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+} else {
+    $null
+}
+
+function Test-OcrLanguageModel {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [object]$Expected
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return $false
+    }
+    if ($null -eq $Expected) {
+        return (Get-Item -LiteralPath $Path).Length -gt 1MB
+    }
+    if ((Get-Item -LiteralPath $Path).Length -ne [long]$Expected.bytes) {
+        return $false
+    }
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -eq
+        [string]$Expected.sha256
+}
+
+$invalidLanguages = @(
     $requestedLanguages |
         Where-Object {
-            -not (Test-Path -LiteralPath (Join-Path $tessdata "$_.traineddata") -PathType Leaf)
+            $expected = if ($null -ne $languageManifest) {
+                $property = $languageManifest.languages.PSObject.Properties[$_]
+                if ($null -ne $property) { $property.Value } else { $null }
+            } else {
+                $null
+            }
+            -not (Test-OcrLanguageModel `
+                -Path (Join-Path $tessdata "$_.traineddata") `
+                -Expected $expected)
         }
 )
-if ($missingLanguages.Count -gt 0) {
+if ($invalidLanguages.Count -gt 0) {
     $languageInstaller = Resolve-FirstExistingFile @(
         (Join-Path $PSScriptRoot 'ocr\Install-OCR-Languages.ps1'),
         (Join-Path $repositoryRoot 'ocr-spike\download-tessdata.ps1')
     )
     if (-not $languageInstaller) {
-        throw "OCR language data is missing and the automatic repair script was not found: $($missingLanguages -join ', ')"
+        throw "OCR language data is missing or corrupt and the automatic repair script was not found: $($invalidLanguages -join ', ')"
     }
 
-    Write-Host "Installing missing OCR languages: $($missingLanguages -join ', ')"
+    Write-Host "Repairing missing or corrupt OCR languages: $($invalidLanguages -join ', ')"
     & $languageInstaller `
         -DataDirectory $tessdata `
-        -Languages $missingLanguages `
+        -Languages $invalidLanguages `
         -TesseractPath $tesseract
     if ($LASTEXITCODE -ne 0) {
         throw "Automatic OCR language installation failed with exit code $LASTEXITCODE."
@@ -434,9 +488,14 @@ if ($missingLanguages.Count -gt 0) {
 
 foreach ($language in $requestedLanguages) {
     $languageFile = Join-Path $tessdata "$language.traineddata"
-    if (-not (Test-Path -LiteralPath $languageFile -PathType Leaf) -or
-        (Get-Item -LiteralPath $languageFile).Length -le 1MB) {
-        throw "OCR language data is missing: $languageFile"
+    $expected = if ($null -ne $languageManifest) {
+        $property = $languageManifest.languages.PSObject.Properties[$language]
+        if ($null -ne $property) { $property.Value } else { $null }
+    } else {
+        $null
+    }
+    if (-not (Test-OcrLanguageModel -Path $languageFile -Expected $expected)) {
+        throw "OCR language data is missing or corrupt: $languageFile"
     }
 }
 
@@ -528,6 +587,16 @@ try {
         } else {
             $pageLanguages = $Languages
             $pagePsm = $PageSegmentationMode
+            $pageReports.Add([pscustomobject]@{
+                page = $pageNumber
+                languages = $pageLanguages
+                psm = $pagePsm
+                confidence = $null
+                languageGap = $null
+                needsReview = $false
+                warnings = @()
+                candidates = @()
+            })
         }
 
         $ocrBase = Join-Path $temporaryRoot ('ocr-{0:D6}' -f ($index + 1))
@@ -595,8 +664,6 @@ try {
         $report = [ordered]@{
             schemaVersion = 1
             mode = $effectiveMode
-            inputFile = [IO.Path]::GetFileName($inputPath)
-            outputFile = [IO.Path]::GetFileName($outputPath)
             generatedAt = [DateTimeOffset]::Now.ToString('o')
             summary = [ordered]@{
                 pages = $pageImages.Count
@@ -614,15 +681,11 @@ try {
     }
 
     if ($KeepPageImages) {
-        $imageOutput = "$outputPath.pages"
-        if (Test-Path -LiteralPath $imageOutput) {
-            throw "Cannot preserve page images because the target already exists: $imageOutput"
-        }
-        New-Item -ItemType Directory -Path $imageOutput | Out-Null
+        New-Item -ItemType Directory -Path $imageOutputPath | Out-Null
         foreach ($image in $pageImages) {
-            Copy-Item -LiteralPath $image.FullName -Destination $imageOutput
+            Copy-Item -LiteralPath $image.FullName -Destination $imageOutputPath
         }
-        Write-Host "Rendered page images saved: $imageOutput"
+        Write-Host "Rendered page images saved: $imageOutputPath"
     }
 }
 finally {

@@ -2,6 +2,25 @@
 
 本檔記錄 FamilyPDF 自有功能版本；內嵌的上游 PDF4QT About 版本仍為 1.6.0.0。
 
+## [0.2.1-beta] - 2026-08-10
+
+### Added
+
+- 固定語言模式的逐頁 JSON 報告。
+- OCR 模型 manifest、下載雜湊／半檔清理測試與 Windows GitHub validation workflow。
+- `-Pages`、`-KeepPageImages`、損壞模型自動修復及輸出目錄誤用回歸。
+
+### Changed
+
+- OCR 外掛更新為 0.4.1；五個官方模型固定至 `tessdata_fast` commit `87416418657359cb625c412a48b6e1d6d41c29bd`。
+- JSON 報告不再記錄輸入或輸出檔名。
+
+### Fixed
+
+- 固定語言模式指定 `OutputReport` 時 `pages` 為空陣列。
+- 已損壞但仍存在的模型未觸發自動修復。
+- 輸出路徑實際是目錄時，OCR 已產生部分結果才失敗。
+
 ## [0.2.0-beta] - 2026-08-10
 
 ### Added
@@ -22,3 +41,4 @@
 - PowerShell 5.1 的空白選用輸出路徑與繁體中文字元解析相容性。
 
 [0.2.0-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.0-beta
+[0.2.1-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.1-beta

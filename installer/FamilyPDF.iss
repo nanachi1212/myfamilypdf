@@ -1,5 +1,5 @@
 #define MyAppName "FamilyPDF"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.2.1"
 #define MyAppPublisher "FamilyPDF"
 #define MyAppExeName "Pdf4QtViewer.exe"
 

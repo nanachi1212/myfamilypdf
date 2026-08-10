@@ -9,6 +9,7 @@ param(
         'chi_sim_vert'
     ),
     [string]$TesseractPath = '',
+    [string]$ManifestPath = '',
     [ValidateRange(1, 5)]
     [int]$MaxAttempts = 3
 )
@@ -18,6 +19,21 @@ Set-StrictMode -Version Latest
 
 if ([string]::IsNullOrWhiteSpace($DataDirectory)) {
     $DataDirectory = Join-Path $PSScriptRoot 'tessdata'
+}
+
+if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
+    $ManifestPath = Join-Path $PSScriptRoot 'tessdata-manifest.json'
+}
+$ManifestPath = [IO.Path]::GetFullPath($ManifestPath)
+if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
+    throw "OCR language manifest was not found: $ManifestPath"
+}
+$languageManifest = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 |
+    ConvertFrom-Json
+if ($languageManifest.schemaVersion -ne 1 -or
+    [string]::IsNullOrWhiteSpace([string]$languageManifest.commit) -or
+    [string]::IsNullOrWhiteSpace([string]$languageManifest.baseUrl)) {
+    throw "OCR language manifest is invalid: $ManifestPath"
 }
 $DataDirectory = [IO.Path]::GetFullPath($DataDirectory)
 New-Item -ItemType Directory -Path $DataDirectory -Force | Out-Null
@@ -41,6 +57,9 @@ foreach ($language in $requestedLanguages) {
     if ($language -notin $allowedLanguages) {
         throw "Unsupported FamilyPDF OCR language: $language"
     }
+    if ($null -eq $languageManifest.languages.PSObject.Properties[$language]) {
+        throw "OCR language manifest has no entry for: $language"
+    }
 }
 
 function Test-LanguageFile {
@@ -48,11 +67,17 @@ function Test-LanguageFile {
         [Parameter(Mandatory = $true)]
         [string]$Path,
         [Parameter(Mandatory = $true)]
-        [string]$Language
+        [string]$Language,
+        [Parameter(Mandatory = $true)]
+        [object]$Expected
     )
 
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf) -or
-        (Get-Item -LiteralPath $Path).Length -le 1MB) {
+        (Get-Item -LiteralPath $Path).Length -ne [long]$Expected.bytes) {
+        return $false
+    }
+    $actualHash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+    if ($actualHash -ne [string]$Expected.sha256) {
         return $false
     }
 
@@ -68,12 +93,13 @@ function Test-LanguageFile {
     return $true
 }
 
-$baseUrl = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main'
+$baseUrl = ([string]$languageManifest.baseUrl).TrimEnd('/', '\')
 $failures = [Collections.Generic.List[string]]::new()
 
 foreach ($language in $requestedLanguages) {
+    $expected = $languageManifest.languages.PSObject.Properties[$language].Value
     $target = Join-Path $DataDirectory "$language.traineddata"
-    if (Test-LanguageFile -Path $target -Language $language) {
+    if (Test-LanguageFile -Path $target -Language $language -Expected $expected) {
         continue
     }
 
@@ -82,18 +108,34 @@ foreach ($language in $requestedLanguages) {
         $temporaryTarget = "$target.download.$([Guid]::NewGuid().ToString('N'))"
         try {
             Write-Host "Downloading official Tesseract language '$language' (attempt $attempt/$MaxAttempts)..."
-            Invoke-WebRequest `
-                -Uri "$baseUrl/$language.traineddata" `
-                -OutFile $temporaryTarget `
-                -UseBasicParsing `
-                -TimeoutSec 120
+            if (Test-Path -LiteralPath $baseUrl -PathType Container) {
+                Copy-Item -LiteralPath (Join-Path $baseUrl "$language.traineddata") `
+                    -Destination $temporaryTarget
+            }
+            else {
+                Invoke-WebRequest `
+                    -Uri "$baseUrl/$language.traineddata" `
+                    -OutFile $temporaryTarget `
+                    -UseBasicParsing `
+                    -TimeoutSec 120
+            }
 
-            if ((Get-Item -LiteralPath $temporaryTarget).Length -le 1MB) {
-                throw "Downloaded OCR language data is unexpectedly small: $language"
+            $downloadedBytes = (Get-Item -LiteralPath $temporaryTarget).Length
+            if ($downloadedBytes -ne [long]$expected.bytes) {
+                throw "Downloaded OCR language size mismatch for $language`: expected $($expected.bytes), got $downloadedBytes."
+            }
+            $downloadedHash = (
+                Get-FileHash -LiteralPath $temporaryTarget -Algorithm SHA256
+            ).Hash
+            if ($downloadedHash -ne [string]$expected.sha256) {
+                throw "Downloaded OCR language SHA-256 mismatch for $language`: expected $($expected.sha256), got $downloadedHash."
             }
 
             Move-Item -LiteralPath $temporaryTarget -Destination $target -Force
-            if (-not (Test-LanguageFile -Path $target -Language $language)) {
+            if (-not (Test-LanguageFile `
+                    -Path $target `
+                    -Language $language `
+                    -Expected $expected)) {
                 throw "Tesseract could not load the downloaded language: $language"
             }
 
@@ -118,7 +160,7 @@ foreach ($language in $requestedLanguages) {
     }
 
     if (-not $downloaded -and (Test-Path -LiteralPath $target -PathType Leaf) -and
-        -not (Test-LanguageFile -Path $target -Language $language)) {
+        -not (Test-LanguageFile -Path $target -Language $language -Expected $expected)) {
         Remove-Item -LiteralPath $target -Force
     }
 }

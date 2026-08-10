@@ -74,9 +74,20 @@ if ($sourceHashBefore -eq $encryptedHash) {
     throw 'Encrypted PDF did not differ from the plain source.'
 }
 
-Copy-Item -LiteralPath $encryptedPdf -Destination $decryptedPdf -Force
-& $pdfTool decrypt --pswd $ownerPassword $decryptedPdf
-if ($LASTEXITCODE -ne 0) {
+$decryptionSucceeded = $false
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    Copy-Item -LiteralPath $encryptedPdf -Destination $decryptedPdf -Force
+    & $pdfTool decrypt --pswd $ownerPassword $decryptedPdf
+    if ($LASTEXITCODE -eq 0) {
+        $decryptionSucceeded = $true
+        break
+    }
+    if ($attempt -lt 3) {
+        Write-Warning "PDF decryption write failed on attempt $attempt; retrying."
+        Start-Sleep -Seconds ([Math]::Pow(2, $attempt))
+    }
+}
+if (-not $decryptionSucceeded) {
     throw 'Owner-authorized PDF decryption failed.'
 }
 

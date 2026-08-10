@@ -33,7 +33,7 @@ FamilyPDF-OCR-Plugin-Setup-x64.exe
 Install-FamilyPDF-OCR-Languages.cmd
 ```
 
-它只會從 Tesseract 官方 `tessdata_fast` 儲存庫下載缺少的五個語言檔。
+它只會從 Tesseract 官方 `tessdata_fast` 儲存庫的固定 commit 下載缺少或損壞的五個語言檔，並核對精確檔案大小與 SHA-256。
 
 ## 使用
 

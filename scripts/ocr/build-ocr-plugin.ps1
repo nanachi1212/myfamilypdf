@@ -122,13 +122,15 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'FamilyPDF-OCR.ps1') -Destinatio
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'FamilyPDF-OCR.cmd') -Destination $packageRoot -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install-FamilyPDF-OCR-Languages.cmd') -Destination $packageRoot -Force
 Copy-Item -LiteralPath $downloader -Destination (Join-Path $packageOcr 'Install-OCR-Languages.ps1') -Force
+Copy-Item -LiteralPath (Join-Path $ocrRoot 'tessdata-manifest.json') `
+    -Destination (Join-Path $packageOcr 'tessdata-manifest.json') -Force
 
 $presentLanguages = @(Get-ChildItem -LiteralPath $packageTessdata -Filter '*.traineddata' -File |
     Sort-Object Name |
     ForEach-Object { $_.BaseName })
 $manifest = [ordered]@{
     name = 'FamilyPDF OCR Plugin'
-    version = '0.4.0'
+    version = '0.4.1'
     engine = 'Tesseract 5'
     languages = $presentLanguages
     searchablePdf = $true
@@ -155,6 +157,11 @@ if (-not $SkipVerification) {
         -TesseractPath (Join-Path $packageOcr 'tesseract.exe') `
         -TessdataPath $packageTessdata `
         -OcrScriptPath (Join-Path $packageRoot 'FamilyPDF-OCR.ps1')
+
+    & (Join-Path $PSScriptRoot 'Test-OCR-Language-Download.ps1') `
+        -DownloaderPath (Join-Path $packageOcr 'Install-OCR-Languages.ps1')
+    & (Join-Path $PSScriptRoot 'Test-OCR-Language-Manifest.ps1') `
+        -ManifestPath (Join-Path $packageOcr 'tessdata-manifest.json')
 
     $requiredVerticalLanguages = @('chi_tra_vert', 'chi_sim_vert')
     $missingVerticalLanguages = @(
