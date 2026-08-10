@@ -113,10 +113,17 @@ $fullRequired = @(
     'Pdf4QtPageMaster.exe',
     'Pdf4QtDiff.exe',
     'PdfTool.exe',
+    'LICENSE-PDF4QT.txt',
     'FamilyPDF-OCR.cmd',
     'FamilyPDF-OCR.ps1',
     'FamilyPDF-OCR-Plugin.json',
+    'THIRD-PARTY-NOTICES.txt',
+    'THIRD-PARTY-NOTICES-OCR.txt',
+    'THIRD-PARTY-LICENSES\OCR\tesseract.txt',
+    'THIRD-PARTY-LICENSES\OCR\tessdata.txt',
+    'THIRD-PARTY-LICENSES\Base\openssl.txt',
     'ocr\tesseract.exe',
+    'ocr\tessdata-manifest.json',
     'ocr\tessdata\eng.traineddata',
     'ocr\tessdata\chi_tra.traineddata',
     'ocr\tessdata\chi_sim.traineddata',
@@ -172,6 +179,15 @@ $fullOcrFileCount = Assert-PayloadMatches `
     -OcrScriptPath (Join-Path $fullRoot 'FamilyPDF-OCR.ps1')
 if ($LASTEXITCODE -ne 0) {
     throw 'Installed full-package OCR verification failed.'
+}
+
+& (Join-Path $repositoryRoot 'scripts\ocr\Test-FamilyPDF-OCR-Auto.ps1') `
+    -PdfToolPath (Join-Path $fullRoot 'PdfTool.exe') `
+    -TesseractPath (Join-Path $fullRoot 'ocr\tesseract.exe') `
+    -TessdataPath (Join-Path $fullRoot 'ocr\tessdata') `
+    -OcrScriptPath (Join-Path $fullRoot 'FamilyPDF-OCR.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Installed full-package automatic OCR verification failed.'
 }
 
 & (Join-Path $repositoryRoot 'scripts\qa\smoke-pdf-diff.ps1') `

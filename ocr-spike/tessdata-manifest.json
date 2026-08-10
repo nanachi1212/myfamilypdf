@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/tesseract-ocr/tessdata_fast",
+  "commit": "87416418657359cb625c412a48b6e1d6d41c29bd",
+  "baseUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd",
+  "languages": {
+    "eng": {
+      "bytes": 4113088,
+      "sha256": "7D4322BD2A7749724879683FC3912CB542F19906C83BCC1A52132556427170B2"
+    },
+    "chi_tra": {
+      "bytes": 2366642,
+      "sha256": "529C5B5797D64B126065CD55F2BB4C7FD7B15790798091B1FF259941A829330B"
+    },
+    "chi_sim": {
+      "bytes": 2469156,
+      "sha256": "A5FCB6F0DB1E1D6D8522F39DB4E848F05984669172E584E8D76B6B3141E1F730"
+    },
+    "chi_tra_vert": {
+      "bytes": 1824756,
+      "sha256": "1DF02A4B210E5C217B783819538B63E9DFE6904E2B5E53B62664F1B9F7A989D0"
+    },
+    "chi_sim_vert": {
+      "bytes": 1927902,
+      "sha256": "20590DE84725BAB69CDE93BD6E8ED360A13CC5421A7E7364DDEB93E9AF53D6DA"
+    }
+  }
+}

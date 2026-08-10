@@ -1,0 +1,51 @@
+name: FamilyPDF validation
+
+on:
+  push:
+    branches:
+      - "codex/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  powershell-and-ocr-metadata:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Parse PowerShell with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $failed = $false
+          Get-ChildItem -Path . -Filter *.ps1 -File -Recurse | ForEach-Object {
+            $errors = $null
+            $tokens = $null
+            [Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | Format-List
+              $failed = $true
+            }
+          }
+          if ($failed) {
+            throw 'One or more PowerShell scripts could not be parsed.'
+          }
+
+      - name: Verify pinned OCR language manifest
+        shell: powershell
+        run: .\scripts\ocr\Test-OCR-Language-Manifest.ps1
+
+      - name: Verify release metadata consistency
+        shell: powershell
+        run: .\scripts\qa\test-release-metadata.ps1
+
+      - name: Verify OCR download hash enforcement and cleanup
+        shell: powershell
+        run: .\scripts\ocr\Test-OCR-Language-Download.ps1

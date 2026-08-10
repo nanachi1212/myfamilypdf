@@ -61,6 +61,57 @@ if (Test-Path -LiteralPath $packageRoot) {
 New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 Set-Content -LiteralPath (Join-Path $packageRoot 'portable.mode') -Value 'FamilyPDF portable data mode' -Encoding ASCII
 
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'LICENSE') `
+    -Destination (Join-Path $packageRoot 'LICENSE-PDF4QT.txt') -Force
+$baseLicenseRoot = Join-Path $packageRoot 'THIRD-PARTY-LICENSES\Base'
+New-Item -ItemType Directory -Path $baseLicenseRoot -Force | Out-Null
+$qtSbomRoot = Join-Path $packageRoot 'THIRD-PARTY-SBOM\Qt'
+New-Item -ItemType Directory -Path $qtSbomRoot -Force | Out-Null
+$qtSourceSbomRoot = Join-Path $QtPrefix 'sbom'
+$qtSbomModules = @('qtbase', 'qtmultimedia', 'qtspeech', 'qtsvg', 'qttranslations')
+foreach ($module in $qtSbomModules) {
+    $sbom = Join-Path $qtSourceSbomRoot "$module-6.9.1.spdx"
+    if (-not (Test-Path -LiteralPath $sbom -PathType Leaf)) {
+        throw "Required Qt SBOM was not found: $sbom"
+    }
+    Copy-Item -LiteralPath $sbom -Destination $qtSbomRoot -Force
+}
+$vcpkgShareRoot = Join-Path $BuildDirectory 'vcpkg_installed\x64-windows\share'
+$copiedLicensePackages = [Collections.Generic.List[string]]::new()
+if (Test-Path -LiteralPath $vcpkgShareRoot -PathType Container) {
+    foreach ($shareDirectory in Get-ChildItem -LiteralPath $vcpkgShareRoot -Directory) {
+        $copyright = Join-Path $shareDirectory.FullName 'copyright'
+        if (Test-Path -LiteralPath $copyright -PathType Leaf) {
+            Copy-Item -LiteralPath $copyright `
+                -Destination (Join-Path $baseLicenseRoot "$($shareDirectory.Name).txt") `
+                -Force
+            $copiedLicensePackages.Add($shareDirectory.Name)
+        }
+    }
+}
+if ($copiedLicensePackages.Count -eq 0) {
+    throw "No third-party license files were found under $vcpkgShareRoot"
+}
+$baseNotice = @(
+    'FamilyPDF third-party notices',
+    '',
+    'FamilyPDF is based on PDF4QT and dynamically links Qt 6 libraries.',
+    'PDF4QT license: LICENSE-PDF4QT.txt',
+    'Qt licensing information and corresponding source: https://www.qt.io/licensing/open-source-lgpl-obligations',
+    'Qt source code: https://code.qt.io/cgit/qt/',
+    'The multimedia runtime includes FFmpeg libraries distributed with Qt.',
+    'FFmpeg licensing and source: https://ffmpeg.org/legal.html and https://ffmpeg.org/download.html',
+    'Qt 6.9.1 package SBOMs, including the FFmpeg runtime relationship, are included in THIRD-PARTY-SBOM\Qt.',
+    'Office export dependency hashes and notices are included under office-export.',
+    'Microsoft Visual C++ and DirectX runtime files remain subject to Microsoft license terms.',
+    '',
+    'Bundled vcpkg dependency notices are included in THIRD-PARTY-LICENSES\Base:',
+    ($copiedLicensePackages | Sort-Object | ForEach-Object { "- $_" })
+)
+$baseNotice | Set-Content `
+    -LiteralPath (Join-Path $packageRoot 'THIRD-PARTY-NOTICES.txt') `
+    -Encoding UTF8
+
 # Start from a clean staging directory, then copy application, third-party and
 # explicitly verified release Qt runtime files.
 Get-ChildItem -LiteralPath $runtimeDirectory -File |
@@ -83,6 +134,10 @@ if (Test-Path -LiteralPath $vcpkgBin -PathType Container) {
 
 $officeExportTarget = Join-Path $packageRoot 'office-export'
 Copy-Item -LiteralPath $officeExportSource -Destination $officeExportTarget -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'office-export\requirements.lock') `
+    -Destination $officeExportTarget -Force
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'office-export\THIRD-PARTY-NOTICES.md') `
+    -Destination $officeExportTarget -Force
 
 # Keep the portable package runnable on clean Windows installations without
 # requiring an administrator-level VC++ Redistributable install.

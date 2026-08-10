@@ -11,6 +11,8 @@ OCR 已與 FamilyPDF 基礎程式分開封裝。未使用 OCR 的家人只需安
 - 將掃描 PDF 轉成新的可搜尋、可複製文字 PDF。
 - 保留相同頁數；原始 PDF 永遠不會被覆寫。
 - 可另外輸出 UTF-8 文字檔。
+- 預設逐頁比較繁體、簡體與必要的混合模型；低信心頁才追加版面模式探測。
+- 自動產生 `.ocr-report.json`，列出每頁採用的語言、版面模式、信心與人工複核警示。
 - 可指定 `1-3,8,10-12` 等頁面範圍、72–600 DPI 與 Tesseract 分頁模式。
 - Viewer／Editor 的「工具」選單會在外掛安裝後直接啟動 OCR。
 
@@ -31,7 +33,7 @@ FamilyPDF-OCR-Plugin-Setup-x64.exe
 Install-FamilyPDF-OCR-Languages.cmd
 ```
 
-它只會從 Tesseract 官方 `tessdata_fast` 儲存庫下載缺少的五個語言檔。
+它只會從 Tesseract 官方 `tessdata_fast` 儲存庫的固定 commit 下載缺少或損壞的五個語言檔，並核對精確檔案大小與 SHA-256。
 
 ## 使用
 
@@ -48,14 +50,19 @@ Install-FamilyPDF-OCR-Languages.cmd
 ```powershell
 .\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf"
 .\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf" "D:\文件\可搜尋版本.pdf"
-.\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf" "D:\文件\可搜尋版本.pdf" -Languages chi_sim+eng
+.\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf" "D:\文件\可搜尋版本.pdf" -Mode Simplified
 .\FamilyPDF-OCR.cmd "D:\文件\掃描檔.pdf" "D:\文件\部分頁面.pdf" -Pages 1-3,8,10-12
 ```
 
 進階參數：
 
 - `-OutputText "結果.txt"`：另外輸出 UTF-8 純文字。
-- `-Languages chi_tra+chi_sim+eng`：橫排繁簡中文與英文，預設值。
+- `-Mode Auto`：預設模式；逐頁判斷繁體、簡體或混合內容，必要時比較 PSM 3、4、6。
+- `-Mode Traditional`：固定使用橫排繁體中文與英文。
+- `-Mode Simplified`：固定使用橫排簡體中文與英文。
+- `-Mode English`：固定使用英文。
+- `-OutputReport "結果.ocr-report.json"`：指定自動分析報告位置；Auto 未指定時會放在輸出 PDF 旁。
+- `-Languages chi_tra+chi_sim+eng`：相容舊用法；一旦明確指定即視為 Custom 模式。
 - `-Languages chi_tra_vert+eng`：繁體中文直排與英文。
 - `-Dpi 300`：渲染解析度。
 - `-KeepPageImages`：保留辨識用 PNG 供人工檢查。
@@ -69,9 +76,10 @@ Install-FamilyPDF-OCR-Languages.cmd
 
 缺少 Tesseract 相依套件時會透過 vcpkg 安裝；缺少語言檔時會自動從官方來源下載。
 
-建置會固定執行橫排繁中、簡中、英文的實際辨識與可搜尋 PDF 回歸。當 `chi_tra_vert`、`chi_sim_vert` 都存在時，也會自動執行直排繁簡中回歸：
+建置會固定執行自動繁簡選擇、橫排繁中、簡中、英文的實際辨識與可搜尋 PDF 回歸。當 `chi_tra_vert`、`chi_sim_vert` 都存在時，也會自動執行直排繁簡中回歸：
 
 ```powershell
 .\scripts\ocr\Test-FamilyPDF-OCR-Horizontal.ps1
+.\scripts\ocr\Test-FamilyPDF-OCR-Auto.ps1
 .\scripts\ocr\Test-FamilyPDF-OCR-Vertical.ps1
 ```
