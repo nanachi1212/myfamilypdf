@@ -2,6 +2,22 @@
 
 本檔記錄 FamilyPDF 自有功能版本；內嵌的上游 PDF4QT About 版本仍為 1.6.0.0。
 
+## [0.2.2-beta] - 2026-08-10
+
+### Added
+
+- `PdfTool`、Tesseract 非零退出與 sidecar 鎖檔的故障注入回歸。
+- Qt 6.9.1 官方 SPDX SBOM、Office dependency lock 與 notices 封裝驗證。
+- `OCR_VERSION` 與 GitHub release metadata consistency gate。
+
+### Changed
+
+- OCR 外掛更新為 0.4.2；主程式與 OCR installer／manifest 分別只讀取 `VERSION` 與 `OCR_VERSION`。
+
+### Fixed
+
+- PDF 已發布後 sidecar 或頁面圖片寫入失敗會留下不完整 OCR 結果；現在所有輸出先完成 staging，發布失敗時會還原原輸出。
+
 ## [0.2.1-beta] - 2026-08-10
 
 ### Added
@@ -42,3 +58,4 @@
 
 [0.2.0-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.0-beta
 [0.2.1-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.1-beta
+[0.2.2-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.2-beta

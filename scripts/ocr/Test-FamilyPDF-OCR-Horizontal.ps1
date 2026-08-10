@@ -178,6 +178,105 @@ try {
         throw 'FamilyPDF OCR changed its source while rejecting an invalid target.'
     }
 
+    $failureCases = @(
+        [pscustomobject]@{ Name = 'pdf-tool'; ExitCode = 23 },
+        [pscustomobject]@{ Name = 'tesseract'; ExitCode = 29 }
+    )
+    foreach ($failureCase in $failureCases) {
+        $failingCommand = Join-Path $testRoot "$($failureCase.Name)-failure.cmd"
+        Set-Content -LiteralPath $failingCommand `
+            -Value "@exit /b $($failureCase.ExitCode)" -Encoding ASCII
+        $failureOutputPdf = Join-Path $testRoot "$($failureCase.Name)-failure.pdf"
+        $failureOutputText = Join-Path $testRoot "$($failureCase.Name)-failure.txt"
+        $failureOutputReport = Join-Path $testRoot "$($failureCase.Name)-failure.json"
+        $toolFailureRejected = $false
+        try {
+            & $OcrScriptPath `
+                -InputPdf $sourcePdf `
+                -OutputPdf $failureOutputPdf `
+                -OutputText $failureOutputText `
+                -OutputReport $failureOutputReport `
+                -Mode Traditional `
+                -Dpi 120 `
+                -PdfToolPath $(if ($failureCase.Name -eq 'pdf-tool') {
+                    $failingCommand
+                } else {
+                    $PdfToolPath
+                }) `
+                -TesseractPath $(if ($failureCase.Name -eq 'tesseract') {
+                    $failingCommand
+                } else {
+                    $TesseractPath
+                }) `
+                -TessdataPath $TessdataPath
+        }
+        catch {
+            $toolFailureRejected = $_.Exception.Message -match [string]$failureCase.ExitCode
+        }
+        if (-not $toolFailureRejected) {
+            throw "FamilyPDF OCR did not report the injected $($failureCase.Name) failure."
+        }
+        foreach ($unexpectedOutput in @(
+                $failureOutputPdf,
+                $failureOutputText,
+                $failureOutputReport
+            )) {
+            if (Test-Path -LiteralPath $unexpectedOutput) {
+                throw "FamilyPDF OCR left output after $($failureCase.Name) failed: $unexpectedOutput"
+            }
+        }
+        if ((Get-FileHash -LiteralPath $sourcePdf -Algorithm SHA256).Hash -ne $sourceHash) {
+            throw "FamilyPDF OCR changed its source after $($failureCase.Name) failed."
+        }
+    }
+
+    $lockedOutputPdf = Join-Path $testRoot 'locked-sidecar-must-not-exist.pdf'
+    $lockedOutputText = Join-Path $testRoot 'locked-sidecar.txt'
+    $lockedOutputReport = Join-Path $testRoot 'locked-sidecar-report-must-not-exist.json'
+    [IO.File]::WriteAllText($lockedOutputText, 'preserve-me', $utf8)
+    $lockedTextStream = [IO.File]::Open(
+        $lockedOutputText,
+        [IO.FileMode]::Open,
+        [IO.FileAccess]::ReadWrite,
+        [IO.FileShare]::None
+    )
+    $lockedTargetRejected = $false
+    try {
+        try {
+            & $OcrScriptPath `
+                -InputPdf $sourcePdf `
+                -OutputPdf $lockedOutputPdf `
+                -OutputText $lockedOutputText `
+                -OutputReport $lockedOutputReport `
+                -Mode Traditional `
+                -Dpi 120 `
+                -PdfToolPath $PdfToolPath `
+                -TesseractPath $TesseractPath `
+                -TessdataPath $TessdataPath
+        }
+        catch {
+            $lockedTargetRejected = $true
+        }
+    }
+    finally {
+        $lockedTextStream.Dispose()
+    }
+    if (-not $lockedTargetRejected) {
+        throw 'FamilyPDF OCR did not reject a locked sidecar target.'
+    }
+    if (Test-Path -LiteralPath $lockedOutputPdf) {
+        throw 'FamilyPDF OCR left a PDF after a sidecar publish failure.'
+    }
+    if (Test-Path -LiteralPath $lockedOutputReport) {
+        throw 'FamilyPDF OCR left a report after a sidecar publish failure.'
+    }
+    if ([IO.File]::ReadAllText($lockedOutputText, [Text.Encoding]::UTF8) -ne 'preserve-me') {
+        throw 'FamilyPDF OCR changed a locked sidecar after a publish failure.'
+    }
+    if ((Get-FileHash -LiteralPath $sourcePdf -Algorithm SHA256).Hash -ne $sourceHash) {
+        throw 'FamilyPDF OCR changed its source during a sidecar publish failure.'
+    }
+
     & $OcrScriptPath `
         -InputPdf $sourcePdf `
         -OutputPdf $outputPdf `

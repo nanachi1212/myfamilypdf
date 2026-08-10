@@ -9,6 +9,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$ocrVersion = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'OCR_VERSION') -Raw -Encoding UTF8).Trim()
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repositoryRoot 'dist'
 }
@@ -130,7 +131,7 @@ $presentLanguages = @(Get-ChildItem -LiteralPath $packageTessdata -Filter '*.tra
     ForEach-Object { $_.BaseName })
 $manifest = [ordered]@{
     name = 'FamilyPDF OCR Plugin'
-    version = '0.4.1'
+    version = $ocrVersion
     engine = 'Tesseract 5'
     languages = $presentLanguages
     searchablePdf = $true

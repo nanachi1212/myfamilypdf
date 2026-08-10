@@ -65,6 +65,17 @@ Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'LICENSE') `
     -Destination (Join-Path $packageRoot 'LICENSE-PDF4QT.txt') -Force
 $baseLicenseRoot = Join-Path $packageRoot 'THIRD-PARTY-LICENSES\Base'
 New-Item -ItemType Directory -Path $baseLicenseRoot -Force | Out-Null
+$qtSbomRoot = Join-Path $packageRoot 'THIRD-PARTY-SBOM\Qt'
+New-Item -ItemType Directory -Path $qtSbomRoot -Force | Out-Null
+$qtSourceSbomRoot = Join-Path $QtPrefix 'sbom'
+$qtSbomModules = @('qtbase', 'qtmultimedia', 'qtspeech', 'qtsvg', 'qttranslations')
+foreach ($module in $qtSbomModules) {
+    $sbom = Join-Path $qtSourceSbomRoot "$module-6.9.1.spdx"
+    if (-not (Test-Path -LiteralPath $sbom -PathType Leaf)) {
+        throw "Required Qt SBOM was not found: $sbom"
+    }
+    Copy-Item -LiteralPath $sbom -Destination $qtSbomRoot -Force
+}
 $vcpkgShareRoot = Join-Path $BuildDirectory 'vcpkg_installed\x64-windows\share'
 $copiedLicensePackages = [Collections.Generic.List[string]]::new()
 if (Test-Path -LiteralPath $vcpkgShareRoot -PathType Container) {
@@ -90,6 +101,8 @@ $baseNotice = @(
     'Qt source code: https://code.qt.io/cgit/qt/',
     'The multimedia runtime includes FFmpeg libraries distributed with Qt.',
     'FFmpeg licensing and source: https://ffmpeg.org/legal.html and https://ffmpeg.org/download.html',
+    'Qt 6.9.1 package SBOMs, including the FFmpeg runtime relationship, are included in THIRD-PARTY-SBOM\Qt.',
+    'Office export dependency hashes and notices are included under office-export.',
     'Microsoft Visual C++ and DirectX runtime files remain subject to Microsoft license terms.',
     '',
     'Bundled vcpkg dependency notices are included in THIRD-PARTY-LICENSES\Base:',
@@ -121,6 +134,10 @@ if (Test-Path -LiteralPath $vcpkgBin -PathType Container) {
 
 $officeExportTarget = Join-Path $packageRoot 'office-export'
 Copy-Item -LiteralPath $officeExportSource -Destination $officeExportTarget -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'office-export\requirements.lock') `
+    -Destination $officeExportTarget -Force
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'office-export\THIRD-PARTY-NOTICES.md') `
+    -Destination $officeExportTarget -Force
 
 # Keep the portable package runnable on clean Windows installations without
 # requiring an administrator-level VC++ Redistributable install.

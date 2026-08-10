@@ -42,6 +42,10 @@ jobs:
         shell: powershell
         run: .\scripts\ocr\Test-OCR-Language-Manifest.ps1
 
+      - name: Verify release metadata consistency
+        shell: powershell
+        run: .\scripts\qa\test-release-metadata.ps1
+
       - name: Verify OCR download hash enforcement and cleanup
         shell: powershell
         run: .\scripts\ocr\Test-OCR-Language-Download.ps1

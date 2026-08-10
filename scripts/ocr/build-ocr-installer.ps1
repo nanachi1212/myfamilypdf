@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$ocrVersion = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'OCR_VERSION') -Raw -Encoding UTF8).Trim()
 $iscc = 'E:\CodexProject\FamilyPDF-tools\inno-7.0.2\ISCC.exe'
 if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) {
     throw 'The verified Inno Setup compiler is missing. Run scripts\phase0\build-installer.ps1 once.'
@@ -23,7 +24,7 @@ if (-not $SkipPackage) {
     & (Join-Path $PSScriptRoot 'build-ocr-plugin.ps1') @arguments
 }
 
-$compilerArguments = @()
+$compilerArguments = @("/DMyAppVersion=$ocrVersion")
 if ($VerificationBuild) {
     $compilerArguments += '/DVerificationBuild'
 }

@@ -1,5 +1,7 @@
 #define MyAppName "FamilyPDF"
-#define MyAppVersion "0.2.1"
+#ifndef MyAppVersion
+#define MyAppVersion "0.0.0-dev"
+#endif
 #define MyAppPublisher "FamilyPDF"
 
 [Setup]

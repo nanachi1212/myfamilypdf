@@ -650,13 +650,16 @@ try {
         throw 'OCR output validation failed: candidate is not a PDF.'
     }
 
-    Move-Item -LiteralPath $candidatePdf -Destination $outputPath -Force
-    Write-Host "Searchable OCR PDF saved: $outputPath"
-
+    $publishItems = [Collections.Generic.List[object]]::new()
     if (-not [string]::IsNullOrWhiteSpace($textOutputPath)) {
         $utf8NoBom = [Text.UTF8Encoding]::new($false)
-        [IO.File]::WriteAllText($textOutputPath, ($pageTexts -join "`r`n`r`n"), $utf8NoBom)
-        Write-Host "OCR text saved: $textOutputPath"
+        $candidateText = Join-Path $temporaryRoot 'FamilyPDF-searchable-candidate.txt'
+        [IO.File]::WriteAllText($candidateText, ($pageTexts -join "`r`n`r`n"), $utf8NoBom)
+        $publishItems.Add([pscustomobject]@{
+            Candidate = $candidateText
+            Destination = $textOutputPath
+            IsDirectory = $false
+        })
     }
 
     if (-not [string]::IsNullOrWhiteSpace($reportOutputPath)) {
@@ -672,19 +675,91 @@ try {
             pages = $pageReports.ToArray()
         }
         $utf8NoBom = [Text.UTF8Encoding]::new($false)
+        $candidateReport = Join-Path $temporaryRoot 'FamilyPDF-searchable-candidate-report.json'
         [IO.File]::WriteAllText(
-            $reportOutputPath,
+            $candidateReport,
             ($report | ConvertTo-Json -Depth 8),
             $utf8NoBom
         )
-        Write-Host "OCR analysis report saved: $reportOutputPath"
+        $publishItems.Add([pscustomobject]@{
+            Candidate = $candidateReport
+            Destination = $reportOutputPath
+            IsDirectory = $false
+        })
     }
 
     if ($KeepPageImages) {
-        New-Item -ItemType Directory -Path $imageOutputPath | Out-Null
+        $candidateImages = Join-Path $temporaryRoot 'FamilyPDF-searchable-candidate-pages'
+        New-Item -ItemType Directory -Path $candidateImages | Out-Null
         foreach ($image in $pageImages) {
-            Copy-Item -LiteralPath $image.FullName -Destination $imageOutputPath
+            Copy-Item -LiteralPath $image.FullName -Destination $candidateImages
         }
+        $publishItems.Add([pscustomobject]@{
+            Candidate = $candidateImages
+            Destination = $imageOutputPath
+            IsDirectory = $true
+        })
+    }
+
+    # Publish the PDF last. If any destination cannot be replaced, restore every
+    # prior output so callers never see a successful-looking partial OCR result.
+    $publishItems.Add([pscustomobject]@{
+        Candidate = $candidatePdf
+        Destination = $outputPath
+        IsDirectory = $false
+    })
+    $backups = [Collections.Generic.List[object]]::new()
+    $published = [Collections.Generic.List[object]]::new()
+    try {
+        foreach ($item in $publishItems) {
+            if (Test-Path -LiteralPath $item.Destination) {
+                $destinationDirectory = [IO.Path]::GetDirectoryName($item.Destination)
+                $backupName = '.' + [IO.Path]::GetFileName($item.Destination) +
+                    '.familypdf-backup-' + [Guid]::NewGuid().ToString('N')
+                $backupPath = Join-Path $destinationDirectory $backupName
+                Move-Item -LiteralPath $item.Destination -Destination $backupPath
+                $backups.Add([pscustomobject]@{
+                    Backup = $backupPath
+                    Destination = $item.Destination
+                })
+            }
+        }
+        foreach ($item in $publishItems) {
+            Move-Item -LiteralPath $item.Candidate -Destination $item.Destination
+            $published.Add($item)
+        }
+    }
+    catch {
+        for ($index = $published.Count - 1; $index -ge 0; $index--) {
+            $publishedItem = $published[$index]
+            if (Test-Path -LiteralPath $publishedItem.Destination) {
+                Remove-Item -LiteralPath $publishedItem.Destination `
+                    -Recurse:$publishedItem.IsDirectory `
+                    -Force
+            }
+        }
+        for ($index = $backups.Count - 1; $index -ge 0; $index--) {
+            $backup = $backups[$index]
+            if (Test-Path -LiteralPath $backup.Backup) {
+                Move-Item -LiteralPath $backup.Backup -Destination $backup.Destination
+            }
+        }
+        throw
+    }
+    foreach ($backup in $backups) {
+        if (Test-Path -LiteralPath $backup.Backup) {
+            Remove-Item -LiteralPath $backup.Backup -Recurse -Force
+        }
+    }
+
+    Write-Host "Searchable OCR PDF saved: $outputPath"
+    if (-not [string]::IsNullOrWhiteSpace($textOutputPath)) {
+        Write-Host "OCR text saved: $textOutputPath"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($reportOutputPath)) {
+        Write-Host "OCR analysis report saved: $reportOutputPath"
+    }
+    if ($KeepPageImages) {
         Write-Host "Rendered page images saved: $imageOutputPath"
     }
 }

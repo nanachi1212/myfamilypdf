@@ -1,5 +1,7 @@
 #define MyAppName "FamilyPDF OCR Plugin"
-#define MyAppVersion "0.4.1"
+#ifndef MyAppVersion
+#define MyAppVersion "0.0.0-dev"
+#endif
 #define MyAppPublisher "FamilyPDF"
 
 [Setup]

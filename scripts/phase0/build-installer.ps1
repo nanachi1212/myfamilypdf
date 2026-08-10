@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$appVersion = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'VERSION') -Raw -Encoding UTF8).Trim()
 $toolsRoot = 'E:\CodexProject\FamilyPDF-tools'
 $innoVersion = '7.0.2'
 $innoRoot = Join-Path $toolsRoot "inno-$innoVersion"
@@ -65,7 +66,7 @@ foreach ($requiredExecutable in @('Pdf4QtViewer.exe', 'Pdf4QtDiff.exe')) {
     }
 }
 
-$compilerArguments = @()
+$compilerArguments = @("/DMyAppVersion=$appVersion")
 if ($VerificationBuild) {
     $compilerArguments += '/DVerificationBuild'
 }
