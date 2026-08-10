@@ -22,7 +22,7 @@
 
 ## OCR 外掛完成版回歸（2026-07-29）
 
-- OCR 外掛已更新為 0.3.0；驗證安裝 exit code `0`，manifest 與安裝 payload 版本一致。
+- OCR 外掛已更新為 0.4.0；驗證安裝 exit code `0`，manifest 與安裝 payload 版本一致。
 - 單頁及雙頁 PDF 均成功建立同頁數的可搜尋 PDF，`PdfTool fetch-text` 可抽取 `FamilyPDF` 文字。
 - 測試同時確認原始 PDF SHA-256 未改變，且可選擇另外輸出非空白 UTF-8 文字檔。
 - 固定橫排圖像回歸直接以 `chi_tra`、`chi_sim`、`eng` 辨識，分別取得「傳統中文測試」、「简体中文测试」及 `FamilyPDF OCR 2026`。

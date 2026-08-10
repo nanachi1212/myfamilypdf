@@ -2,7 +2,8 @@
 param(
     [switch]$SkipPackage,
     [switch]$SkipDownload,
-    [switch]$VerificationBuild
+    [switch]$VerificationBuild,
+    [switch]$StandaloneSmokeBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,13 +27,18 @@ $compilerArguments = @()
 if ($VerificationBuild) {
     $compilerArguments += '/DVerificationBuild'
 }
+if ($StandaloneSmokeBuild) {
+    $compilerArguments += '/DStandaloneSmokeBuild'
+}
 $compilerArguments += (Join-Path $repositoryRoot 'installer\FamilyPDF-OCR-Plugin.iss')
 & $iscc $compilerArguments
 if ($LASTEXITCODE -ne 0) {
     throw "OCR plugin installer compilation failed with exit code $LASTEXITCODE."
 }
 
-$setup = if ($VerificationBuild) {
+$setup = if ($StandaloneSmokeBuild) {
+    Join-Path $repositoryRoot 'build\FamilyPDF-OCR-Plugin-Smoke-Setup-x64.exe'
+} elseif ($VerificationBuild) {
     Join-Path $repositoryRoot 'build\FamilyPDF-OCR-Plugin-Verification-Setup-x64.exe'
 } else {
     Join-Path $repositoryRoot 'dist\FamilyPDF-OCR-Plugin-Setup-x64.exe'

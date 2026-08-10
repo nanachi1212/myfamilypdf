@@ -70,6 +70,54 @@ Get-ChildItem -LiteralPath $tesseractTools -File |
 Get-ChildItem -LiteralPath $tessdata -Filter '*.traineddata' -File |
     Copy-Item -Destination $packageTessdata -Force
 
+$licenseRoot = Join-Path $packageRoot 'THIRD-PARTY-LICENSES\OCR'
+New-Item -ItemType Directory -Path $licenseRoot -Force | Out-Null
+$licensePackages = @(
+    'tesseract',
+    'tessdata',
+    'leptonica',
+    'libarchive',
+    'bzip2',
+    'giflib',
+    'libjpeg-turbo',
+    'liblzma',
+    'libpng',
+    'libwebp',
+    'lz4',
+    'openjpeg',
+    'openssl',
+    'curl',
+    'tiff',
+    'zlib',
+    'zstd'
+)
+$shareRoot = Join-Path $tripletRoot 'share'
+foreach ($package in $licensePackages) {
+    $copyright = Join-Path (Join-Path $shareRoot $package) 'copyright'
+    if ($package -eq 'tessdata' -and
+        -not (Test-Path -LiteralPath $copyright -PathType Leaf)) {
+        # Tesseract and the official tessdata models are both distributed
+        # under Apache-2.0. vcpkg installs the shared notice with Tesseract.
+        $copyright = Join-Path (Join-Path $shareRoot 'tesseract') 'copyright'
+    }
+    if (-not (Test-Path -LiteralPath $copyright -PathType Leaf)) {
+        throw "Required third-party license was not found: $copyright"
+    }
+    Copy-Item -LiteralPath $copyright `
+        -Destination (Join-Path $licenseRoot "$package.txt") -Force
+}
+$noticeLines = @(
+    'FamilyPDF OCR Plugin third-party notices',
+    '',
+    'This package redistributes Tesseract OCR, its language models, and runtime dependencies.',
+    'The corresponding license and copyright texts are included in THIRD-PARTY-LICENSES.',
+    '',
+    'Included components:'
+) + @($licensePackages | ForEach-Object { "- $_" })
+$noticeLines | Set-Content `
+    -LiteralPath (Join-Path $packageRoot 'THIRD-PARTY-NOTICES-OCR.txt') `
+    -Encoding UTF8
+
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'FamilyPDF-OCR.ps1') -Destination $packageRoot -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'FamilyPDF-OCR.cmd') -Destination $packageRoot -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install-FamilyPDF-OCR-Languages.cmd') -Destination $packageRoot -Force
@@ -80,11 +128,12 @@ $presentLanguages = @(Get-ChildItem -LiteralPath $packageTessdata -Filter '*.tra
     ForEach-Object { $_.BaseName })
 $manifest = [ordered]@{
     name = 'FamilyPDF OCR Plugin'
-    version = '0.3.0'
+    version = '0.4.0'
     engine = 'Tesseract 5'
     languages = $presentLanguages
     searchablePdf = $true
     sourcePdfIsNeverOverwritten = $true
+    thirdPartyNotices = 'THIRD-PARTY-NOTICES-OCR.txt'
 }
 $manifest | ConvertTo-Json -Depth 4 |
     Set-Content -LiteralPath (Join-Path $packageRoot 'FamilyPDF-OCR-Plugin.json') -Encoding UTF8
@@ -96,6 +145,12 @@ if (-not $SkipVerification) {
     }
 
     & (Join-Path $PSScriptRoot 'Test-FamilyPDF-OCR-Horizontal.ps1') `
+        -PdfToolPath $pdfTool `
+        -TesseractPath (Join-Path $packageOcr 'tesseract.exe') `
+        -TessdataPath $packageTessdata `
+        -OcrScriptPath (Join-Path $packageRoot 'FamilyPDF-OCR.ps1')
+
+    & (Join-Path $PSScriptRoot 'Test-FamilyPDF-OCR-Auto.ps1') `
         -PdfToolPath $pdfTool `
         -TesseractPath (Join-Path $packageOcr 'tesseract.exe') `
         -TessdataPath $packageTessdata `

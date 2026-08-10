@@ -1,16 +1,16 @@
 # FamilyPDF 目前交付狀態
 
-更新日期：2026-08-03
+更新日期：2026-08-10
 
 ## 可直接使用的產物
 
 | 產物 | Bytes | SHA-256 |
 |---|---:|---|
-| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,186,001 | `BA74E7364217FC73F8367BC81925E0CAB9B460F98DFA744554F2FC91B295048E` |
-| `dist\FamilyPDF-Setup-x64.exe` | 58,299,100 | `28A895E776851402E3A138DE523A121D370BF4BAEE3CF5CE05DDB16DCB264D3F` |
-| `dist\FamilyPDF-windows-x64.zip` | 82,924,819 | `5A19646F9E01445CBDE3D320A8A42B1484D5EC63CAFB9D6FC300D43E6D6E6B8B` |
-| `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,049,516 | `C40944A35AEE045DA4C1DC339AD62FB1C63F6F507E562D2EBFECA5773903C801` |
-| `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,657,824 | `E562C7592A1E4DF830E05BA258736473AA9BF151497C17EA5C00A44899AFBF47` |
+| `dist\FamilyPDF-Full-Setup-x64.exe` | 69,208,596 | `37487B2527048900EF49465DEA6291AB2BB5F74D1D5E1C7B436D7A1046FD7D01` |
+| `dist\FamilyPDF-Setup-x64.exe` | 58,308,783 | `A25C06D86B7A5C474A3BF2A2011A7AE288A02D4209371CB5F03DA8FD13E08666` |
+| `dist\FamilyPDF-windows-x64.zip` | 82,959,340 | `AEFC55858ADA4DFA72776134979C9F6B4228179CCED729AF0C3509BEE4DE90D0` |
+| `dist\FamilyPDF-OCR-Plugin-Setup-x64.exe` | 14,070,151 | `1B3FFD8E08D70142CD2E0BB95C84EFC8C95D96F7293008112C85466D485557B6` |
+| `dist\FamilyPDF-OCR-Plugin-windows-x64.zip` | 14,697,778 | `F164192BF6467AFDAF5F8D58B8845730B05F107BCF5CF4C9EE0B360C7FD69DD3` |
 
 `dist\` 是本機建置產物，不提交到 Git。
 
@@ -26,7 +26,8 @@
 - 繁體及簡體中文驗證安裝各為 exit code `0`；安裝後 Viewer、Editor、PageMaster 同時載入中文檔名與 1,160 頁 PDF，15 秒後全部為 Responding。
 - 單數頁、雙數頁及 `10-20` 範圍輸出經獨立引擎驗證為 29、29、11 頁；合併 58 頁及大型 1,160 頁檔案頁數亦正確。
 - 基礎封裝不含 Tesseract、語言模型、測試 EXE 或 Qt 除錯 DLL。
-- OCR 外掛 0.3.0 最新隔離安裝 exit code `0`；安裝後 manifest、五個語言模型及橫排／直排 OCR 回歸均通過。
+- OCR 外掛 0.4.0 的隔離安裝與解除安裝 exit code 均為 `0`；47 個封裝檔案逐檔 SHA-256 相同，五個語言模型及橫排／直排／自動繁簡 OCR 回歸均通過。
+- 自動模式已驗證繁體、簡體、繁簡混合與空白頁；低信心空白頁會進入人工複核清單。來源 PDF、結果 PDF、文字與 JSON 報告路徑必須兩兩不同，碰撞測試確認來源雜湊不變。
 - 一鍵完整安裝程式已分別以 `core,ocr` 與 `core` 元件隔離安裝：完整模式含五個模型並通過繁簡中可搜尋 PDF 回歸，精簡模式不含 OCR，兩者安裝 exit code 均為 `0`。
 - 一鍵完整安裝程式已在繁中／簡中互動式 GUI 實測：三種安裝類型及元件說明使用正確語系，完整模式預設勾選 OCR，精簡模式取消 OCR，來回切換可正確恢復元件狀態。
 - 基礎版與完整版新增可取消的使用者層級 Windows PDF 整合：繁中／簡中 GUI 均正確顯示且預設勾選；正式安裝器已成功編譯 12 個 HKCU Registry 項目，不改寫預設 `.pdf` ProgID，解除安裝會刪除 FamilyPDF 自有鍵。
@@ -42,10 +43,10 @@
 - 修正舊 PDF4QT 設定含空白插件清單時 FamilyPDF 功能看似遺失的問題；六個正式功能插件現在會在第 2 版設定遷移時自動啟用，後續仍尊重使用者自行停用的選擇。
 - GUI 實測已確認繁中介面會顯示三個插件工具列，並可開啟「匯出至 Word」的繁中頁碼範圍對話框。
 - Viewer 與 Editor 的命令列多檔輸入已修正為載入全部檔案；兩者均以兩份一般 PDF 加一份 1,160 頁 PDF 回歸，工作階段記錄 3 份文件且維持 Responding。
-- 2026-08-03 最新可攜包回歸已通過；結果屬本機可重建資料，不提交 Git。摘要：`build\final-regression-20260803-153018\summary.json`。
+- 2026-08-10 最新可攜包回歸已通過；結果屬本機可重建資料，不提交 Git。摘要：`build\final-regression-20260810-122954\summary.json`。
 - 最新主安裝程式再次隔離靜默安裝成功；安裝後六個插件、Office helper 及 Full/Core PDF 密碼安全 smoke 均通過。
 - 修正後的完整驗證安裝檔已重新建置；完整與精簡模式安裝通過，完整模式繁中／簡中／英文 OCR 與可搜尋 PDF 回歸通過。摘要：`build\full-installer-smoke\summary.json`。
-- 完整安裝的 406 個核心檔案與 29 個 OCR 檔案、精簡安裝的 406 個核心檔案，均與目前 `dist` 可攜包逐檔 SHA-256 相同；安裝器刻意排除僅供免安裝模式使用的 `portable.mode`。
+- 完整安裝的 424 個核心檔案與 47 個 OCR 檔案、精簡安裝的 424 個核心檔案，均與目前 `dist` 可攜包逐檔 SHA-256 相同；安裝器刻意排除僅供免安裝模式使用的 `portable.mode`。
 - Microsoft Word 16.0 已實際開啟匯出 DOCX，辨識三頁、十個段落、明確分頁、繁簡中、英文、五種字級及粗斜體；Word 原生 renderer 另輸出三頁 PNG，尺寸、非白色像素比例及 SHA-256 均已記錄，固定 fixture 巡覽未見亂碼、缺字方框、裁切或重疊。Microsoft Excel 16.0 已實際開啟匯出 XLSX，辨識三個工作表、同頁多表格、四行 fallback、UsedRange、表格值、繁簡中文、跨欄合併、各表表頭粗體及自動欄寬。驗證摘要：`build\microsoft-office-smoke\summary.json`。
 - 一般等寬／不等寬雙欄與三欄會依「各欄由上到下，再由左到右」重建；欄寬由重複文字起點聚類推導，跨越全部欄位的文字則保留為普通可編輯段落。固定三欄真實 PDF 已由來源測試與封裝 EXE 重讀一個三欄表格、六個欄內段落、三張欄內圖片及跨全頁標題；約 73/27 不等寬雙欄、既有等寬雙欄的多區段與圖片順序仍通過。表格頁不會被誤判為多欄。四頁 Word COM fixture 已準備，但本次隔離帳號缺少互動式 Office 工作階段（HRESULT `0x80070520`），不把該項列為已通過。
 - DOCX 新增非重疊 raster 圖片：`pdfplumber` 以既有 `pypdfium2` 後端在 144 DPI 渲染並依 PDF bounding box 裁成 PNG；單欄、雙欄、三欄儲存格內圖片及跨欄圖片均依文字閱讀順序輸出並自動限制寬度。封裝 helper 的三欄 fixture 回報 `images_exported: 3`，既有雙欄回報 `2`，純文字匯出回報 `0`。
@@ -54,8 +55,8 @@
 
 ## Git
 
-- 分支：`codex/phase0-baseline`
-- push 目標：`origin/codex/phase0-baseline`
+- 分支：`codex/auto-ocr-v0.2.0`
+- push 目標：`origin/codex/auto-ocr-v0.2.0`
 
 ## 2026-08-03 環境修復與最新回歸
 
