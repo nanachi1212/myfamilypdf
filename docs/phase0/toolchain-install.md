@@ -4,14 +4,14 @@
 
 ## 結果
 
-Phase 0 baseline configure/build 立即需要的 Qt 與 vcpkg 已安裝在 `E:\CodexProject\FamilyPDF-tools`。本次沒有執行 PDF4QT configure 或 build，也沒有安裝 WiX Toolset 或 Tesseract。
+Phase 0 baseline configure/build 立即需要的 Qt 與 vcpkg 已安裝在 `E:\Codex project\FamilyPDF-tools`。本次沒有執行 PDF4QT configure 或 build，也沒有安裝 WiX Toolset 或 Tesseract。
 
 | 工具 | 固定版本或基線 | 實際路徑 | 實際大小 |
 | --- | --- | --- | ---: |
-| Qt | 6.9.1，`win64_msvc2022_64` | `E:\CodexProject\FamilyPDF-tools\qt` | 2,560,774,752 bytes（約 2.38 GiB） |
-| aqtinstall | 3.3.0，local venv | `E:\CodexProject\FamilyPDF-tools\aqt-3.3.0` | 28,252,860 bytes（約 26.94 MiB） |
-| vcpkg source | commit `6d9d7df564a1ccdaa994e4ad39ccd4a32360867b` | `E:\CodexProject\FamilyPDF-tools\vcpkg` | 152,203,257 bytes（約 145.15 MiB） |
-| vcpkg executable | `2026-07-13-bf04c909169fdbb30821c02c6eb01f1cd1295d05` | `E:\CodexProject\FamilyPDF-tools\vcpkg\vcpkg.exe` | 包含於上列 vcpkg 大小 |
+| Qt | 6.9.1，`win64_msvc2022_64` | `E:\Codex project\FamilyPDF-tools\qt` | 2,560,774,752 bytes（約 2.38 GiB） |
+| aqtinstall | 3.3.0，local venv | `E:\Codex project\FamilyPDF-tools\aqt-3.3.0` | 28,252,860 bytes（約 26.94 MiB） |
+| vcpkg source | commit `6d9d7df564a1ccdaa994e4ad39ccd4a32360867b` | `E:\Codex project\FamilyPDF-tools\vcpkg` | 152,203,257 bytes（約 145.15 MiB） |
+| vcpkg executable | `2026-07-13-bf04c909169fdbb30821c02c6eb01f1cd1295d05` | `E:\Codex project\FamilyPDF-tools\vcpkg\vcpkg.exe` | 包含於上列 vcpkg 大小 |
 
 安裝沒有修改全域 `PATH`、Registry 或 system Python。aqtinstall 使用自己的 virtual environment。
 
@@ -75,7 +75,7 @@ qtpaths.exe --qt-version
 6.9.1
 
 Qt6Config.cmake
-E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake
+E:\Codex project\FamilyPDF-tools\qt\6.9.1\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake
 
 vcpkg.exe version
 vcpkg package management program version 2026-07-13-bf04c909169fdbb30821c02c6eb01f1cd1295d05
@@ -87,21 +87,21 @@ git rev-parse HEAD
 實際 executable：
 
 ```text
-E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64\bin\qmake.exe
-E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64\bin\qtpaths.exe
-E:\CodexProject\FamilyPDF-tools\vcpkg\vcpkg.exe
+E:\Codex project\FamilyPDF-tools\qt\6.9.1\msvc2022_64\bin\qmake.exe
+E:\Codex project\FamilyPDF-tools\qt\6.9.1\msvc2022_64\bin\qtpaths.exe
+E:\Codex project\FamilyPDF-tools\vcpkg\vcpkg.exe
 ```
 
 Qt CMake prefix：
 
 ```text
-E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64
+E:\Codex project\FamilyPDF-tools\qt\6.9.1\msvc2022_64
 ```
 
 vcpkg toolchain file：
 
 ```text
-E:\CodexProject\FamilyPDF-tools\vcpkg\scripts\buildsystems\vcpkg.cmake
+E:\Codex project\FamilyPDF-tools\vcpkg\scripts\buildsystems\vcpkg.cmake
 ```
 
 從 toolchain presence 與 package-path 驗證結果來看，可以進入後續 configure task。後續 configure 必須在該 process 明確設定 Qt prefix、`PDF4QT_QT_ROOT` 與 vcpkg toolchain path；本安裝腳本刻意不建立全域環境變數。vcpkg manifest dependencies 尚未預先安裝，會由後續 manifest-mode configure/install 階段解析。
@@ -116,7 +116,7 @@ E:\CodexProject\FamilyPDF-tools\vcpkg\scripts\buildsystems\vcpkg.cmake
 所有本 task 的工具都在單一隔離目錄。確認沒有程序正在使用後，刪除以下目錄即可完整 rollback：
 
 ```text
-E:\CodexProject\FamilyPDF-tools
+E:\Codex project\FamilyPDF-tools
 ```
 
 不需要清理全域 `PATH`、Registry 或 system Python，因為本次未修改它們。

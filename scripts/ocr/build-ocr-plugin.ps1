@@ -22,7 +22,7 @@ $tesseractTools = Join-Path $tripletRoot 'tools\tesseract'
 $tesseractExe = Join-Path $tesseractTools 'tesseract.exe'
 $tessdata = Join-Path $ocrRoot 'tessdata'
 $downloader = Join-Path $ocrRoot 'download-tessdata.ps1'
-$vcpkg = 'E:\CodexProject\FamilyPDF-tools\vcpkg\vcpkg.exe'
+$vcpkg = 'E:\Codex project\FamilyPDF-tools\vcpkg\vcpkg.exe'
 
 if (-not $SkipDownload) {
     try {

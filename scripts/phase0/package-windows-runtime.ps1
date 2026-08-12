@@ -30,7 +30,7 @@ if (-not (Test-Path -LiteralPath (
     throw "Office export helper was not found: $officeExportSource"
 }
 
-$QtPrefix = 'E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
+$QtPrefix = 'E:\Codex project\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
 $runtimeDirectory = Join-Path $BuildDirectory 'usr\bin'
 $vcpkgBin = Join-Path $BuildDirectory 'vcpkg_installed\x64-windows\bin'
 $targets = @(

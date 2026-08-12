@@ -14,8 +14,8 @@ if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
 }
 $BuildDirectory = [IO.Path]::GetFullPath($BuildDirectory)
 
-$QtPrefix = 'E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
-$VcpkgRoot = 'E:\CodexProject\FamilyPDF-tools\vcpkg'
+$QtPrefix = 'E:\Codex project\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
+$VcpkgRoot = 'E:\Codex project\FamilyPDF-tools\vcpkg'
 $VcpkgToolchain = Join-Path $VcpkgRoot 'scripts\buildsystems\vcpkg.cmake'
 $VsWhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
 $Targets = @(

@@ -236,7 +236,7 @@ $viewerMultiFile = Test-MultiDocumentSession -Executable (
 )
 $editorMultiFile = Test-MultiDocumentSession -Executable $editor
 
-$qtPrefix = 'E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
+$qtPrefix = 'E:\Codex project\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
 $lconvert = Join-Path $qtPrefix 'bin\lconvert.exe'
 Assert-File -LiteralPath $lconvert
 foreach ($locale in @('zh_TW', 'zh_CN')) {

@@ -11,7 +11,7 @@ Set-StrictMode -Version Latest
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $appVersion = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'VERSION') -Raw -Encoding UTF8).Trim()
-$toolsRoot = 'E:\CodexProject\FamilyPDF-tools'
+$toolsRoot = 'E:\Codex project\FamilyPDF-tools'
 $innoVersion = '7.0.2'
 $innoRoot = Join-Path $toolsRoot "inno-$innoVersion"
 $iscc = Join-Path $innoRoot 'ISCC.exe'

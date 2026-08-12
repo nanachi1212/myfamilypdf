@@ -74,7 +74,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\smoke-acrobat-document-edit.ps1
 ```
 
-建置腳本會在缺少時自動安裝 Qt／vcpkg 建置工具；安裝程式腳本會下載並驗證 Inno Setup 的 Authenticode 簽章。開發工具預設放在 `E:\CodexProject\FamilyPDF-tools`。
+建置腳本會在缺少時自動安裝 Qt／vcpkg 建置工具；安裝程式腳本會下載並驗證 Inno Setup 的 Authenticode 簽章。開發工具預設放在 `E:\Codex project\FamilyPDF-tools`。
 
 ## 開源基底
 

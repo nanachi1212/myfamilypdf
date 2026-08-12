@@ -20,7 +20,7 @@ $PyPiIndex = 'https://pypi.org/simple'
 
 $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 if ([string]::IsNullOrWhiteSpace($ToolsRoot)) {
-    $ToolsRoot = Join-Path (Split-Path $RepositoryRoot -Parent) 'FamilyPDF-tools'
+    $ToolsRoot = 'E:\Codex project\FamilyPDF-tools'
 }
 $ToolsRoot = [System.IO.Path]::GetFullPath($ToolsRoot)
 $QtRoot = Join-Path $ToolsRoot 'qt'
