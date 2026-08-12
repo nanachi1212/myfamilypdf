@@ -9,6 +9,7 @@ jobs:
     env:
       VCPKG_OVERLAY_PORTS: ${{ github.workspace }}/pdf4qt/vcpkg/overlays/linux:${{ github.workspace }}/pdf4qt/vcpkg/overlays/general
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg_installed
+      VCPKG_COMMIT: 6d9d7df564a1ccdaa994e4ad39ccd4a32360867b
       GNUPGHOME: ${{ github.workspace }}/gnupg
 
     steps:
@@ -70,6 +71,8 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/microsoft/vcpkg.git
           cd vcpkg
+          git fetch --depth=1 origin "$VCPKG_COMMIT"
+          git checkout --detach "$VCPKG_COMMIT"
           ./bootstrap-vcpkg.sh
           ./vcpkg integrate install
         
@@ -80,7 +83,7 @@ jobs:
             ./vcpkg/downloads
             ./vcpkg/packages
             ./vcpkg_installed
-          key: ${{ runner.os }}-vcpkg-v2-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
+          key: ${{ runner.os }}-vcpkg-v2-${{ env.VCPKG_COMMIT }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
           restore-keys: |
             ${{ runner.os }}-vcpkg-v2-
 

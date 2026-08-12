@@ -6,6 +6,8 @@ on:
 jobs:
   build_windows:
     runs-on: windows-2022
+    env:
+      VCPKG_COMMIT: 6d9d7df564a1ccdaa994e4ad39ccd4a32360867b
 
     steps:
       - name: Checkout repository
@@ -92,6 +94,8 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/microsoft/vcpkg.git
           cd vcpkg
+          git fetch --depth=1 origin $env:VCPKG_COMMIT
+          git checkout --detach $env:VCPKG_COMMIT
           .\bootstrap-vcpkg.bat -disableMetrics
           .\vcpkg integrate install
           set VCPKG_ROOT=${env:GITHUB_WORKSPACE}\vcpkg\
@@ -105,7 +109,7 @@ jobs:
             ./vcpkg/packages
             ./vcpkg/installed
             ./vcpkg/archives
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/vcpkg.json') }}
+          key: ${{ runner.os }}-vcpkg-${{ env.VCPKG_COMMIT }}-${{ hashFiles('**/vcpkg.json') }}
 
 
       - name: 'VCPKG: Install project dependencies'
