@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+      - "codex/**"
+  pull_request:
       
   workflow_dispatch:
 
@@ -71,6 +73,7 @@ jobs:
         run: |
           cmake -B build -S . -DPDF4QT_INSTALL_QT_DEPENDENCIES=0 -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_VCPKG_BUILD_TYPE=Release
           cmake --build build --target all release_translations --config Release -j6
+          ctest --test-dir build --output-on-failure -C Release
           cmake --install build
 
       - name: Make DEB package
@@ -151,6 +154,7 @@ jobs:
           cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_VCPKG_BUILD_TYPE=Release -DPDF4QT_INSTALL_QT_DEPENDENCIES=ON -DPDF4QT_INSTALL_DEPENDENCIES=ON -DCMAKE_TOOLCHAIN_FILE="${env:GITHUB_WORKSPACE}\vcpkg\scripts\buildsystems\vcpkg.cmake" -DPDF4QT_QT_ROOT="${env:Qt6_DIR}" -DPDF4QT_INSTALL_MSVC_REDISTRIBUTABLE=ON -DPDF4QT_INSTALL_PREPARE_WIX_INSTALLER=ON -DPDF4QT_INSTALL_TO_USR=ON 
           cmake --build build --target release_translations --config Release -j6
           cmake --build build --config Release -j6
+          ctest --test-dir build --output-on-failure -C Release
           cmake --install build --config Release
  
       - name: Upload Windows package

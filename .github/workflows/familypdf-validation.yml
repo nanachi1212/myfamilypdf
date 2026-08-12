@@ -49,3 +49,17 @@ jobs:
       - name: Verify OCR download hash enforcement and cleanup
         shell: powershell
         run: .\scripts\ocr\Test-OCR-Language-Download.ps1
+
+      - name: Install Office export test dependencies
+        shell: powershell
+        run: |
+          python -m pip install --require-hashes -r .\office-export\requirements.lock
+          python -m pip install --no-deps -e .\office-export
+
+      - name: Run Office export tests
+        shell: powershell
+        run: python -m pytest .\office-export\tests -q
+
+      - name: Lint Office export code
+        shell: powershell
+        run: python -m ruff check .\office-export
