@@ -13,6 +13,7 @@ jobs:
   build_ubuntu:
     runs-on: ubuntu-latest
     env:
+      QT_QPA_PLATFORM: offscreen
       VCPKG_OVERLAY_PORTS: ${{ github.workspace }}/pdf4qt/vcpkg/overlays/linux:${{ github.workspace }}/pdf4qt/vcpkg/overlays/general
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg_installed
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
