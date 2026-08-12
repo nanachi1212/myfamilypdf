@@ -36,6 +36,7 @@ $Targets = @(
     'UnitTestsBookmarks',
     'UnitTestsForms',
     'UnitTestsDocumentEdit',
+    'UnitTestsContentEditor',
     'release_translations'
 )
 
