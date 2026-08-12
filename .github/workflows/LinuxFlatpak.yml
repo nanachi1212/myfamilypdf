@@ -31,10 +31,10 @@ jobs:
           flatpak list
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Cache Flatpak builder artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cache/flatpak-builder
@@ -58,7 +58,7 @@ jobs:
           flatpak build-bundle repo io.github.JakubMelka.Pdf4qt.flatpak io.github.JakubMelka.Pdf4qt
 
       - name: Upload Flatpak Package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: io.github.JakubMelka.Pdf4qt.flatpak
           path: ./io.github.JakubMelka.Pdf4qt.flatpak

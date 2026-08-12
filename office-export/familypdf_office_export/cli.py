@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import tempfile
 from dataclasses import asdict
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence, TypeVar
 
 from .docx_writer import write_docx
 from .extract import extract_document
+from .model import ExtractedDocument
 from .xlsx_writer import write_xlsx
 
 EXIT_ERROR = 1
 EXIT_MISSING_TEXT_LAYER = 3
+ExportReport = TypeVar("ExportReport")
 
 
 def parse_page_range(value: str) -> list[int] | None:
@@ -74,12 +78,35 @@ def _emit(payload: dict) -> None:
     print(json.dumps(payload, ensure_ascii=False))
 
 
+def _write_output_atomically(
+    writer: Callable[[ExtractedDocument, Path], ExportReport],
+    extracted: ExtractedDocument,
+    target: Path,
+) -> ExportReport:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, candidate_name = tempfile.mkstemp(
+        dir=target.parent,
+        prefix=f".{target.name}.",
+        suffix=".tmp",
+    )
+    os.close(descriptor)
+    candidate = Path(candidate_name)
+    try:
+        report = writer(extracted, candidate)
+        os.replace(candidate, target)
+        return report
+    finally:
+        candidate.unlink(missing_ok=True)
+
+
 def run(arguments: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     try:
         args = parser.parse_args(arguments)
         if not args.input.is_file():
             raise FileNotFoundError(f"Input PDF does not exist: {args.input}")
+        if args.input.resolve() == args.output.resolve():
+            raise ValueError("Input PDF and output document must be different files.")
         page_numbers = parse_page_range(args.pages)
         extracted = extract_document(args.input, page_numbers)
 
@@ -98,9 +125,13 @@ def run(arguments: Sequence[str] | None = None) -> int:
             return EXIT_MISSING_TEXT_LAYER
 
         if args.format == "docx":
-            export_report = write_docx(extracted, args.output)
+            export_report = _write_output_atomically(
+                write_docx, extracted, args.output
+            )
         else:
-            export_report = write_xlsx(extracted, args.output)
+            export_report = _write_output_atomically(
+                write_xlsx, extracted, args.output
+            )
 
         _emit(
             {
