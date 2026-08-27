@@ -75,6 +75,9 @@ set_target_properties(UnitTestsBookmarks PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
 )
 add_test(UnitTestsBookmarks "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsBookmarks")
+set_tests_properties(UnitTestsBookmarks PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
 
 if(TARGET Qt6::QOffscreenIntegrationPlugin)
     add_custom_command(TARGET UnitTestsBookmarks POST_BUILD

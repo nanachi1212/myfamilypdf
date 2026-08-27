@@ -21,6 +21,7 @@
 - 書籤 JSON 改用 `QSaveFile` 原子提交，寫入失敗時保留原檔。
 - 簽署 PDF 與附件輸出改用 `QSaveFile` 原子提交，避免直接截斷使用者輸出檔。
 - 文字轉語音的 proxy、語音引擎、播放文件與同步控制項加入 Release 建置仍有效的 null guard。
+- `UnitTestsBookmarks` 固定使用 Qt `offscreen` 平台並部署對應 plugin，避免測試啟動時出現 Qt platform plugin 初始化錯誤。
 - vcpkg manifests 與 PDF4QT CMake 版本統一為 1.6.0.0。
 
 ## [0.2.2-beta] - 2026-08-10

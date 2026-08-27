@@ -58,6 +58,10 @@ jobs:
         shell: powershell
         run: .\scripts\qa\test-atomic-output-contracts.ps1
 
+      - name: Verify Qt test platform contract
+        shell: powershell
+        run: .\scripts\qa\test-qt-test-platform-contract.ps1
+
       - name: Verify installer in-place upgrade contract
         shell: powershell
         run: .\scripts\qa\test-installer-upgrade-contract.ps1
