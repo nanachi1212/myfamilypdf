@@ -100,9 +100,25 @@ ScanResult WiaScannerBackend::scan(const ScanSettings& settings)
 
     QProcess process;
     process.start(powershell, { QStringLiteral("-NoProfile"), QStringLiteral("-ExecutionPolicy"), QStringLiteral("Bypass"), QStringLiteral("-Command"), script });
-    if (!process.waitForStarted() || !process.waitForFinished(-1))
+    if (!process.waitForStarted())
     {
         result.errorMessage = QObject::tr("Failed to run the Windows WIA scanner dialog.");
+        return result;
+    }
+
+    bool timeoutOk = false;
+    int timeoutMs = qEnvironmentVariableIntValue(
+        "FAMILYPDF_SCANNER_TIMEOUT_MS", &timeoutOk);
+    if (!timeoutOk || timeoutMs < 1000)
+    {
+        timeoutMs = 30 * 60 * 1000;
+    }
+    if (!process.waitForFinished(timeoutMs))
+    {
+        process.kill();
+        process.waitForFinished(5000);
+        result.errorMessage = QObject::tr(
+            "The Windows WIA scanner timed out and was stopped. Try scanning fewer pages.");
         return result;
     }
 

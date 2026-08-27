@@ -3,23 +3,32 @@ param(
     [switch]$SkipPackage,
     [switch]$SkipOcr,
     [switch]$VerificationBuild,
-    [switch]$ShellVerificationBuild
+    [switch]$ShellVerificationBuild,
+    [switch]$UpgradeVerificationBuild,
+    [string]$VersionOverride = ''
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+. (Join-Path $repositoryRoot 'scripts\common\Resolve-FamilyPDFToolsRoot.ps1')
 $appVersion = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'VERSION') -Raw -Encoding UTF8).Trim()
-$toolsRoot = 'E:\CodexProject\FamilyPDF-tools'
+$toolsRoot = Resolve-FamilyPDFToolsRoot -RepositoryRoot $repositoryRoot
 $innoVersion = '7.0.2'
 $innoRoot = Join-Path $toolsRoot "inno-$innoVersion"
 $iscc = Join-Path $innoRoot 'ISCC.exe'
 $innoInstaller = Join-Path $toolsRoot "innosetup-$innoVersion-x64.exe"
 $innoUrl = "https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-$innoVersion-x64.exe"
 
-if ($VerificationBuild -and $ShellVerificationBuild) {
-    throw 'VerificationBuild and ShellVerificationBuild are mutually exclusive.'
+if (@($VerificationBuild, $ShellVerificationBuild, $UpgradeVerificationBuild).Where({ $_ }).Count -gt 1) {
+    throw 'VerificationBuild, ShellVerificationBuild, and UpgradeVerificationBuild are mutually exclusive.'
+}
+if (-not [string]::IsNullOrWhiteSpace($VersionOverride)) {
+    if (-not $UpgradeVerificationBuild) {
+        throw 'VersionOverride is only available for UpgradeVerificationBuild.'
+    }
+    $appVersion = $VersionOverride
 }
 
 New-Item -ItemType Directory -Path $toolsRoot -Force | Out-Null
@@ -73,6 +82,9 @@ if ($VerificationBuild) {
 if ($ShellVerificationBuild) {
     $compilerArguments += '/DShellVerificationBuild'
 }
+if ($UpgradeVerificationBuild) {
+    $compilerArguments += '/DUpgradeVerificationBuild'
+}
 $compilerArguments += (Join-Path $repositoryRoot 'installer\FamilyPDF.iss')
 
 & $iscc $compilerArguments
@@ -80,7 +92,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compiler failed with exit code $LASTEXITCODE."
 }
 
-$setup = if ($ShellVerificationBuild) {
+$setup = if ($UpgradeVerificationBuild) {
+    Join-Path $repositoryRoot 'build\FamilyPDF-Upgrade-Verification-Setup-x64.exe'
+} elseif ($ShellVerificationBuild) {
     Join-Path $repositoryRoot 'build\FamilyPDF-Shell-Verification-Setup-x64.exe'
 } elseif ($VerificationBuild) {
     Join-Path $repositoryRoot 'build\FamilyPDF-Verification-Setup-x64.exe'

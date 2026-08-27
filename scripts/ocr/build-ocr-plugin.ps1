@@ -9,6 +9,8 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+. (Join-Path $repositoryRoot 'scripts\common\Resolve-FamilyPDFToolsRoot.ps1')
+$toolsRoot = Resolve-FamilyPDFToolsRoot -RepositoryRoot $repositoryRoot
 $ocrVersion = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'OCR_VERSION') -Raw -Encoding UTF8).Trim()
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repositoryRoot 'dist'
@@ -22,7 +24,7 @@ $tesseractTools = Join-Path $tripletRoot 'tools\tesseract'
 $tesseractExe = Join-Path $tesseractTools 'tesseract.exe'
 $tessdata = Join-Path $ocrRoot 'tessdata'
 $downloader = Join-Path $ocrRoot 'download-tessdata.ps1'
-$vcpkg = 'E:\CodexProject\FamilyPDF-tools\vcpkg\vcpkg.exe'
+$vcpkg = Join-Path $toolsRoot 'vcpkg\vcpkg.exe'
 
 if (-not $SkipDownload) {
     try {

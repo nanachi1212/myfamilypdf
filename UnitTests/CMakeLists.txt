@@ -66,7 +66,7 @@ add_executable(UnitTestsBookmarks
     tst_bookmarkmanagertest.cpp
 )
 
-target_link_libraries(UnitTestsBookmarks PRIVATE Pdf4QtLibGui Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+target_link_libraries(UnitTestsBookmarks PRIVATE Pdf4QtLibGui Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
 
 set_target_properties(UnitTestsBookmarks PROPERTIES
     WIN32_EXECUTABLE OFF
@@ -75,6 +75,16 @@ set_target_properties(UnitTestsBookmarks PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
 )
 add_test(UnitTestsBookmarks "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsBookmarks")
+
+if(TARGET Qt6::QOffscreenIntegrationPlugin)
+    add_custom_command(TARGET UnitTestsBookmarks POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:UnitTestsBookmarks>/platforms"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
+            "$<TARGET_FILE_DIR:UnitTestsBookmarks>/platforms/"
+        VERBATIM)
+endif()
 
 add_executable(UnitTestsForms
     tst_formbuildertest.cpp

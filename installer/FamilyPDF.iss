@@ -6,20 +6,32 @@
 #define MyAppExeName "Pdf4QtViewer.exe"
 
 [Setup]
+#ifdef UpgradeVerificationBuild
+AppId={{A31480A6-4CB4-4CBF-B797-A971C4C2A2C7}
+#else
 #ifdef ShellVerificationBuild
 AppId={{D8942855-6D26-4801-908C-B8CD588A19C5}
 #else
 AppId={{3EE743F2-F10D-4D69-A4C3-01834462FBA6}
+#endif
 #endif
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\Programs\FamilyPDF
 DefaultGroupName=FamilyPDF
+UsePreviousAppDir=yes
+UsePreviousGroup=yes
+UsePreviousLanguage=yes
+UsePreviousTasks=yes
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+#ifdef UpgradeVerificationBuild
+OutputDir=..\build
+OutputBaseFilename=FamilyPDF-Upgrade-Verification-Setup-x64
+#else
 #ifdef ShellVerificationBuild
 OutputDir=..\build
 OutputBaseFilename=FamilyPDF-Shell-Verification-Setup-x64
@@ -32,6 +44,7 @@ CreateUninstallRegKey=no
 #else
 OutputDir=..\dist
 OutputBaseFilename=FamilyPDF-Setup-x64
+#endif
 #endif
 #endif
 Compression=lzma2/ultra64
@@ -72,6 +85,7 @@ Name: "pdfshell"; Description: "{cm:PdfShellTask}"; GroupDescription: "{cm:Windo
 Source: "..\dist\FamilyPDF-windows-x64\*"; DestDir: "{app}"; Excludes: "portable.mode"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 #ifndef VerificationBuild
+#ifndef UpgradeVerificationBuild
 [Registry]
 Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtViewer.exe"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "FamilyPDF Reader"; Flags: uninsdeletekey; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtViewer.exe\SupportedTypes"; ValueType: none; ValueName: ".pdf"; Tasks: pdfshell
@@ -86,8 +100,10 @@ Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPD
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\Pdf4QtEditor.exe"; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""; Tasks: pdfshell
 #endif
+#endif
 
 #ifndef VerificationBuild
+#ifndef UpgradeVerificationBuild
 #ifndef ShellVerificationBuild
 [Icons]
 Name: "{group}\FamilyPDF 閱讀器"; Filename: "{app}\Pdf4QtViewer.exe"; WorkingDir: "{app}"
@@ -98,5 +114,6 @@ Name: "{autodesktop}\FamilyPDF"; Filename: "{app}\Pdf4QtViewer.exe"; WorkingDir:
 
 [Run]
 Filename: "{app}\Pdf4QtViewer.exe"; Description: "{cm:LaunchProgram,FamilyPDF}"; Flags: nowait postinstall skipifsilent
+#endif
 #endif
 #endif

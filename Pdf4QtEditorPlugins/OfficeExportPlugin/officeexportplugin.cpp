@@ -17,6 +17,7 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QProgressDialog>
+#include <QTimer>
 
 namespace pdfplugin
 {
@@ -81,7 +82,11 @@ QString OfficeExportPlugin::findHelper() const
         if (!candidate.isEmpty() &&
             QFileInfo(candidate).isFile())
         {
-            return QDir::toNativeSeparators(candidate);
+            const QString canonicalPath = QFileInfo(candidate).canonicalFilePath();
+            if (!canonicalPath.isEmpty())
+            {
+                return QDir::toNativeSeparators(canonicalPath);
+            }
         }
     }
     return QString();
@@ -90,8 +95,8 @@ QString OfficeExportPlugin::findHelper() const
 void OfficeExportPlugin::exportDocument(const QString& format)
 {
     QMainWindow* parent = m_dataExchangeInterface->getMainWindow();
-    const QString source =
-        m_dataExchangeInterface->getOriginalFileName();
+    const QString source = QFileInfo(
+        m_dataExchangeInterface->getOriginalFileName()).canonicalFilePath();
     if (!QFileInfo(source).isFile())
     {
         QMessageBox::warning(
@@ -133,12 +138,13 @@ void OfficeExportPlugin::exportDocument(const QString& format)
             tr("Excel workbook (*.xlsx)");
     const QString suggested = QDir(sourceInfo.absolutePath()).filePath(
         sourceInfo.completeBaseName() + QLatin1Char('.') + format);
-    const QString output = QFileDialog::getSaveFileName(
+    const QString selectedOutput = QFileDialog::getSaveFileName(
         parent, tr("Export PDF"), suggested, suffix);
-    if (output.isEmpty())
+    if (selectedOutput.isEmpty())
     {
         return;
     }
+    const QString output = QFileInfo(selectedOutput).absoluteFilePath();
 
     QStringList arguments = {
         QStringLiteral("--input"), source,
@@ -163,11 +169,29 @@ void OfficeExportPlugin::exportDocument(const QString& format)
     progress.setAutoClose(false);
 
     bool canceled = false;
+    bool timedOut = false;
+    bool timeoutOk = false;
+    int timeoutMs = qEnvironmentVariableIntValue(
+        "FAMILYPDF_OFFICE_EXPORT_TIMEOUT_MS", &timeoutOk);
+    if (!timeoutOk || timeoutMs < 1000)
+    {
+        timeoutMs = 30 * 60 * 1000;
+    }
+    QTimer watchdog;
+    watchdog.setSingleShot(true);
     connect(&progress, &QProgressDialog::canceled,
-            &process, [&process, &canceled]()
+            &process, [&process, &canceled, &progress]()
             {
                 canceled = true;
                 process.kill();
+                progress.reject();
+            });
+    connect(&watchdog, &QTimer::timeout,
+            &process, [&process, &timedOut, &progress]()
+            {
+                timedOut = true;
+                process.kill();
+                progress.reject();
             });
     connect(&process,
             qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
@@ -184,16 +208,27 @@ void OfficeExportPlugin::exportDocument(const QString& format)
         return;
     }
 
+    watchdog.start(timeoutMs);
     progress.exec();
+    watchdog.stop();
     if (canceled)
     {
-        process.waitForFinished();
+        process.waitForFinished(5000);
+        return;
+    }
+    if (timedOut)
+    {
+        process.waitForFinished(5000);
+        QMessageBox::critical(
+            parent,
+            tr("Office Export"),
+            tr("Office export timed out and was stopped. Try fewer pages."));
         return;
     }
     if (process.state() != QProcess::NotRunning)
     {
         process.kill();
-        process.waitForFinished();
+        process.waitForFinished(5000);
         return;
     }
 

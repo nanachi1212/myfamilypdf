@@ -519,7 +519,7 @@ void PDFTextToSpeech::updatePlay()
 void PDFTextToSpeech::updateToNextPage(pdf::PDFInteger pageIndex)
 {
     Q_ASSERT(m_document);
-    Q_ASSERT(m_state = Playing);
+    Q_ASSERT(m_state == Playing);
 
     m_currentPage = pageIndex;
     const pdf::PDFInteger pageCount = m_document->getCatalog()->getPageCount();

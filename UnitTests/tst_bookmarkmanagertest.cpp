@@ -15,10 +15,15 @@
 
 #include <QDir>
 #include <QFile>
+#include <QApplication>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QTemporaryDir>
 #include <QtTest>
+
+#ifdef Q_OS_WIN
+#include <qt_windows.h>
+#endif
 
 class BookmarkManagerTest : public QObject
 {
@@ -29,14 +34,18 @@ private slots:
     void foldersAndColorsRoundTrip();
     void bookmarkFolderEditingPreservesBookmarks();
     void treeModelExposesFoldersAsParents();
+    void baselineCapturesExistingAndRejectsMissingFiles();
     void sameSizeTimestampExternalChangeIsDetected();
     void safeCommitKeepsLatestThreeBackups();
     void preCommitFailureKeepsOriginalAndCandidate();
     void postCommitFailureKeepsRecoverableBackup();
     void recoveryMetadataRoundTripsWithoutSecrets();
+    void recoveryDocumentKeyUsesPlatformCaseRules();
+    void recoverySkipsIncompleteRecords();
     void sessionPathsAreNormalizedAndMissingFilesAreSkipped();
     void portableModeUsesApplicationDataDirectory();
     void newDestinationCommitIsValidatedAndDurable();
+    void failedBookmarkReplacementPreservesOriginalFile();
     void embeddedOutlineIsWrittenWithHierarchyColorAndDestinations();
     void standardAnnotationsAreWrittenWithColorsAndText();
 };
@@ -182,6 +191,30 @@ void BookmarkManagerTest::sameSizeTimestampExternalChangeIsDetected()
     QString error;
     QVERIFY(!pdfviewer::PDFSafeSaveService::sourceMatchesBaseline(sourcePath, baseline, &error));
     QVERIFY(error.contains(QStringLiteral("SHA-256")));
+}
+
+void BookmarkManagerTest::baselineCapturesExistingAndRejectsMissingFiles()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString existingPath = directory.filePath(QStringLiteral("existing.pdf"));
+    const QString missingPath = directory.filePath(QStringLiteral("missing.pdf"));
+
+    QFile existing(existingPath);
+    QVERIFY(existing.open(QIODevice::WriteOnly));
+    QCOMPARE(existing.write("%PDF-1.7\n", 9), qint64(9));
+    existing.close();
+
+    const auto existingBaseline =
+        pdfviewer::PDFSafeSaveService::captureBaseline(existingPath);
+    QVERIFY(existingBaseline.isValid);
+    QCOMPARE(existingBaseline.fileSize, qint64(9));
+    QVERIFY(!existingBaseline.sha256.isEmpty());
+
+    const auto missingBaseline =
+        pdfviewer::PDFSafeSaveService::captureBaseline(missingPath);
+    QVERIFY(!missingBaseline.isValid);
+    QVERIFY(missingBaseline.sha256.isEmpty());
 }
 
 void BookmarkManagerTest::safeCommitKeepsLatestThreeBackups()
@@ -362,6 +395,41 @@ void BookmarkManagerTest::recoveryMetadataRoundTripsWithoutSecrets()
     QVERIFY(!QFileInfo::exists(snapshotPath));
 }
 
+void BookmarkManagerTest::recoveryDocumentKeyUsesPlatformCaseRules()
+{
+    const QString mixedCase = QStringLiteral("C:/FamilyPDF/Documents/Example.pdf");
+    const QString lowerCase = QStringLiteral("c:/familypdf/documents/example.pdf");
+#ifdef Q_OS_WIN
+    QCOMPARE(pdfviewer::PDFRecoveryManager::documentKey(mixedCase),
+             pdfviewer::PDFRecoveryManager::documentKey(lowerCase));
+#else
+    QVERIFY(pdfviewer::PDFRecoveryManager::documentKey(mixedCase) !=
+            pdfviewer::PDFRecoveryManager::documentKey(lowerCase));
+#endif
+}
+
+void BookmarkManagerTest::recoverySkipsIncompleteRecords()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString recoveryRoot = directory.filePath(QStringLiteral("recovery"));
+    QVERIFY(QDir().mkpath(recoveryRoot));
+
+    const QString sourcePath = directory.filePath(QStringLiteral("source.pdf"));
+    const QString missingSnapshot = directory.filePath(QStringLiteral("missing.pdf"));
+    QVERIFY(pdfviewer::PDFRecoveryManager::writeMetadata(sourcePath,
+                                                         missingSnapshot,
+                                                         4,
+                                                         recoveryRoot));
+    QVERIFY(pdfviewer::PDFRecoveryManager::findRecords(recoveryRoot).isEmpty());
+
+    QFile orphanSnapshot(QDir(recoveryRoot).filePath(QStringLiteral("orphan.pdf")));
+    QVERIFY(orphanSnapshot.open(QIODevice::WriteOnly));
+    QCOMPARE(orphanSnapshot.write("snapshot"), qint64(8));
+    orphanSnapshot.close();
+    QVERIFY(pdfviewer::PDFRecoveryManager::findRecords(recoveryRoot).isEmpty());
+}
+
 void BookmarkManagerTest::sessionPathsAreNormalizedAndMissingFilesAreSkipped()
 {
     QTemporaryDir directory;
@@ -435,6 +503,42 @@ void BookmarkManagerTest::newDestinationCommitIsValidatedAndDurable()
     QCOMPARE(validationCount, 2);
     QVERIFY(QFileInfo::exists(destinationPath));
     QVERIFY(!QFileInfo::exists(candidatePath));
+}
+
+void BookmarkManagerTest::failedBookmarkReplacementPreservesOriginalFile()
+{
+#ifndef Q_OS_WIN
+    QSKIP("This test requires Windows file sharing semantics.");
+#else
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString destinationPath = directory.filePath(QStringLiteral("bookmarks.json"));
+    const QByteArray originalContent("original-bookmarks");
+
+    QFile destination(destinationPath);
+    QVERIFY(destination.open(QIODevice::WriteOnly));
+    QCOMPARE(destination.write(originalContent), qint64(originalContent.size()));
+    destination.close();
+
+    const QString nativePath = QDir::toNativeSeparators(destinationPath);
+    HANDLE lock = CreateFileW(reinterpret_cast<LPCWSTR>(nativePath.utf16()),
+                              GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE,
+                              nullptr,
+                              OPEN_EXISTING,
+                              FILE_ATTRIBUTE_NORMAL,
+                              nullptr);
+    QVERIFY2(lock != INVALID_HANDLE_VALUE,
+             qPrintable(QStringLiteral("CreateFileW failed: %1").arg(GetLastError())));
+
+    pdfviewer::PDFBookmarkManager manager(nullptr);
+    manager.toggleBookmark(2);
+    manager.saveToFile(destinationPath);
+    CloseHandle(lock);
+
+    QVERIFY(destination.open(QIODevice::ReadOnly));
+    QCOMPARE(destination.readAll(), originalContent);
+#endif
 }
 
 void BookmarkManagerTest::embeddedOutlineIsWrittenWithHierarchyColorAndDestinations()
@@ -586,6 +690,12 @@ void BookmarkManagerTest::standardAnnotationsAreWrittenWithColorsAndText()
     QCOMPARE(restored.getCatalog()->getPageCount(), pdf::PDFInteger(1));
 }
 
-QTEST_MAIN(BookmarkManagerTest)
+int main(int argc, char* argv[])
+{
+    qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen"));
+    QApplication application(argc, argv);
+    BookmarkManagerTest test;
+    return QTest::qExec(&test, argc, argv);
+}
 
 #include "tst_bookmarkmanagertest.moc"

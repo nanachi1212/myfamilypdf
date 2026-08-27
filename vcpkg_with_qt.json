@@ -1,5 +1,5 @@
 {
   "name": "pdf4qt",
-  "version-string": "1.5.2",
+  "version-string": "1.6.0.0",
   "dependencies": [ "openssl", "lcms", "zlib", "openjpeg", "freetype", "libjpeg-turbo", "libpng", "qt" ]
 }

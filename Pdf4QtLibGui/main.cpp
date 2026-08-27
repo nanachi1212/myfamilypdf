@@ -35,9 +35,9 @@ int main(int argc, char *argv[])
     QApplication application(argc, argv);
 
     QCoreApplication::setOrganizationName("MelkaJ");
-    QCoreApplication::setApplicationName("PDF4QT Editor");
+QCoreApplication::setApplicationName("FamilyPDF Editor");
     QCoreApplication::setApplicationVersion("1.0.0");
-    QApplication::setApplicationDisplayName(QApplication::translate("Application", "PDF4QT Editor"));
+    QApplication::setApplicationDisplayName(QStringLiteral("FamilyPDF Editor"));
     QCommandLineParser parser;
     QCommandLineOption configPath = pdf::PDFSettings::getConfigPathOption();
     parser.setApplicationDescription(QCoreApplication::applicationName());

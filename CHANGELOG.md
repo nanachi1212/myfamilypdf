@@ -2,6 +2,25 @@
 
 本檔記錄 FamilyPDF 自有功能版本；內嵌的上游 PDF4QT About 版本仍為 1.6.0.0。
 
+## [0.2.3-beta] - 2026-08-27
+
+### Added
+
+- Inno Setup 覆蓋升級契約：沿用既有 FamilyPDF `AppId`、安裝目錄、語言、元件與工作選項，不要求先解除安裝 0.2.2。
+- 書籤原子替換失敗回歸、外部程式 timeout 契約與工具鏈路徑可攜性驗證。
+
+### Changed
+
+- Office Export 與 Windows WIA Scanner 加入可設定 watchdog，取消或逾時時會終止外部程序。
+- FamilyPDF 工具根目錄預設從 repository 同層解析，也可用 `FAMILYPDF_TOOLS_ROOT` 覆寫。
+- Editor、Reader、PageMaster 與 Diff 的顯示名稱和內部設定名稱統一改為 FamilyPDF；本版不搬移舊 PDF4QT 偏好設定。
+
+### Fixed
+
+- 修正文字轉語音狀態斷言使用賦值運算子。
+- 書籤 JSON 改用 `QSaveFile` 原子提交，寫入失敗時保留原檔。
+- vcpkg manifests 與 PDF4QT CMake 版本統一為 1.6.0.0。
+
 ## [0.2.2-beta] - 2026-08-10
 
 ### Added
@@ -59,3 +78,4 @@
 [0.2.0-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.0-beta
 [0.2.1-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.1-beta
 [0.2.2-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.2-beta
+[0.2.3-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.3-beta

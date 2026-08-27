@@ -3145,7 +3145,7 @@ void PDFProgramController::onActionCloseTriggered()
 
 void PDFProgramController::onActionGetSource()
 {
-    QDesktopServices::openUrl(QUrl("https://github.com/JakubMelka/PDF4QT"));
+    QDesktopServices::openUrl(QUrl("https://github.com/nanachi1212/myfamilypdf"));
 }
 
 void PDFProgramController::onActionBecomeSponsor()

@@ -31,6 +31,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QCryptographicHash>
+#include <QDebug>
+#include <QSaveFile>
 #include <QUuid>
 
 namespace pdfviewer
@@ -145,6 +147,32 @@ public:
         return bookmarks;
     }
 
+    static bool writeJsonAtomically(const QString& fileName, const QByteArray& data)
+    {
+        QSaveFile file(fileName);
+        file.setDirectWriteFallback(false);
+        if (!file.open(QIODevice::WriteOnly))
+        {
+            qWarning() << "Could not open bookmark file for atomic save:"
+                       << fileName << file.errorString();
+            return false;
+        }
+        if (file.write(data) != data.size())
+        {
+            qWarning() << "Could not write complete bookmark data:"
+                       << fileName << file.errorString();
+            file.cancelWriting();
+            return false;
+        }
+        if (!file.commit())
+        {
+            qWarning() << "Could not atomically replace bookmark file:"
+                       << fileName << file.errorString();
+            return false;
+        }
+        return true;
+    }
+
 };
 
 PDFBookmarkManager::PDFBookmarkManager(QObject* parent) :
@@ -194,14 +222,7 @@ void PDFBookmarkManager::setDocument(const pdf::PDFModifiedDocument& document)
 void PDFBookmarkManager::saveToFile(QString fileName)
 {
     QJsonDocument doc(PDFBookmarkManagerHelper::convertBookmarksToJson(m_bookmarks));
-
-    // Příklad zápisu do souboru
-    QFile file(fileName);
-    if (file.open(QIODevice::WriteOnly))
-    {
-        file.write(doc.toJson());
-        file.close();
-    }
+    PDFBookmarkManagerHelper::writeJsonAtomically(fileName, doc.toJson());
 }
 
 bool PDFBookmarkManager::loadFromFile(QString fileName)
@@ -434,12 +455,9 @@ void PDFBookmarkManager::savePersistentBookmarks() const
 
     documents[documentKey] = PDFBookmarkManagerHelper::convertBookmarksToJson(m_bookmarks);
 
-    QFile file(fileName);
-    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-    {
-        file.write(QJsonDocument(documents).toJson(QJsonDocument::Compact));
-        file.close();
-    }
+    PDFBookmarkManagerHelper::writeJsonAtomically(
+        fileName,
+        QJsonDocument(documents).toJson(QJsonDocument::Compact));
 }
 
 QString PDFBookmarkManager::getDocumentKey(const pdf::PDFDocument* document) const

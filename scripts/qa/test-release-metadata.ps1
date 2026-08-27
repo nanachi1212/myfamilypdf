@@ -21,6 +21,19 @@ foreach ($entry in $versionFiles.GetEnumerator()) {
     $versions[$entry.Key] = $version
 }
 
+$cmakeContent = Get-Content -LiteralPath (Join-Path $repositoryRoot 'CMakeLists.txt') -Raw
+if ($cmakeContent -notmatch 'set\(PDF4QT_VERSION\s+([0-9]+(?:\.[0-9]+){3})\)') {
+    throw 'CMakeLists.txt does not define a four-part PDF4QT_VERSION.'
+}
+$pdf4qtVersion = $Matches[1]
+foreach ($relativePath in @('vcpkg.json', 'vcpkg_with_qt.json')) {
+    $manifest = Get-Content -LiteralPath (Join-Path $repositoryRoot $relativePath) -Raw |
+        ConvertFrom-Json
+    if ($manifest.'version-string' -ne $pdf4qtVersion) {
+        throw "$relativePath version '$($manifest.'version-string')' does not match PDF4QT_VERSION '$pdf4qtVersion'."
+    }
+}
+
 $installerFiles = @(
     'installer\FamilyPDF.iss',
     'installer\FamilyPDF-Full.iss',
@@ -62,4 +75,4 @@ if (Test-Path -LiteralPath $builtManifest -PathType Leaf) {
     }
 }
 
-Write-Host "Release metadata passed: FamilyPDF $($versions.FamilyPDF), OCR $($versions.OCR)."
+Write-Host "Release metadata passed: FamilyPDF $($versions.FamilyPDF), PDF4QT $pdf4qtVersion, OCR $($versions.OCR)."

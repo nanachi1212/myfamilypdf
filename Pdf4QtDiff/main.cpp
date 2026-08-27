@@ -38,9 +38,9 @@ int main(int argc, char *argv[])
     QApplication application(argc, argv);
 
     QCoreApplication::setOrganizationName("MelkaJ");
-    QCoreApplication::setApplicationName("PDF4QT Diff");
+QCoreApplication::setApplicationName("FamilyPDF Diff");
     QCoreApplication::setApplicationVersion(pdf::PDF_LIBRARY_VERSION);
-    QApplication::setApplicationDisplayName(QApplication::translate("Application", "PDF4QT Diff"));
+    QApplication::setApplicationDisplayName(QStringLiteral("FamilyPDF Diff"));
 
     QCommandLineOption noDrm("no-drm", "Disable DRM settings of documents.");
     QCommandLineOption lightGui("theme-light", "Use a light theme for the GUI.");

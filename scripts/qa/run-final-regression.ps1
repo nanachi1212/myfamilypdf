@@ -10,6 +10,8 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+. (Join-Path $repositoryRoot 'scripts\common\Resolve-FamilyPDFToolsRoot.ps1')
+$toolsRoot = Resolve-FamilyPDFToolsRoot -RepositoryRoot $repositoryRoot
 if ([string]::IsNullOrWhiteSpace($PackageDirectory)) {
     $PackageDirectory = Join-Path $repositoryRoot 'dist\FamilyPDF-windows-x64'
 }
@@ -236,7 +238,7 @@ $viewerMultiFile = Test-MultiDocumentSession -Executable (
 )
 $editorMultiFile = Test-MultiDocumentSession -Executable $editor
 
-$qtPrefix = 'E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
+$qtPrefix = Join-Path $toolsRoot 'qt\6.9.1\msvc2022_64'
 $lconvert = Join-Path $qtPrefix 'bin\lconvert.exe'
 Assert-File -LiteralPath $lconvert
 foreach ($locale in @('zh_TW', 'zh_CN')) {

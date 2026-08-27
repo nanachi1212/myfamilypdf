@@ -10,6 +10,8 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+. (Join-Path $RepositoryRoot 'scripts\common\Resolve-FamilyPDFToolsRoot.ps1')
+$ToolsRoot = Resolve-FamilyPDFToolsRoot -RepositoryRoot $RepositoryRoot
 if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
     $BuildDirectory = Join-Path $RepositoryRoot 'build\phase0-upstream-release'
 }
@@ -30,7 +32,7 @@ if (-not (Test-Path -LiteralPath (
     throw "Office export helper was not found: $officeExportSource"
 }
 
-$QtPrefix = 'E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
+$QtPrefix = Join-Path $ToolsRoot 'qt\6.9.1\msvc2022_64'
 $runtimeDirectory = Join-Path $BuildDirectory 'usr\bin'
 $vcpkgBin = Join-Path $BuildDirectory 'vcpkg_installed\x64-windows\bin'
 $targets = @(

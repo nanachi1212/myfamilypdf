@@ -3511,7 +3511,7 @@ void MainWindow::performOperation(Operation operation)
             break;
 
         case Operation::GetSource:
-            QDesktopServices::openUrl(QUrl("https://github.com/JakubMelka/PDF4QT"));
+    QDesktopServices::openUrl(QUrl("https://github.com/nanachi1212/myfamilypdf"));
             break;
 
         case Operation::BecomeSponsor:

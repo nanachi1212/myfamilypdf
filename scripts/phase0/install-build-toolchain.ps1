@@ -19,10 +19,9 @@ $VcpkgRepository = 'https://github.com/microsoft/vcpkg.git'
 $PyPiIndex = 'https://pypi.org/simple'
 
 $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-if ([string]::IsNullOrWhiteSpace($ToolsRoot)) {
-    $ToolsRoot = Join-Path (Split-Path $RepositoryRoot -Parent) 'FamilyPDF-tools'
-}
-$ToolsRoot = [System.IO.Path]::GetFullPath($ToolsRoot)
+. (Join-Path $RepositoryRoot 'scripts\common\Resolve-FamilyPDFToolsRoot.ps1')
+$ToolsRoot = Resolve-FamilyPDFToolsRoot -RepositoryRoot $RepositoryRoot `
+    -ExplicitRoot $ToolsRoot
 $QtRoot = Join-Path $ToolsRoot 'qt'
 $QtPrefix = Join-Path $QtRoot "$QtVersion\$QtInstallDirectoryName"
 $AqtVenv = Join-Path $ToolsRoot "aqt-$AqtVersion"

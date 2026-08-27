@@ -6443,6 +6443,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <source>Text color</source>
         <translation type="unfinished"></translation>
     </message>
+    <message><source>The Windows WIA scanner timed out and was stopped. Try scanning fewer pages.</source><translation>Windows WIA 掃描逾時並已停止。請嘗試減少掃描頁數。</translation></message>
 </context>
 <context>
     <name>SelectOutlineToRegroupDialog</name>
@@ -15300,5 +15301,6 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>將使用最�
 %1</translation></message>
     <message><source>The selected pages have no searchable text layer. Run FamilyPDF OCR, then export again.</source><translation>所選頁面沒有可搜尋文字層。請先執行 FamilyPDF OCR，再重新匯出。</translation></message>
     <message><source>Office export failed with exit code %1.</source><translation>Office 匯出失敗，結束代碼為 %1。</translation></message>
+    <message><source>Office export timed out and was stopped. Try fewer pages.</source><translation>Office 匯出逾時並已停止。請嘗試減少匯出頁數。</translation></message>
 </context>
 </TS>

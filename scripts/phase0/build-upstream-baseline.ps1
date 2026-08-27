@@ -9,13 +9,15 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+. (Join-Path $RepositoryRoot 'scripts\common\Resolve-FamilyPDFToolsRoot.ps1')
+$ToolsRoot = Resolve-FamilyPDFToolsRoot -RepositoryRoot $RepositoryRoot
 if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
     $BuildDirectory = Join-Path $RepositoryRoot 'build\phase0-upstream-release'
 }
 $BuildDirectory = [IO.Path]::GetFullPath($BuildDirectory)
 
-$QtPrefix = 'E:\CodexProject\FamilyPDF-tools\qt\6.9.1\msvc2022_64'
-$VcpkgRoot = 'E:\CodexProject\FamilyPDF-tools\vcpkg'
+$QtPrefix = Join-Path $ToolsRoot 'qt\6.9.1\msvc2022_64'
+$VcpkgRoot = Join-Path $ToolsRoot 'vcpkg'
 $VcpkgToolchain = Join-Path $VcpkgRoot 'scripts\buildsystems\vcpkg.cmake'
 $VsWhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
 $Targets = @(
@@ -50,7 +52,7 @@ if ($requiredToolchainFiles |
         throw "Toolchain files are missing and the bootstrap script was not found: $toolchainBootstrap"
     }
     Write-Host 'Required Qt/vcpkg files are missing. Running the verified local toolchain bootstrap...'
-    & $toolchainBootstrap
+    & $toolchainBootstrap -ToolsRoot $ToolsRoot
     if ($LASTEXITCODE -ne 0) {
         throw "Toolchain bootstrap failed with exit code $LASTEXITCODE."
     }

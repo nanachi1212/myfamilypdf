@@ -46,6 +46,22 @@ jobs:
         shell: powershell
         run: .\scripts\qa\test-release-metadata.ps1
 
+      - name: Verify toolchain path portability
+        shell: powershell
+        run: .\scripts\qa\test-toolchain-paths.ps1
+
+      - name: Verify bounded external process execution
+        shell: powershell
+        run: .\scripts\qa\test-external-process-contracts.ps1
+
+      - name: Verify installer in-place upgrade contract
+        shell: powershell
+        run: .\scripts\qa\test-installer-upgrade-contract.ps1
+
+      - name: Verify branding without settings identity drift
+        shell: powershell
+        run: .\scripts\qa\test-branding-contract.ps1
+
       - name: Verify OCR download hash enforcement and cleanup
         shell: powershell
         run: .\scripts\ocr\Test-OCR-Language-Download.ps1
