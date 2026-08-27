@@ -91,6 +91,11 @@ void PDFTextToSpeech::setDocument(const pdf::PDFModifiedDocument& document)
 
 void PDFTextToSpeech::updateVoices()
 {
+    if (!m_textToSpeech || !m_speechVoiceComboBox)
+    {
+        return;
+    }
+
     QVector<QVoice> voices = m_textToSpeech->availableVoices();
     m_speechVoiceComboBox->setUpdatesEnabled(false);
     m_speechVoiceComboBox->clear();
@@ -159,7 +164,20 @@ void PDFTextToSpeech::setSettings(const PDFViewerSettings* viewerSettings)
 
 void PDFTextToSpeech::setProxy(pdf::PDFDrawWidgetProxy* proxy)
 {
+    if (m_proxy)
+    {
+        disconnect(m_proxy->getTextLayoutCompiler(),
+                   &pdf::PDFAsynchronousTextLayoutCompiler::textLayoutChanged,
+                   this,
+                   &PDFTextToSpeech::updatePlay);
+    }
+
     m_proxy = proxy;
+    if (!m_proxy)
+    {
+        return;
+    }
+
     pdf::PDFAsynchronousTextLayoutCompiler* compiler = m_proxy->getTextLayoutCompiler();
     connect(compiler, &pdf::PDFAsynchronousTextLayoutCompiler::textLayoutChanged, this, &PDFTextToSpeech::updatePlay);
 }
@@ -466,6 +484,10 @@ void PDFTextToSpeech::updatePlay()
 
     Q_ASSERT(m_proxy);
     Q_ASSERT(m_document);
+    if (!m_proxy || !m_document || !m_textToSpeech)
+    {
+        return;
+    }
 
     // Jakub Melka: Check, if we have text layout. If not, then create it and return immediately.
     // Otherwise, check, if we have something to say.
@@ -520,6 +542,10 @@ void PDFTextToSpeech::updateToNextPage(pdf::PDFInteger pageIndex)
 {
     Q_ASSERT(m_document);
     Q_ASSERT(m_state == Playing);
+    if (!m_document || !m_proxy || !m_speechSynchronizeButton || !m_speechActualTextBrowser)
+    {
+        return;
+    }
 
     m_currentPage = pageIndex;
     const pdf::PDFInteger pageCount = m_document->getCatalog()->getPageCount();

@@ -36,6 +36,7 @@
 #include <QMainWindow>
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QSaveFile>
 
 namespace pdfplugin
 {
@@ -491,12 +492,19 @@ void SignaturePlugin::onSignDigitally()
         QString fileName = QFileDialog::getSaveFileName(m_dataExchangeInterface->getMainWindow(), tr("Save Signed Document"), getSignedFileName(), tr("Portable Document (*.pdf);;All files (*.*)"));
         if (!fileName.isEmpty())
         {
-            QFile signedFile(fileName);
-            if (signedFile.open(QFile::WriteOnly | QFile::Truncate))
+            QSaveFile signedFile(fileName);
+            signedFile.setDirectWriteFallback(false);
+            if (signedFile.open(QIODevice::WriteOnly) &&
+                signedFile.write(buffer.data()) == buffer.size() &&
+                signedFile.commit())
             {
-                signedFile.write(buffer.data());
-                signedFile.close();
+                return;
             }
+
+            QMessageBox::critical(
+                m_dataExchangeInterface->getMainWindow(),
+                tr("Save Signed Document"),
+                tr("Failed to save signed document: %1").arg(signedFile.errorString()));
         }
     }
 }

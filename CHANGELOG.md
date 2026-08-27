@@ -19,6 +19,8 @@
 
 - 修正文字轉語音狀態斷言使用賦值運算子。
 - 書籤 JSON 改用 `QSaveFile` 原子提交，寫入失敗時保留原檔。
+- 簽署 PDF 與附件輸出改用 `QSaveFile` 原子提交，避免直接截斷使用者輸出檔。
+- 文字轉語音的 proxy、語音引擎、播放文件與同步控制項加入 Release 建置仍有效的 null guard。
 - vcpkg manifests 與 PDF4QT CMake 版本統一為 1.6.0.0。
 
 ## [0.2.2-beta] - 2026-08-10

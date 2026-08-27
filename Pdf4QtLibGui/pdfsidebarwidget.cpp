@@ -56,8 +56,8 @@
 #include <QDialog>
 #include <QPushButton>
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
 #include <QStandardItemModel>
 #include <QSortFilterProxyModel>
 #include <QUrl>
@@ -990,11 +990,12 @@ bool PDFSidebarWidget::saveAttachmentToFile(const pdf::PDFFileSpecification* fil
     {
         QByteArray decodedStreamData = m_document->getDecodedStream(platformFile->getStream());
 
-        QFile file(fileName);
-        if (file.open(QFile::WriteOnly | QFile::Truncate))
+        QSaveFile file(fileName);
+        file.setDirectWriteFallback(false);
+        if (file.open(QIODevice::WriteOnly) &&
+            file.write(decodedStreamData) == decodedStreamData.size() &&
+            file.commit())
         {
-            file.write(decodedStreamData);
-            file.close();
             return true;
         }
 

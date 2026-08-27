@@ -54,6 +54,10 @@ jobs:
         shell: powershell
         run: .\scripts\qa\test-external-process-contracts.ps1
 
+      - name: Verify atomic output and TTS null-safety contracts
+        shell: powershell
+        run: .\scripts\qa\test-atomic-output-contracts.ps1
+
       - name: Verify installer in-place upgrade contract
         shell: powershell
         run: .\scripts\qa\test-installer-upgrade-contract.ps1

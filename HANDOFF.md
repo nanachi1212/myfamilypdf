@@ -37,6 +37,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 
 - FamilyPDF 版本：`0.2.3`。
 - 已完成核心 Bug、安全儲存、外部程序 timeout、路徑可攜性、品牌名稱與 Qt platform plugin 測試修正。
+- 依優先級補強簽署 PDF／附件的 `QSaveFile` 原子輸出，以及 TTS proxy、語音引擎、播放文件與同步控制項的 Release null guard；相關靜態契約已納入 GitHub validation workflow。
 - Editor、Reader、PageMaster、Diff 的顯示名稱與內部設定名稱均已統一為 FamilyPDF。
 - 已加入 `.github/dependabot.yml` 與 `.github/workflows/codeql.yml`。
 - 已建立 Inno Setup 覆蓋升級流程；保留正式 FamilyPDF AppId，0.2.2 可直接升級至 0.2.3，不需先解除安裝。
@@ -50,6 +51,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - Office Export Python unittest：`11/11 passed`。
 - OCR manifest、下載雜湊與竄改拒絕測試：通過。
 - Branding、installer upgrade、external process timeout、toolchain path contracts：通過。
+- Atomic output and TTS proxy contracts：通過；SignaturePlugin、Pdf4QtLibGui 與 Pdf4QtViewer 相關 target 建置成功。
 - PowerShell scripts 語法解析與 GitHub workflow YAML：通過。
 - 隔離安裝升級測試：`0.2.2 -> 0.2.3 passed`。
 - `git diff --check`：通過。
