@@ -23,6 +23,7 @@
 - 文字轉語音的 proxy、語音引擎、播放文件與同步控制項加入 Release 建置仍有效的 null guard。
 - 文字轉語音在 UI 尚未初始化或設定指標為空時不再更新不存在的控制項；空設定也會安全忽略。
 - `UnitTestsBookmarks` 固定使用 Qt `offscreen` 平台並部署對應 plugin，避免測試啟動時出現 Qt platform plugin 初始化錯誤。
+- 測試 CMake target 的共用輸出、連結與 CTest 設定集中到 `add_familypdf_qt_test()`，降低重複設定漂移。
 - vcpkg manifests 與 PDF4QT CMake 版本統一為 1.6.0.0。
 
 ## [0.2.2-beta] - 2026-08-10
