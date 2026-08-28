@@ -94,7 +94,7 @@ QCoreApplication::setApplicationName("FamilyPDF Reader");
 
     pdf::PDFWidgetUtils::setDarkTheme(isLightGui, isDarkGui);
 
-    QIcon appIcon(":/app-icon.svg");
+    QIcon appIcon(":/familypdf-app-icon.svg");
     QApplication::setWindowIcon(appIcon);
 
     const QStringList savedSession = pdfviewer::PDFSessionManager::loadPaths();

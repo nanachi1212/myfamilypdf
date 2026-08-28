@@ -70,7 +70,7 @@ QCoreApplication::setApplicationName("FamilyPDF Diff");
     pdf::PDFApplicationTranslator translator;
     translator.installTranslator();
 
-    QIcon appIcon(":/app-icon.svg");
+    QIcon appIcon(":/familypdf-app-icon.svg");
     QApplication::setWindowIcon(appIcon);
 
     pdfdiff::MainWindow mainWindow(nullptr);

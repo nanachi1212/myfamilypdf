@@ -1,5 +1,5 @@
 <RCC>
     <qresource prefix="/">
-        <file>app-icon.svg</file>
+        <file>familypdf-app-icon.svg</file>
     </qresource>
 </RCC>

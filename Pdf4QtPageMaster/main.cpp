@@ -101,7 +101,7 @@ QCoreApplication::setApplicationName("FamilyPDF PageMaster");
     pdf::PDFApplicationTranslator translator;
     translator.installTranslator();
 
-    QIcon appIcon(":/app-icon.svg");
+    QIcon appIcon(":/familypdf-app-icon.svg");
     QApplication::setWindowIcon(appIcon);
 
     pdfpagemaster::MainWindow mainWindow(nullptr);

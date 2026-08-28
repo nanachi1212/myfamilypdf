@@ -265,6 +265,92 @@ void PDFWidgetUtils::setDarkTheme(bool isLightTheme, bool isDarkTheme)
 
         QApplication::setPalette(darkPalette);
     }
+
+    const bool dark = PDFWidgetUtils::isDarkTheme();
+    const QString surface = dark ? QStringLiteral("#111827") : QStringLiteral("#F8FAFC");
+    const QString elevated = dark ? QStringLiteral("#1F2937") : QStringLiteral("#FFFFFF");
+    const QString border = dark ? QStringLiteral("#374151") : QStringLiteral("#D7DEE8");
+    const QString text = dark ? QStringLiteral("#F3F4F6") : QStringLiteral("#172033");
+    const QString muted = dark ? QStringLiteral("#9CA3AF") : QStringLiteral("#5B667A");
+    const QString accent = dark ? QStringLiteral("#60A5FA") : QStringLiteral("#2563EB");
+    const QString accentSurface = dark ? QStringLiteral("#1E3A5F") : QStringLiteral("#E8F0FF");
+
+    qApp->setStyleSheet(QStringLiteral(R"(
+        QMainWindow, QDialog { background: %1; color: %4; }
+        QToolBar {
+            background: %1;
+            border: 0;
+            border-bottom: 1px solid %3;
+            spacing: 4px;
+            padding: 6px 8px;
+        }
+        QToolButton {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            padding: 6px;
+            margin: 0;
+        }
+        QToolButton:hover, QToolButton:checked {
+            background: %7;
+            border-color: %3;
+        }
+        QToolButton:pressed { background: %6; }
+        QDockWidget { titlebar-close-icon: none; titlebar-normal-icon: none; }
+        QDockWidget::title {
+            background: %1;
+            color: %4;
+            border-bottom: 1px solid %3;
+            padding: 8px 10px;
+            font-weight: 600;
+        }
+        QTabBar::tab {
+            background: %1;
+            color: %5;
+            border: 1px solid transparent;
+            border-bottom: 2px solid transparent;
+            padding: 8px 14px;
+            margin-right: 2px;
+        }
+        QTabBar::tab:hover { color: %4; background: %7; }
+        QTabBar::tab:selected { color: %4; border-bottom-color: %6; background: %2; }
+        QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+            background: %2;
+            color: %4;
+            border: 1px solid %3;
+            border-radius: 5px;
+            padding: 5px 7px;
+            selection-background-color: %6;
+        }
+        QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus,
+        QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
+            border: 2px solid %6;
+            padding: 4px 6px;
+        }
+        QPushButton {
+            background: %2;
+            color: %4;
+            border: 1px solid %3;
+            border-radius: 5px;
+            padding: 7px 14px;
+            min-height: 18px;
+        }
+        QPushButton:hover { background: %7; border-color: %6; }
+        QPushButton:pressed { background: %6; color: white; }
+        QPushButton:default { background: %6; color: white; border-color: %6; }
+        QMenu { background: %2; color: %4; border: 1px solid %3; padding: 5px; }
+        QMenu::item { padding: 7px 28px 7px 10px; border-radius: 4px; }
+        QMenu::item:selected { background: %7; color: %4; }
+        QStatusBar { background: %1; color: %5; border-top: 1px solid %3; }
+        QGroupBox { border: 1px solid %3; border-radius: 6px; margin-top: 12px; padding-top: 12px; }
+        QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: %5; }
+        QScrollBar:vertical { background: %1; width: 12px; margin: 2px; }
+        QScrollBar::handle:vertical { background: %3; min-height: 30px; border-radius: 5px; }
+        QScrollBar::handle:vertical:hover { background: %5; }
+        QScrollBar:horizontal { background: %1; height: 12px; margin: 2px; }
+        QScrollBar::handle:horizontal { background: %3; min-width: 30px; border-radius: 5px; }
+        QToolTip { background: %2; color: %4; border: 1px solid %3; padding: 5px; }
+    )").arg(surface, elevated, border, text, muted, accent, accentSurface));
 }
 
 bool PDFWidgetUtils::isDarkTheme()

@@ -49,6 +49,8 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - Appx、WiX、Debian、Flatpak、AppStream 與 desktop metadata 的可見品牌／版本／來源已統一；技術 package ID 刻意保留以維持升級相容性。
 - 新增跨平台 branding contract，並將其與 AES contract 接入 GitHub validation。
 - Windows installer 編譯支援指定 runtime package 路徑，已避開同步工具鎖定舊 package 的本機封裝問題。
+- UI 已加入一致的 FamilyPDF light/dark visual system，統一工具列、Dock、分頁、按鈕、輸入框、選單、狀態列與捲軸的間距、色彩與互動狀態。
+- Viewer、Editor、PageMaster、Diff 已改用一致的 FamilyPDF SVG 應用程式圖標。
 - 已建立 Inno Setup 覆蓋升級流程；保留正式 FamilyPDF AppId，0.2.2 可直接升級至 0.2.3，不需先解除安裝。
 - 本機正式安裝已完成覆蓋升級，登錄版本為 `0.2.3`；安裝目錄中的主要 EXE 已與最終 package 雜湊一致。
 - 最終安裝包：`dist\\FamilyPDF-Full-Setup-x64.exe`。
@@ -72,12 +74,13 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - AES security contract、cross-platform branding contract：通過。
 - 1160 頁 PDF Windows locale smoke：繁中／簡中各通過 10 秒載入、回應性與記憶體採樣；正式安裝後再次通過。
 - 本機現有裸安裝覆蓋升級：installer exit code `0`，登錄版本 `0.2.3`，runtime `Pdf4QtLibCore.dll` 雜湊與新 package 一致。
+- UI 美化版重新編譯四個桌面程式、產生完整 installer；安裝後 Viewer 繁中／簡中 1160 頁 PDF smoke 均通過。
 
 ## 8. GitHub 狀態
 
 - Repository：`https://github.com/nanachi1212/myfamilypdf`
 - Branch：`codex/auto-ocr-v0.2.0`
-- 最近提交：`ca9433b8 fix: close remaining security and packaging gaps`。
+- 最近提交：待本次 UI 修改提交後更新。
 - 本文件的後續更新應另建提交並推送；不要把使用者秘密或未核准的個人檔案加入 Git。
 
 最後更新：2026-08-28。
