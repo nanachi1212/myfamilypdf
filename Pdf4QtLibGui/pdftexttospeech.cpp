@@ -108,9 +108,7 @@ void PDFTextToSpeech::updateVoices()
 
 void PDFTextToSpeech::setSettings(const PDFViewerSettings* viewerSettings)
 {
-    Q_ASSERT(viewerSettings);
-
-    if (!m_initialized)
+    if (!viewerSettings || !m_initialized)
     {
         // This object is not initialized yet
         return;
@@ -234,6 +232,20 @@ void PDFTextToSpeech::initializeUI(QComboBox* speechLocaleComboBox,
 
 void PDFTextToSpeech::updateUI()
 {
+    if (!m_initialized ||
+        !m_speechLocaleComboBox ||
+        !m_speechVoiceComboBox ||
+        !m_speechRateEdit ||
+        !m_speechVolumeEdit ||
+        !m_speechPitchEdit ||
+        !m_speechPlayButton ||
+        !m_speechPauseButton ||
+        !m_speechStopButton ||
+        !m_speechSynchronizeButton)
+    {
+        return;
+    }
+
     bool enableControls = false;
     bool enablePlay = false;
     bool enablePause = false;
