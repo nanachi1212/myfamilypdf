@@ -27,6 +27,10 @@
 - Office Export DOCX／XLSX writer 改用同目錄暫存檔與原子替換，並新增寫入路徑回歸測試。
 - recovery snapshot 與 `PDFSafeSaveService` 的 POSIX 覆蓋提交改用 `std::rename` 原子替換，避免先刪除目標檔造成資料遺失窗口。
 - vcpkg manifests 與 PDF4QT CMake 版本統一為 1.6.0.0。
+- AES 解密改為嚴格拒絕截斷、非區塊對齊及錯誤 PKCS#7 padding，並新增 AES-256 邊界／亂數 IV／錯誤輸入回歸測試。
+- Appx、WiX、Debian、Flatpak、AppStream 與 desktop metadata 的可見產品名稱、版本與來源統一為 FamilyPDF；為保留既有 Windows／Linux 升級識別，技術 package ID 維持原值。
+- 新增跨平台 metadata 與 AES 安全契約，接入 GitHub validation；新增 1160 頁 PDF 的繁中／簡中 Windows runtime 啟動、回應性與記憶體採樣 smoke。
+- installer 編譯腳本支援指定 runtime package 路徑，避免同步工具鎖定舊套件時無法產生可驗證的新 installer。
 
 ## [0.2.2-beta] - 2026-08-10
 

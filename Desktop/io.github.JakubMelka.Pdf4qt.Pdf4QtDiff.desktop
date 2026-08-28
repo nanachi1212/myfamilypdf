@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=PDF4QT Diff
+Name=FamilyPDF Diff
 Comment=Compare PDF documents
 Exec=Pdf4QtDiff %F
 Icon=io.github.JakubMelka.Pdf4qt.Pdf4QtDiff

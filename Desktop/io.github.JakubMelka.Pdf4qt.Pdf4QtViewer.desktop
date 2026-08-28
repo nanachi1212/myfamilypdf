@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=PDF4QT Viewer
+Name=FamilyPDF Viewer
 Comment=View and navigate PDF documents
 Exec=Pdf4QtViewer %f
 Icon=io.github.JakubMelka.Pdf4qt.Pdf4QtViewer

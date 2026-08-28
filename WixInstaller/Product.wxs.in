@@ -2,15 +2,15 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <?define MyInstallDir="${WIX_INSTALL_PREFIX}" ?>
 
-  <Product Id="*" Name="PDF4QT" Language="1033" Version="${PDF4QT_VERSION}" Manufacturer="Jakub Melka" UpgradeCode="26336d8a-b2e7-44fc-9a73-68aa99900c7a">
-    <Package Id="*" InstallerVersion="200" Compressed="yes" InstallScope="perMachine" Manufacturer="Jakub Melka" Keywords="pdf,editor,viewer" />
+  <Product Id="*" Name="FamilyPDF" Language="1033" Version="${FAMILYPDF_PACKAGE_VERSION}" Manufacturer="FamilyPDF" UpgradeCode="26336d8a-b2e7-44fc-9a73-68aa99900c7a">
+    <Package Id="*" InstallerVersion="200" Compressed="yes" InstallScope="perMachine" Manufacturer="FamilyPDF" Keywords="pdf,editor,viewer" />
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of PDF4QT is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of FamilyPDF is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <WixVariable Id="WixUILicenseRtf" Value="explic.rtf" />
 
-    <Feature Id="feature_PDF4QT_Framework" Title="PDF4QT" Level="1" ConfigurableDirectory="INSTALLFOLDER" Absent="disallow" AllowAdvertise="no" Display="expand" Description="Framework libraries and other data files required to run all other programs.">
+    <Feature Id="feature_PDF4QT_Framework" Title="FamilyPDF" Level="1" ConfigurableDirectory="INSTALLFOLDER" Absent="disallow" AllowAdvertise="no" Display="expand" Description="Framework libraries and other data files required to run all other programs.">
       <ComponentGroupRef Id="PDF4QT_Framework" />
       <ComponentRef Id="ProgramMenuDir" />
 
@@ -41,11 +41,11 @@
   <Fragment>
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFilesFolder">
-        <Directory Id="INSTALLFOLDER" Name="PDF4QT" />
+        <Directory Id="INSTALLFOLDER" Name="FamilyPDF" />
       </Directory>
       <Directory Id="DesktopFolder" Name="Desktop"/>
       <Directory Id="ProgramMenuFolder" Name="Programs">
-        <Directory Id="ProgramMenuDir" Name="PDF4QT">
+        <Directory Id="ProgramMenuDir" Name="FamilyPDF">
           <Component Id="ProgramMenuDir" Guid="{33A118A2-C455-45C1-9E0C-710750A71335}">
             <RemoveFolder Id="ProgramMenuDir" On="uninstall" />
             <RegistryValue Root="HKMU" Key="Software\[Manufacturer]\[ProductName]" Type="string" Value="" KeyPath="yes" />

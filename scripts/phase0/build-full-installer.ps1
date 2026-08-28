@@ -3,7 +3,9 @@ param(
     [switch]$SkipBasePackage,
     [switch]$SkipOcrPackage,
     [switch]$SkipDownload,
-    [switch]$VerificationBuild
+    [switch]$VerificationBuild,
+    [string]$BasePackageDirectory = '',
+    [string]$OcrPackageDirectory = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,6 +14,16 @@ Set-StrictMode -Version Latest
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $repositoryRoot 'scripts\common\Resolve-FamilyPDFToolsRoot.ps1')
 $appVersion = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'VERSION') -Raw -Encoding UTF8).Trim()
+$basePackage = if ([string]::IsNullOrWhiteSpace($BasePackageDirectory)) {
+    Join-Path $repositoryRoot 'dist\FamilyPDF-windows-x64'
+} else {
+    [IO.Path]::GetFullPath($BasePackageDirectory)
+}
+$ocrPackage = if ([string]::IsNullOrWhiteSpace($OcrPackageDirectory)) {
+    Join-Path $repositoryRoot 'dist\FamilyPDF-OCR-Plugin-windows-x64'
+} else {
+    [IO.Path]::GetFullPath($OcrPackageDirectory)
+}
 $toolsRoot = Resolve-FamilyPDFToolsRoot -RepositoryRoot $repositoryRoot
 $iscc = Join-Path $toolsRoot 'inno-7.0.2\ISCC.exe'
 
@@ -33,8 +45,6 @@ if (-not $SkipOcrPackage) {
     & (Join-Path $repositoryRoot 'scripts\ocr\build-ocr-plugin.ps1') @ocrArguments
 }
 
-$basePackage = Join-Path $repositoryRoot 'dist\FamilyPDF-windows-x64'
-$ocrPackage = Join-Path $repositoryRoot 'dist\FamilyPDF-OCR-Plugin-windows-x64'
 $requiredFiles = @(
     (Join-Path $basePackage 'Pdf4QtViewer.exe'),
     (Join-Path $basePackage 'Pdf4QtEditor.exe'),
@@ -52,7 +62,11 @@ foreach ($requiredFile in $requiredFiles) {
     }
 }
 
-$compilerArguments = @("/DMyAppVersion=$appVersion")
+$compilerArguments = @(
+    "/DMyAppVersion=$appVersion",
+    "/DBasePackageDir=$basePackage",
+    "/DOcrPackageDir=$ocrPackage"
+)
 if ($VerificationBuild) {
     $compilerArguments += '/DVerificationBuild'
 }

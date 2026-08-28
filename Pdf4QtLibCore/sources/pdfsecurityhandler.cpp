@@ -867,6 +867,7 @@ QByteArray PDFStandardOrPublicSecurityHandler::decryptUsingFilter(const QByteArr
 
     struct AES_data
     {
+        bool valid = false;
         QByteArray initializationVector;
         QByteArray paddedData;
     };
@@ -875,40 +876,41 @@ QByteArray PDFStandardOrPublicSecurityHandler::decryptUsingFilter(const QByteArr
     {
         AES_data result;
 
+        if (data.size() < AES_BLOCK_SIZE * 2 ||
+            (data.size() - AES_BLOCK_SIZE) % AES_BLOCK_SIZE != 0)
+        {
+            return result;
+        }
+
         result.initializationVector = data.left(AES_BLOCK_SIZE);
-
-        // This is an error. But to handle it, we resize the vector
-        // with arbitrary data.
-        if (result.initializationVector.size() < AES_BLOCK_SIZE)
-        {
-            result.initializationVector.resize(AES_BLOCK_SIZE);
-        }
-
         result.paddedData = data.mid(AES_BLOCK_SIZE);
-
-        // Remove errorneous data - we must have a data of multiple of AES_BLOCK_SIZE
-        const int remainder = result.paddedData.size() % AES_BLOCK_SIZE;
-        if (remainder != 0)
-        {
-            result.paddedData = result.paddedData.left(result.paddedData.size() - remainder);
-        }
+        result.valid = true;
 
         return result;
     };
 
     auto removeAES_padding = [](const QByteArray& data)
     {
-        if (data.isEmpty())
+        if (data.isEmpty() || data.size() % AES_BLOCK_SIZE != 0)
         {
-            return data;
+            return QByteArray();
         }
 
-        // If padding doesnt fit from 1 to AES_BLOCK_SIZE, then it is
-        // an error, but just clamp the value.
-        const int padding = data.back();
-        const int clampedPadding = qBound(1, padding, AES_BLOCK_SIZE);
+        const int padding = static_cast<unsigned char>(data.back());
+        if (padding < 1 || padding > AES_BLOCK_SIZE)
+        {
+            return QByteArray();
+        }
 
-        return data.left(data.size() - clampedPadding);
+        for (int i = 1; i <= padding; ++i)
+        {
+            if (static_cast<unsigned char>(data.at(data.size() - i)) != padding)
+            {
+                return QByteArray();
+            }
+        }
+
+        return data.left(data.size() - padding);
     };
 
     switch (filter.type)
@@ -943,7 +945,7 @@ QByteArray PDFStandardOrPublicSecurityHandler::decryptUsingFilter(const QByteArr
             AES_set_decrypt_key(objectEncryptionKey.data(), static_cast<int>(objectEncryptionKey.size()) * 8, &key);
 
             AES_data aes_data = prepareAES_data(data);
-            if (!aes_data.paddedData.isEmpty())
+            if (aes_data.valid)
             {
                 decryptedData.resize(aes_data.paddedData.size());
                 AES_cbc_encrypt(convertByteArrayToUcharPtr(aes_data.paddedData), convertByteArrayToUcharPtr(decryptedData), aes_data.paddedData.length(), &key, convertByteArrayToUcharPtr(aes_data.initializationVector), AES_DECRYPT);
@@ -960,7 +962,7 @@ QByteArray PDFStandardOrPublicSecurityHandler::decryptUsingFilter(const QByteArr
             AES_set_decrypt_key(convertByteArrayToUcharPtr(m_authorizationData.fileEncryptionKey), static_cast<int>(m_authorizationData.fileEncryptionKey.size()) * 8, &key);
 
             AES_data aes_data = prepareAES_data(data);
-            if (!aes_data.paddedData.isEmpty())
+            if (aes_data.valid)
             {
                 decryptedData.resize(aes_data.paddedData.size());
                 AES_cbc_encrypt(convertByteArrayToUcharPtr(aes_data.paddedData), convertByteArrayToUcharPtr(decryptedData), aes_data.paddedData.length(), &key, convertByteArrayToUcharPtr(aes_data.initializationVector), AES_DECRYPT);

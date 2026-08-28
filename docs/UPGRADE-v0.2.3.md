@@ -28,8 +28,8 @@
 ## 安裝包驗證
 
 - 產品版本：`0.2.3`
-- 檔案大小：`69,379,484 bytes`
-- SHA-256：`42FC159AA070DCEEAFA3BEB3583C4918FA562F9E88E3C5F7AA57E30D3FD1E57A`
+- 檔案大小：`59,476,484 bytes`
+- SHA-256：`C00A3439107260730FC33D17D83938BBC884AFBB869503380D75E656041F974E`
 
 可用 PowerShell 自行核對：
 
@@ -48,3 +48,5 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'E:\CodexProject\FamilyPDF\dist\Fami
 - 測試完成後，臨時安裝、登錄項目及暫存目錄已清除。
 
 完成隔離測試後，也已依照使用者授權，使用相同安裝包將本機正式 FamilyPDF 從 0.2.2 覆蓋升級為 0.2.3。正式安裝目錄中的 Editor、Reader、PageMaster 與 Diff 雜湊均與最終套件一致。
+
+本次修正版另外以相同安裝包完成本機現有裸安裝的覆蓋升級，安裝程式退出碼為 `0`，登錄版本仍為 `0.2.3`；`Pdf4QtLibCore.dll` 與新 runtime package 雜湊一致。安裝後以 1160 頁測試 PDF 分別執行繁中與簡中設定，每種設定均通過 10 秒回應性與記憶體採樣 smoke。

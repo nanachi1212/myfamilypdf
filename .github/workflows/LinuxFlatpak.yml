@@ -47,7 +47,7 @@ jobs:
         run: |
           COMMIT_HASH=$(git rev-parse HEAD)
           echo "Current commit hash: $COMMIT_HASH"
-          sed -i "s/PDF4QT_LAST_COMMIT/$COMMIT_HASH/g" ./Flatpak/io.github.JakubMelka.Pdf4qt.json
+            sed -i "s/FAMILYPDF_LAST_COMMIT/$COMMIT_HASH/g" ./Flatpak/io.github.JakubMelka.Pdf4qt.json
 
       - name: Build Flatpak
         run: |

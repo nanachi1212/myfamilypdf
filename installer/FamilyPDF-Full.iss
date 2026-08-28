@@ -3,6 +3,12 @@
 #define MyAppVersion "0.0.0-dev"
 #endif
 #define MyAppPublisher "FamilyPDF"
+#ifndef BasePackageDir
+#define BasePackageDir "..\dist\FamilyPDF-windows-x64"
+#endif
+#ifndef OcrPackageDir
+#define OcrPackageDir "..\dist\FamilyPDF-OCR-Plugin-windows-x64"
+#endif
 
 [Setup]
 AppId={{3EE743F2-F10D-4D69-A4C3-01834462FBA6}
@@ -87,8 +93,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "pdfshell"; Description: "{cm:PdfShellTask}"; GroupDescription: "{cm:WindowsIntegration}"
 
 [Files]
-Source: "..\dist\FamilyPDF-windows-x64\*"; DestDir: "{app}"; Excludes: "portable.mode"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: core
-Source: "..\dist\FamilyPDF-OCR-Plugin-windows-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: ocr
+Source: "{#BasePackageDir}\*"; DestDir: "{app}"; Excludes: "portable.mode"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: core
+Source: "{#OcrPackageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: ocr
 
 #ifndef VerificationBuild
 [Registry]

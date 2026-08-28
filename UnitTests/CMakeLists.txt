@@ -35,6 +35,7 @@ endfunction()
 add_familypdf_qt_test(UnitTests tst_lexicalanalyzertest.cpp)
 add_familypdf_qt_test(UnitTestsImageOptimizer tst_imageoptimizertest.cpp)
 add_familypdf_qt_test(UnitTestsFontEncoding tst_fontencodingtest.cpp)
+add_familypdf_qt_test(UnitTestsSecurity tst_securityhandlertest.cpp)
 
 add_familypdf_qt_test(UnitTestsBookmarks tst_bookmarkmanagertest.cpp)
 target_link_libraries(UnitTestsBookmarks PRIVATE Pdf4QtLibGui Qt6::Widgets)

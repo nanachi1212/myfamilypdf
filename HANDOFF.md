@@ -45,6 +45,10 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - recovery snapshot 與 `PDFSafeSaveService` 的非 Windows 覆蓋提交已改用 POSIX `std::rename` 原子替換，不再先刪除既有目標檔；新增 `test-posix-atomic-replacement-contract.ps1` 並接入 GitHub validation。
 - Editor、Reader、PageMaster、Diff 的顯示名稱與內部設定名稱均已統一為 FamilyPDF。
 - 已加入 `.github/dependabot.yml` 與 `.github/workflows/codeql.yml`。
+- AES 解密已拒絕截斷、非區塊對齊與錯誤 padding；新增 `UnitTestsSecurity`，並加入 AES 靜態安全契約。
+- Appx、WiX、Debian、Flatpak、AppStream 與 desktop metadata 的可見品牌／版本／來源已統一；技術 package ID 刻意保留以維持升級相容性。
+- 新增跨平台 branding contract，並將其與 AES contract 接入 GitHub validation。
+- Windows installer 編譯支援指定 runtime package 路徑，已避開同步工具鎖定舊 package 的本機封裝問題。
 - 已建立 Inno Setup 覆蓋升級流程；保留正式 FamilyPDF AppId，0.2.2 可直接升級至 0.2.3，不需先解除安裝。
 - 本機正式安裝已完成覆蓋升級，登錄版本為 `0.2.3`；安裝目錄中的主要 EXE 已與最終 package 雜湊一致。
 - 最終安裝包：`dist\\FamilyPDF-Full-Setup-x64.exe`。
@@ -52,7 +56,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 
 ## 7. 最近驗證結果
 
-- CTest：`6/6 passed`。
+- CTest：`7/7 passed`，包含 `UnitTestsSecurity` 的 AES-256 邊界、fresh IV、截斷 ciphertext 與錯誤 padding 測試。
 - Office Export Python unittest：`11/11 passed`。
 - OCR manifest、下載雜湊與竄改拒絕測試：通過。
 - Branding、installer upgrade、external process timeout、toolchain path contracts：通過。
@@ -65,12 +69,15 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - PowerShell scripts 語法解析與 GitHub workflow YAML：通過。
 - 隔離安裝升級測試：`0.2.2 -> 0.2.3 passed`。
 - `git diff --check`：通過。
+- AES security contract、cross-platform branding contract：通過。
+- 1160 頁 PDF Windows locale smoke：繁中／簡中各通過 10 秒載入、回應性與記憶體採樣；正式安裝後再次通過。
+- 本機現有裸安裝覆蓋升級：installer exit code `0`，登錄版本 `0.2.3`，runtime `Pdf4QtLibCore.dll` 雜湊與新 package 一致。
 
 ## 8. GitHub 狀態
 
 - Repository：`https://github.com/nanachi1212/myfamilypdf`
 - Branch：`codex/auto-ocr-v0.2.0`
-- 最近提交：`49e91b04 fix: preserve atomic replacement on POSIX paths`。
+- 最近提交：待本次修改提交後更新。
 - 本文件的後續更新應另建提交並推送；不要把使用者秘密或未核准的個人檔案加入 Git。
 
 最後更新：2026-08-28。

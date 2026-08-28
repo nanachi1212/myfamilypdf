@@ -4,11 +4,11 @@
   <id>io.github.JakubMelka.Pdf4qt</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
-  <name>PDF4QT</name>
+  <name>FamilyPDF</name>
   <summary>Open Source PDF Editor</summary>
   <description>
     <p>
-      Unleash the power of PDF4QT: Your go-to open source PDF editor. Beyond its capabilities in encryption, optimization, advanced annotations, editing, and signing, PDF4QT offers an extensive range of features to enhance your PDF experience. With intuitive PDF viewing/editing applications and a handy command-line tool, PDF4QT streamlines your PDF interactions. Discover its vast potential today.
+      FamilyPDF is an open source PDF viewer and editor with encryption, optimization, annotations, editing, signing, and document comparison features.
     </p>
   </description>
   <categories>
@@ -17,13 +17,13 @@
   </categories>
   <developer_name>Jakub Melka</developer_name>
   <url type="homepage">https://jakubmelka.github.io/</url>
-  <url type="bugtracker">https://github.com/JakubMelka/PDF4QT/issues</url>
-  <url type="help">https://github.com/JakubMelka/PDF4QT/discussions</url>
+  <url type="bugtracker">https://github.com/nanachi1212/myfamilypdf/issues</url>
+  <url type="help">https://github.com/nanachi1212/myfamilypdf/discussions</url>
   <update_contact>Mgr.Jakub.Melka_AT_gmail.com</update_contact>
   <content_rating type="oars-1.1"/>
   <launchable type="desktop-id">io.github.JakubMelka.Pdf4qt.desktop</launchable>
   <releases>
-    <release version="1.6.0.0" date="2026-06-14">
+    <release version="0.2.3" date="2026-08-28">
       <description>
         <ul>
           <li>Issue #389: Adding hyperlink to _internal_ object in PDF</li>
