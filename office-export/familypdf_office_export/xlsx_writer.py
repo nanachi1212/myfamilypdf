@@ -7,6 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 
+from .atomic_output import atomic_write
 from .model import ExtractedDocument
 
 
@@ -83,7 +84,7 @@ def write_xlsx(
     if not extracted.pages:
         workbook.active.title = "Export"
 
-    workbook.save(target)
+    atomic_write(target, workbook.save)
     return XlsxExportReport(
         pages_exported=len(extracted.pages),
         tables_exported=tables_exported,

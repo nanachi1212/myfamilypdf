@@ -7,6 +7,7 @@ from pathlib import Path
 from docx import Document
 from docx.shared import Emu, Pt
 
+from .atomic_output import atomic_write
 from .model import (
     ExtractedDocument,
     ExtractedImage,
@@ -169,7 +170,7 @@ def write_docx(
         if page_index + 1 < len(extracted.pages):
             document.add_page_break()
 
-    document.save(target)
+    atomic_write(target, document.save)
     return DocxExportReport(
         pages_exported=len(extracted.pages),
         paragraphs_exported=paragraphs_exported,

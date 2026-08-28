@@ -41,6 +41,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - `UnitTestsBookmarks` 已固定使用 Qt `offscreen` 平台並部署對應 plugin，修正測試啟動時可能出現的 platform plugin 初始化錯誤。
 - TTS 的 `updateUI()`、`setSettings()` 已補上 UI 初始化與 null 設定防護，避免 public lifecycle 呼叫順序造成 Release crash。
 - `UnitTests/CMakeLists.txt` 已將重複的測試 target 設定集中到共用函式；各測試 target 與 CTest 行為維持不變。
+- Office Export 的 DOCX／XLSX writer 已改用同目錄暫存檔與原子替換，Python 測試由 11/11 增至 13/13，並納入 GitHub validation。
 - Editor、Reader、PageMaster、Diff 的顯示名稱與內部設定名稱均已統一為 FamilyPDF。
 - 已加入 `.github/dependabot.yml` 與 `.github/workflows/codeql.yml`。
 - 已建立 Inno Setup 覆蓋升級流程；保留正式 FamilyPDF AppId，0.2.2 可直接升級至 0.2.3，不需先解除安裝。
@@ -58,6 +59,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - Qt test platform contract、`UnitTestsBookmarks` 直接執行與完整 CTest：通過（6/6）。
 - TTS lifecycle null-safety contract：通過；`Pdf4QtLibGui.dll` 增量建置成功。
 - 測試 CMake 重構後重新配置、建置 6 個測試 target，並通過完整 CTest 6/6。
+- Office Export Python unittest：13/13 通過；原子輸出回歸測試 2/2 通過。
 - PowerShell scripts 語法解析與 GitHub workflow YAML：通過。
 - 隔離安裝升級測試：`0.2.2 -> 0.2.3 passed`。
 - `git diff --check`：通過。
