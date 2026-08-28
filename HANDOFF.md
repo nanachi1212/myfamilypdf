@@ -70,7 +70,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 
 - Repository：`https://github.com/nanachi1212/myfamilypdf`
 - Branch：`codex/auto-ocr-v0.2.0`
-- 最近提交：以目前 Git log 為準（本次 POSIX 原子替換修正完成後更新）。
+- 最近提交：`49e91b04 fix: preserve atomic replacement on POSIX paths`。
 - 本文件的後續更新應另建提交並推送；不要把使用者秘密或未核准的個人檔案加入 Git。
 
 最後更新：2026-08-28。
