@@ -69,6 +69,10 @@ jobs:
         shell: powershell
         run: .\scripts\qa\test-qt-test-platform-contract.ps1
 
+      - name: Verify POSIX atomic replacement contracts
+        shell: powershell
+        run: .\scripts\qa\test-posix-atomic-replacement-contract.ps1
+
       - name: Verify installer in-place upgrade contract
         shell: powershell
         run: .\scripts\qa\test-installer-upgrade-contract.ps1

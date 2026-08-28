@@ -42,6 +42,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - TTS 的 `updateUI()`、`setSettings()` 已補上 UI 初始化與 null 設定防護，避免 public lifecycle 呼叫順序造成 Release crash。
 - `UnitTests/CMakeLists.txt` 已將重複的測試 target 設定集中到共用函式；各測試 target 與 CTest 行為維持不變。
 - Office Export 的 DOCX／XLSX writer 已改用同目錄暫存檔與原子替換，Python 測試由 11/11 增至 13/13，並納入 GitHub validation。
+- recovery snapshot 與 `PDFSafeSaveService` 的非 Windows 覆蓋提交已改用 POSIX `std::rename` 原子替換，不再先刪除既有目標檔；新增 `test-posix-atomic-replacement-contract.ps1` 並接入 GitHub validation。
 - Editor、Reader、PageMaster、Diff 的顯示名稱與內部設定名稱均已統一為 FamilyPDF。
 - 已加入 `.github/dependabot.yml` 與 `.github/workflows/codeql.yml`。
 - 已建立 Inno Setup 覆蓋升級流程；保留正式 FamilyPDF AppId，0.2.2 可直接升級至 0.2.3，不需先解除安裝。
@@ -60,6 +61,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - TTS lifecycle null-safety contract：通過；`Pdf4QtLibGui.dll` 增量建置成功。
 - 測試 CMake 重構後重新配置、建置 6 個測試 target，並通過完整 CTest 6/6。
 - Office Export Python unittest：13/13 通過；原子輸出回歸測試 2/2 通過。
+- POSIX atomic replacement contract：通過；Windows 分支仍使用既有 `ReplaceFileW`／`MoveFileExW`。
 - PowerShell scripts 語法解析與 GitHub workflow YAML：通過。
 - 隔離安裝升級測試：`0.2.2 -> 0.2.3 passed`。
 - `git diff --check`：通過。
@@ -68,7 +70,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 
 - Repository：`https://github.com/nanachi1212/myfamilypdf`
 - Branch：`codex/auto-ocr-v0.2.0`
-- 最近提交：`22aa58fd feat: ship FamilyPDF 0.2.3 hardening and upgrade`
+- 最近提交：以目前 Git log 為準（本次 POSIX 原子替換修正完成後更新）。
 - 本文件的後續更新應另建提交並推送；不要把使用者秘密或未核准的個人檔案加入 Git。
 
-最後更新：2026-08-27。
+最後更新：2026-08-28。

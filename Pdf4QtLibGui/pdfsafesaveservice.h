@@ -14,6 +14,7 @@
 #include <QUuid>
 
 #include <functional>
+#include <cstdio>
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -315,7 +316,11 @@ public:
             return result;
         }
 #else
-        if (!QFile::remove(sourcePath) || !QFile::rename(candidatePath, sourcePath))
+        const QByteArray nativeSource = QFile::encodeName(
+            QFileInfo(sourcePath).absoluteFilePath());
+        const QByteArray nativeCandidate = QFile::encodeName(
+            QFileInfo(candidatePath).absoluteFilePath());
+        if (std::rename(nativeCandidate.constData(), nativeSource.constData()) != 0)
         {
             result.status = Status::CommitFailed;
             result.errorMessage = QStringLiteral("Atomic file replacement failed.");

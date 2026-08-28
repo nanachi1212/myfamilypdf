@@ -54,6 +54,8 @@
 #include "pdffullscreenwidget.h"
 #include "pdfpagegeometry.h"
 
+#include <cstdio>
+
 #include <QMenu>
 #include <QPrinter>
 #include <QPrintDialog>
@@ -2353,8 +2355,11 @@ void PDFProgramController::startRecoverySnapshot()
                 return QString();
             }
 #else
-            QFile::remove(finalSnapshot);
-            if (!QFile::rename(temporarySnapshot, finalSnapshot))
+            const QByteArray nativeFinal = QFile::encodeName(
+                QFileInfo(finalSnapshot).absoluteFilePath());
+            const QByteArray nativeTemporary = QFile::encodeName(
+                QFileInfo(temporarySnapshot).absoluteFilePath());
+            if (std::rename(nativeTemporary.constData(), nativeFinal.constData()) != 0)
             {
                 return QString();
             }

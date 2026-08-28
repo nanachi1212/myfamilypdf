@@ -25,6 +25,7 @@
 - `UnitTestsBookmarks` 固定使用 Qt `offscreen` 平台並部署對應 plugin，避免測試啟動時出現 Qt platform plugin 初始化錯誤。
 - 測試 CMake target 的共用輸出、連結與 CTest 設定集中到 `add_familypdf_qt_test()`，降低重複設定漂移。
 - Office Export DOCX／XLSX writer 改用同目錄暫存檔與原子替換，並新增寫入路徑回歸測試。
+- recovery snapshot 與 `PDFSafeSaveService` 的 POSIX 覆蓋提交改用 `std::rename` 原子替換，避免先刪除目標檔造成資料遺失窗口。
 - vcpkg manifests 與 PDF4QT CMake 版本統一為 1.6.0.0。
 
 ## [0.2.2-beta] - 2026-08-10
