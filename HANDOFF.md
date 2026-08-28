@@ -80,7 +80,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 
 - Repository：`https://github.com/nanachi1212/myfamilypdf`
 - Branch：`codex/auto-ocr-v0.2.0`
-- 最近提交：待本次 UI 修改提交後更新。
+- 最近提交：`40dcc8b7 feat: refresh FamilyPDF desktop visual style`。
 - 本文件的後續更新應另建提交並推送；不要把使用者秘密或未核准的個人檔案加入 Git。
 
 最後更新：2026-08-28。
