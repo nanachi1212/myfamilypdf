@@ -269,8 +269,13 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     m_programController->initialize(PDFProgramController::Features(PDFProgramController::TextToSpeech | PDFProgramController::Tools), this, this, m_actionManager, m_progress);
     QAction* ocrAction = ui->menuTools->addAction(tr("Create Searchable PDF with OCR..."));
     connect(ocrAction, &QAction::triggered, m_programController, &PDFProgramController::launchOcrPlugin);
-    setCentralWidget(m_programController->getPdfWidget());
-    setFocusProxy(m_programController->getPdfWidget());
+
+    pdf::PDFWidget* pdfWidget = m_programController->getPdfWidget();
+    pdfWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(pdfWidget, &QWidget::customContextMenuRequested, this, &PDFViewerMainWindow::onPdfContextMenuRequested);
+
+    setCentralWidget(pdfWidget);
+    setFocusProxy(pdfWidget);
 
     m_sidebarWidget = new PDFSidebarWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), m_programController->getTextToSpeech(), m_programController->getCertificateStore(), m_programController->getBookmarkManager(), m_programController->getSettings(), false, this);
     m_sidebarDockWidget = new QDockWidget(tr("&Sidebar"), this);
@@ -678,6 +683,64 @@ void PDFViewerMainWindow::dropEvent(QDropEvent* event)
             event->acceptProposedAction();
         }
     }
+}
+
+void PDFViewerMainWindow::onPdfContextMenuRequested(const QPoint& pos)
+{
+    QMenu contextMenu;
+    pdf::PDFWidget* pdfWidget = m_programController->getPdfWidget();
+    pdf::PDFDrawWidgetProxy* proxy = pdfWidget->getDrawWidgetProxy();
+
+    auto onCopyText = [this]()
+    {
+        m_actionManager->getAction(PDFActionManager::CopyText)->trigger();
+    };
+
+    auto onAddBookmark = [this]()
+    {
+        m_actionManager->getAction(PDFActionManager::BookmarkPage)->trigger();
+    };
+
+    auto onAddText = [this]()
+    {
+        if (QAction* action = m_actionManager->getAction(PDFActionManager::CreateInlineText))
+        {
+            action->trigger();
+        }
+    };
+
+    auto onSelectText = [this]()
+    {
+        if (QAction* action = m_actionManager->getAction(PDFActionManager::ToolSelectText))
+        {
+            action->trigger();
+        }
+    };
+
+    // Basic operations
+    contextMenu.addAction(tr("Copy Text"), onCopyText);
+    contextMenu.addAction(tr("Select Text"), onSelectText);
+    contextMenu.addSeparator();
+
+    // Bookmark and annotation operations
+    contextMenu.addAction(tr("Add Bookmark"), onAddBookmark);
+    contextMenu.addAction(tr("Add Text"), onAddText);
+    contextMenu.addSeparator();
+
+    // Show sidebar
+    if (m_sidebarDockWidget)
+    {
+        contextMenu.addAction(m_sidebarDockWidget->toggleViewAction());
+        contextMenu.addSeparator();
+    }
+
+    // View options
+    contextMenu.addAction(ui->actionZoom_In);
+    contextMenu.addAction(ui->actionZoom_Out);
+    contextMenu.addAction(ui->actionFitPage);
+    contextMenu.addAction(ui->actionFitWidth);
+
+    contextMenu.exec(pdfWidget->mapToGlobal(pos));
 }
 
 }   // namespace pdfviewer

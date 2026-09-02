@@ -107,6 +107,7 @@ private:
 
     void onPageNumberSpinboxEditingFinished();
     void onPageZoomSpinboxEditingFinished();
+    void onPdfContextMenuRequested(const QPoint& pos);
 
     void onProgressStarted(pdf::ProgressStartupInfo info);
     void onProgressStep(int percentage);
