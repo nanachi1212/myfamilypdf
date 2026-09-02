@@ -75,12 +75,14 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - 1160 頁 PDF Windows locale smoke：繁中／簡中各通過 10 秒載入、回應性與記憶體採樣；正式安裝後再次通過。
 - 本機現有裸安裝覆蓋升級：installer exit code `0`，登錄版本 `0.2.3`，runtime `Pdf4QtLibCore.dll` 雜湊與新 package 一致。
 - UI 美化版重新編譯四個桌面程式、產生完整 installer；安裝後 Viewer 繁中／簡中 1160 頁 PDF smoke 均通過。
+- 標準化對話框語意狀態圖標的配色：16 個 accept/reject/result-* 圖標（Editor、Signature 外掛，以及通用的 result-ok/error/warning/information）的色階收斂為 Tailwind 色系（綠 #16A34A、紅 #DC2626、琥珀 #D97706），「資訊」藍改用與 QSS 主題強調色相同的 `#2563EB`。保留 settings 對話框內 12 個功能圖標（cache、cms、engine、form-settings、plugins、rendering、security、shading、shortcuts、signature、speech、ui）的原始多色設計，因為使用者反饋多色版本更能區分不同功能區域。變更前後皆用瀏覽器渲染做視覺比對，並以 XML parser 驗證所有圖標仍為合法 SVG；純色彩調整，未變更任何圖標的形狀路徑或程式碼。
 
 ## 8. GitHub 狀態
 
 - Repository：`https://github.com/nanachi1212/myfamilypdf`
 - Branch：`codex/auto-ocr-v0.2.0`
-- 最近提交：`40dcc8b7 feat: refresh FamilyPDF desktop visual style`。
+- 最近提交：`40dcc8b7 feat: refresh FamilyPDF desktop visual style`；本次圖標配色統一尚未提交。
 - 本文件的後續更新應另建提交並推送；不要把使用者秘密或未核准的個人檔案加入 Git。
+- 尚未驗證：本次圖標變更未經實機建置／執行驗證（僅瀏覽器渲染比對），建議下次有建置環境時重新編譯四個桌面程式並用實際 Settings 對話框、Editor/Signature 外掛面板做視覺回歸。
 
-最後更新：2026-08-28。
+最後更新：2026-09-02。

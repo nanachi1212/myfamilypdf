@@ -14,6 +14,7 @@
 - Office Export 與 Windows WIA Scanner 加入可設定 watchdog，取消或逾時時會終止外部程序。
 - 主視窗套用一致的 FamilyPDF light/dark visual system：工具列、Dock、分頁、按鈕、輸入框、選單、狀態列與捲軸具有統一間距、邊框、hover、pressed、focus 狀態。
 - Viewer、Editor、PageMaster、Diff 改用一致的 FamilyPDF SVG 應用程式圖標。
+- 標準化語意狀態圖標的配色：accept/reject/result 等對話框狀態圖標的綠／紅／琥珀／藍色階各自收斂為單一色階（green-600、red-600、amber-600），其中「資訊」藍改為與 QSS 主題強調色一致的 `#2563EB`。
 - FamilyPDF 工具根目錄預設從 repository 同層解析，也可用 `FAMILYPDF_TOOLS_ROOT` 覆寫。
 - Editor、Reader、PageMaster 與 Diff 的顯示名稱和內部設定名稱統一改為 FamilyPDF；本版不搬移舊 PDF4QT 偏好設定。
 
