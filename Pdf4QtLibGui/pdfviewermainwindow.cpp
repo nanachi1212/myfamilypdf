@@ -725,6 +725,18 @@ void PDFViewerMainWindow::onPdfContextMenuRequested(const QPoint& pos)
     // Bookmark and annotation operations
     contextMenu.addAction(tr("Add Bookmark"), onAddBookmark);
     contextMenu.addAction(tr("Add Text"), onAddText);
+
+    if (QAction* highlightAction = m_actionManager->getAction(PDFActionManager::CreateTextHighlight))
+    {
+        contextMenu.addAction(highlightAction);
+    }
+
+    if (QActionGroup* stickyNoteGroup = m_actionManager->getActionGroup(PDFActionManager::CreateStickyNoteGroup))
+    {
+        QMenu* stickyNoteMenu = contextMenu.addMenu(tr("Add Sticky Note"));
+        stickyNoteMenu->addActions(stickyNoteGroup->actions());
+    }
+
     contextMenu.addSeparator();
 
     // Show sidebar
