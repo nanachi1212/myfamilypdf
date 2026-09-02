@@ -689,64 +689,34 @@ void PDFViewerMainWindow::onPdfContextMenuRequested(const QPoint& pos)
 {
     QMenu contextMenu;
     pdf::PDFWidget* pdfWidget = m_programController->getPdfWidget();
-    pdf::PDFDrawWidgetProxy* proxy = pdfWidget->getDrawWidgetProxy();
 
-    auto onCopyText = [this]()
-    {
-        m_actionManager->getAction(PDFActionManager::CopyText)->trigger();
-    };
-
-    auto onAddBookmark = [this]()
-    {
-        m_actionManager->getAction(PDFActionManager::BookmarkPage)->trigger();
-    };
-
-    auto onAddText = [this]()
-    {
-        if (QAction* action = m_actionManager->getAction(PDFActionManager::CreateInlineText))
-        {
-            action->trigger();
-        }
-    };
-
-    auto onSelectText = [this]()
-    {
-        if (QAction* action = m_actionManager->getAction(PDFActionManager::ToolSelectText))
-        {
-            action->trigger();
-        }
-    };
-
-    // Basic operations
-    contextMenu.addAction(tr("Copy Text"), onCopyText);
-    contextMenu.addAction(tr("Select Text"), onSelectText);
+    // The tools maintain the enabled state of these actions themselves, see
+    // PDFSelectTextTool::updateActions(): copy and deselect are enabled only when
+    // the text selection tool is active and the selection is not empty. Add the
+    // actions directly so the menu inherits that state instead of duplicating
+    // selection detection here.
+    contextMenu.addAction(ui->actionCopyText);
+    contextMenu.addAction(ui->actionSelectTextAll);
+    contextMenu.addAction(ui->actionDeselectText);
     contextMenu.addSeparator();
 
-    // Bookmark and annotation operations
-    contextMenu.addAction(tr("Add Bookmark"), onAddBookmark);
-    contextMenu.addAction(tr("Add Text"), onAddText);
-
-    if (QAction* highlightAction = m_actionManager->getAction(PDFActionManager::CreateTextHighlight))
-    {
-        contextMenu.addAction(highlightAction);
-    }
-
-    if (QActionGroup* stickyNoteGroup = m_actionManager->getActionGroup(PDFActionManager::CreateStickyNoteGroup))
-    {
-        QMenu* stickyNoteMenu = contextMenu.addMenu(tr("Add Sticky Note"));
-        stickyNoteMenu->addActions(stickyNoteGroup->actions());
-    }
+    // Tools are modes, not operations on the current selection. They are
+    // checkable, so the menu shows which one is active.
+    QMenu* toolsMenu = contextMenu.addMenu(tr("Tools"));
+    toolsMenu->addAction(ui->actionSelectText);
+    toolsMenu->addAction(ui->actionSelectTable);
+    toolsMenu->addAction(ui->actionMagnifier);
 
     contextMenu.addSeparator();
+    contextMenu.addAction(ui->actionBookmarkPage);
+    contextMenu.addSeparator();
 
-    // Show sidebar
     if (m_sidebarDockWidget)
     {
         contextMenu.addAction(m_sidebarDockWidget->toggleViewAction());
         contextMenu.addSeparator();
     }
 
-    // View options
     contextMenu.addAction(ui->actionZoom_In);
     contextMenu.addAction(ui->actionZoom_Out);
     contextMenu.addAction(ui->actionFitPage);
