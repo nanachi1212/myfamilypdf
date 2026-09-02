@@ -708,7 +708,29 @@ void PDFViewerMainWindow::onPdfContextMenuRequested(const QPoint& pos)
     toolsMenu->addAction(ui->actionMagnifier);
 
     contextMenu.addSeparator();
-    contextMenu.addAction(ui->actionBookmarkPage);
+
+    // The toolbar action bookmarks the current page, which in a continuous or
+    // two page layout is the lowest visible page and not necessarily the page
+    // the user clicked on. Resolve the clicked page instead. The position is
+    // relative to the PDFWidget, while the page layout is relative to the draw
+    // widget placed inside it, so it has to be mapped first.
+    QWidget* drawWidget = pdfWidget->getDrawWidget()->getWidget();
+    const QPoint drawWidgetPos = drawWidget->mapFrom(pdfWidget, pos);
+    const pdf::PDFInteger pageIndex = pdfWidget->getDrawWidgetProxy()->getPageUnderPoint(drawWidgetPos, nullptr);
+
+    auto onBookmarkPage = [this, pageIndex]()
+    {
+        m_programController->getBookmarkManager()->toggleBookmark(pageIndex);
+    };
+
+    QAction* bookmarkAction = contextMenu.addAction(ui->actionBookmarkPage->icon(),
+                                                   ui->actionBookmarkPage->text(),
+                                                   this, onBookmarkPage);
+
+    // No page was clicked, for example the gap between pages. Bookmarking some
+    // other visible page would be arbitrary, so the action is offered disabled.
+    bookmarkAction->setEnabled(pageIndex != -1);
+
     contextMenu.addSeparator();
 
     if (m_sidebarDockWidget)
