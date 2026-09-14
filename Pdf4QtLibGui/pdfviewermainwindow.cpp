@@ -269,8 +269,13 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     m_programController->initialize(PDFProgramController::Features(PDFProgramController::TextToSpeech | PDFProgramController::Tools), this, this, m_actionManager, m_progress);
     QAction* ocrAction = ui->menuTools->addAction(tr("Create Searchable PDF with OCR..."));
     connect(ocrAction, &QAction::triggered, m_programController, &PDFProgramController::launchOcrPlugin);
-    setCentralWidget(m_programController->getPdfWidget());
-    setFocusProxy(m_programController->getPdfWidget());
+
+    pdf::PDFWidget* pdfWidget = m_programController->getPdfWidget();
+    pdfWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(pdfWidget, &QWidget::customContextMenuRequested, this, &PDFViewerMainWindow::onPdfContextMenuRequested);
+
+    setCentralWidget(pdfWidget);
+    setFocusProxy(pdfWidget);
 
     m_sidebarWidget = new PDFSidebarWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), m_programController->getTextToSpeech(), m_programController->getCertificateStore(), m_programController->getBookmarkManager(), m_programController->getSettings(), false, this);
     m_sidebarDockWidget = new QDockWidget(tr("&Sidebar"), this);
@@ -678,6 +683,68 @@ void PDFViewerMainWindow::dropEvent(QDropEvent* event)
             event->acceptProposedAction();
         }
     }
+}
+
+void PDFViewerMainWindow::onPdfContextMenuRequested(const QPoint& pos)
+{
+    QMenu contextMenu;
+    pdf::PDFWidget* pdfWidget = m_programController->getPdfWidget();
+
+    // The tools maintain the enabled state of these actions themselves, see
+    // PDFSelectTextTool::updateActions(): copy and deselect are enabled only when
+    // the text selection tool is active and the selection is not empty. Add the
+    // actions directly so the menu inherits that state instead of duplicating
+    // selection detection here.
+    contextMenu.addAction(ui->actionCopyText);
+    contextMenu.addAction(ui->actionSelectTextAll);
+    contextMenu.addAction(ui->actionDeselectText);
+    contextMenu.addSeparator();
+
+    // Tools are modes, not operations on the current selection. They are
+    // checkable, so the menu shows which one is active.
+    QMenu* toolsMenu = contextMenu.addMenu(tr("Tools"));
+    toolsMenu->addAction(ui->actionSelectText);
+    toolsMenu->addAction(ui->actionSelectTable);
+    toolsMenu->addAction(ui->actionMagnifier);
+
+    contextMenu.addSeparator();
+
+    // The toolbar action bookmarks the current page, which in a continuous or
+    // two page layout is the lowest visible page and not necessarily the page
+    // the user clicked on. Resolve the clicked page instead. The position is
+    // relative to the PDFWidget, while the page layout is relative to the draw
+    // widget placed inside it, so it has to be mapped first.
+    QWidget* drawWidget = pdfWidget->getDrawWidget()->getWidget();
+    const QPoint drawWidgetPos = drawWidget->mapFrom(pdfWidget, pos);
+    const pdf::PDFInteger pageIndex = pdfWidget->getDrawWidgetProxy()->getPageUnderPoint(drawWidgetPos, nullptr);
+
+    auto onBookmarkPage = [this, pageIndex]()
+    {
+        m_programController->getBookmarkManager()->toggleBookmark(pageIndex);
+    };
+
+    QAction* bookmarkAction = contextMenu.addAction(ui->actionBookmarkPage->icon(),
+                                                   ui->actionBookmarkPage->text(),
+                                                   this, onBookmarkPage);
+
+    // No page was clicked, for example the gap between pages. Bookmarking some
+    // other visible page would be arbitrary, so the action is offered disabled.
+    bookmarkAction->setEnabled(pageIndex != -1);
+
+    contextMenu.addSeparator();
+
+    if (m_sidebarDockWidget)
+    {
+        contextMenu.addAction(m_sidebarDockWidget->toggleViewAction());
+        contextMenu.addSeparator();
+    }
+
+    contextMenu.addAction(ui->actionZoom_In);
+    contextMenu.addAction(ui->actionZoom_Out);
+    contextMenu.addAction(ui->actionFitPage);
+    contextMenu.addAction(ui->actionFitWidth);
+
+    contextMenu.exec(pdfWidget->mapToGlobal(pos));
 }
 
 }   // namespace pdfviewer
