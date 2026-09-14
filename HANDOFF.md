@@ -80,9 +80,9 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 ## 8. GitHub 狀態
 
 - Repository：`https://github.com/nanachi1212/myfamilypdf`
-- Branch：`codex/auto-ocr-v0.2.0`
-- 最近提交：`40dcc8b7 feat: refresh FamilyPDF desktop visual style`；本次圖標配色統一尚未提交。
+- Branch：`feature/pdf-context-menu`
+- 本分支已將狀態圖標配色與 PDF 頁面右鍵選單整理為獨立提交；右鍵書籤會以游標實際點擊的頁面為目標。
 - 本文件的後續更新應另建提交並推送；不要把使用者秘密或未核准的個人檔案加入 Git。
 - 尚未驗證：本次圖標變更未經實機建置／執行驗證（僅瀏覽器渲染比對），建議下次有建置環境時重新編譯四個桌面程式並用實際 Settings 對話框、Editor/Signature 外掛面板做視覺回歸。
 
-最後更新：2026-09-02。
+最後更新：2026-09-14。
