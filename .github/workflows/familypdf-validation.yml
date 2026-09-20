@@ -3,7 +3,9 @@ name: FamilyPDF validation
 on:
   push:
     branches:
+      - main
       - "codex/**"
+      - "feature/**"
   pull_request:
   workflow_dispatch:
 
@@ -11,6 +13,52 @@ permissions:
   contents: read
 
 jobs:
+  windows-build-and-runtime:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      FAMILYPDF_TOOLS_ROOT: ${{ runner.temp }}\FamilyPDF-tools
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ runner.temp }}\vcpkg-binary-cache
+      FAMILYPDF_TEST_ARTIFACT_DIR: ${{ github.workspace }}\build\test-artifacts
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Restore pinned Qt and vcpkg toolchain
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ runner.temp }}\FamilyPDF-tools
+            ${{ runner.temp }}\vcpkg-binary-cache
+          key: windows-family-pdf-tools-v3-${{ hashFiles('scripts/phase0/install-build-toolchain.ps1', 'vcpkg.json', 'vcpkg-configuration.json') }}
+          restore-keys: |
+            windows-family-pdf-tools-v3-
+
+      - name: Configure, build and run C++ tests
+        shell: powershell
+        run: .\scripts\phase0\build-upstream-baseline.ps1 -Stage All
+
+      - name: Launch Viewer and open generated PDF
+        shell: powershell
+        run: |
+          .\scripts\qa\smoke-viewer.ps1 `
+            -RuntimeDirectory .\build\phase0-upstream-release\usr\bin `
+            -PdfFile .\build\test-artifacts\viewer-smoke.pdf `
+            -OutputDirectory .\build\test-artifacts\viewer-process
+
+      - name: Upload runtime validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-runtime-validation
+          path: |
+            build/phase0-upstream-release/*.log
+            build/phase0-upstream-release/phase0-build-metrics.json
+            build/phase0-upstream-release/Testing/Temporary/*.log
+            build/test-artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
   powershell-and-ocr-metadata:
     runs-on: windows-latest
     steps:

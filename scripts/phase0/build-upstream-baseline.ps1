@@ -35,6 +35,8 @@ $Targets = @(
     'UnitTests',
     'UnitTestsImageOptimizer',
     'UnitTestsFontEncoding',
+    'UnitTestsSecurity',
+    'UnitTestsViewer',
     'UnitTestsBookmarks',
     'UnitTestsForms',
     'UnitTestsDocumentEdit',
@@ -123,9 +125,21 @@ function Invoke-LoggedNative {
     $startArguments = @($ArgumentList | ForEach-Object {
         '"' + $_.Replace('"', '\"') + '"'
     })
-    $process = Start-Process -FilePath $FilePath -ArgumentList $startArguments -NoNewWindow -Wait -PassThru `
-        -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+    $processArguments = @{
+        FilePath = $FilePath
+        ArgumentList = $startArguments
+        NoNewWindow = $true
+        PassThru = $true
+        RedirectStandardOutput = $stdoutPath
+        RedirectStandardError = $stderrPath
+    }
+    $process = Start-Process @processArguments
+    # Wait for the requested command, not persistent compiler descendants such
+    # as mspdbsrv.exe. Cache the handle before a short-lived command can exit.
+    $null = $process.Handle
+    $process.WaitForExit()
     $exitCode = $process.ExitCode
+    $process.Dispose()
     $output = @(
         if (Test-Path -LiteralPath $stdoutPath) { Get-Content -LiteralPath $stdoutPath }
         if (Test-Path -LiteralPath $stderrPath) { Get-Content -LiteralPath $stderrPath }

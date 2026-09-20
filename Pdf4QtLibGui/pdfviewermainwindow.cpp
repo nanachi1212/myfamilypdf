@@ -702,7 +702,7 @@ void PDFViewerMainWindow::onPdfContextMenuRequested(const QPoint& pos)
 
     // Tools are modes, not operations on the current selection. They are
     // checkable, so the menu shows which one is active.
-    QMenu* toolsMenu = contextMenu.addMenu(tr("Tools"));
+    QMenu* toolsMenu = contextMenu.addMenu(ui->menuTools->title());
     toolsMenu->addAction(ui->actionSelectText);
     toolsMenu->addAction(ui->actionSelectTable);
     toolsMenu->addAction(ui->actionMagnifier);
