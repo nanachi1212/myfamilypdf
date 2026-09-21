@@ -17,8 +17,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     env:
-      FAMILYPDF_TOOLS_ROOT: ${{ runner.temp }}\FamilyPDF-tools
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ runner.temp }}\vcpkg-binary-cache
+      FAMILYPDF_TOOLS_ROOT: ${{ github.workspace }}\build-tools
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg-binary-cache
       FAMILYPDF_TEST_ARTIFACT_DIR: ${{ github.workspace }}\build\test-artifacts
     steps:
       - name: Checkout repository
@@ -28,8 +28,8 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
-            ${{ runner.temp }}\FamilyPDF-tools
-            ${{ runner.temp }}\vcpkg-binary-cache
+            ${{ github.workspace }}\build-tools
+            ${{ github.workspace }}\vcpkg-binary-cache
           key: windows-family-pdf-tools-v3-${{ hashFiles('scripts/phase0/install-build-toolchain.ps1', 'vcpkg.json', 'vcpkg-configuration.json') }}
           restore-keys: |
             windows-family-pdf-tools-v3-
