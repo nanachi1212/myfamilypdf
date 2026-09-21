@@ -57,7 +57,9 @@ add_familypdf_qt_test(UnitTestsForms tst_formbuildertest.cpp)
 add_familypdf_qt_test(UnitTestsDocumentEdit tst_documentedittest.cpp)
 
 if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
-    add_familypdf_qt_test(UnitTestsViewer tst_viewercontextmenutest.cpp -v2)
+    add_familypdf_qt_test(UnitTestsViewer tst_viewercontextmenutest.cpp
+        -o "${CMAKE_BINARY_DIR}/viewer-test.log,txt"
+        -v2)
     target_link_libraries(UnitTestsViewer PRIVATE Pdf4QtLibGui Pdf4QtLibWidgets Qt6::Widgets Qt6::Svg)
     target_compile_definitions(UnitTestsViewer PRIVATE
         EDITOR_PLUGIN_PATH="$<TARGET_FILE:EditorPlugin>"
