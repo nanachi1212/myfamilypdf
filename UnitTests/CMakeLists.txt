@@ -29,7 +29,7 @@ function(add_familypdf_qt_test target source)
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
     )
-    add_test(${target} "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/${target}")
+    add_test(${target} "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/${target}" ${ARGN})
 endfunction()
 
 add_familypdf_qt_test(UnitTests tst_lexicalanalyzertest.cpp)
@@ -57,7 +57,7 @@ add_familypdf_qt_test(UnitTestsForms tst_formbuildertest.cpp)
 add_familypdf_qt_test(UnitTestsDocumentEdit tst_documentedittest.cpp)
 
 if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
-    add_familypdf_qt_test(UnitTestsViewer tst_viewercontextmenutest.cpp)
+    add_familypdf_qt_test(UnitTestsViewer tst_viewercontextmenutest.cpp -v2)
     target_link_libraries(UnitTestsViewer PRIVATE Pdf4QtLibGui Pdf4QtLibWidgets Qt6::Widgets Qt6::Svg)
     target_compile_definitions(UnitTestsViewer PRIVATE
         EDITOR_PLUGIN_PATH="$<TARGET_FILE:EditorPlugin>"

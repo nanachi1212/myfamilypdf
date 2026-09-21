@@ -8,6 +8,7 @@
 
 - Inno Setup 覆蓋升級契約：沿用既有 FamilyPDF `AppId`、安裝目錄、語言、元件與工作選項，不要求先解除安裝 0.2.2。
 - 書籤原子替換失敗回歸、外部程式 timeout 契約與工具鏈路徑可攜性驗證。
+- Viewer 頁面右鍵選單：複製文字、全選／取消選取、文字／表格／放大鏡工具、游標頁面書籤、側欄、縮放與符合頁面／寬度。
 
 ### Changed
 
@@ -34,6 +35,7 @@
 - Appx、WiX、Debian、Flatpak、AppStream 與 desktop metadata 的可見產品名稱、版本與來源統一為 FamilyPDF；為保留既有 Windows／Linux 升級識別，技術 package ID 維持原值。
 - 新增跨平台 metadata 與 AES 安全契約，接入 GitHub validation；新增 1160 頁 PDF 的繁中／簡中 Windows runtime 啟動、回應性與記憶體採樣 smoke。
 - installer 編譯腳本支援指定 runtime package 路徑，避免同步工具鎖定舊套件時無法產生可驗證的新 installer。
+- Viewer 右鍵書籤以滑鼠實際點擊頁面為目標；點在頁面間空白處時停用，避免誤加最低可見頁面。
 
 ## [0.2.2-beta] - 2026-08-10
 

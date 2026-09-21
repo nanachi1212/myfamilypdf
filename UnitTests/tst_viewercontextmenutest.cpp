@@ -85,12 +85,16 @@ void ViewerContextMenuTest::initTestCase()
 
 void ViewerContextMenuTest::init()
 {
+    qInfo() << "ViewerContextMenuTest: construct window";
     m_window = std::make_unique<pdfviewer::PDFViewerMainWindow>();
+    qInfo() << "ViewerContextMenuTest: show window";
     m_window->resize(1100, 900);
     m_window->show();
+    qInfo() << "ViewerContextMenuTest: open fixture";
     m_window->getProgramController()->openDocument(m_pdfPath);
     QTRY_VERIFY_WITH_TIMEOUT(m_window->getProgramController()->getDocument() != nullptr, 15000);
     QTRY_VERIFY(!m_window->getProgramController()->getIsBusy());
+    qInfo() << "ViewerContextMenuTest: fixture opened";
     QCOMPARE(m_window->getProgramController()->getDocument()->getCatalog()->getPageCount(), size_t(3));
     auto* bookmarks = m_window->getProgramController()->getBookmarkManager();
     bookmarks->setGenerateBookmarksAutomatically(false);
@@ -98,6 +102,7 @@ void ViewerContextMenuTest::init()
     proxy()->setPageLayout(pdf::PageLayout::OneColumn);
     proxy()->zoom(0.5);
     QTRY_VERIFY(pagePoint(0).x() >= 0);
+    qInfo() << "ViewerContextMenuTest: initialization complete";
 }
 
 void ViewerContextMenuTest::cleanup()
