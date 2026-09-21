@@ -413,6 +413,11 @@ PDFEditorMainWindow::~PDFEditorMainWindow()
     editorDocumentWindows().removeAll(this);
     removeDeletedEditorWindows();
 
+    // Detach views and models from the document while the controller still
+    // owns it. The window can be destroyed directly (for example by tests or
+    // an embedding application) without receiving closeEvent() first.
+    m_programController->closeDocument();
+
     delete m_programController;
     m_programController = nullptr;
 
