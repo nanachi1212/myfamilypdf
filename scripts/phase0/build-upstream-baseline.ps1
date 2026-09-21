@@ -11,6 +11,13 @@ Set-StrictMode -Version Latest
 $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $RepositoryRoot 'scripts\common\Resolve-FamilyPDFToolsRoot.ps1')
 $ToolsRoot = Resolve-FamilyPDFToolsRoot -RepositoryRoot $RepositoryRoot
+if (-not [string]::IsNullOrWhiteSpace($env:VCPKG_DEFAULT_BINARY_CACHE)) {
+    $env:VCPKG_DEFAULT_BINARY_CACHE = [IO.Path]::GetFullPath(
+        $env:VCPKG_DEFAULT_BINARY_CACHE
+    )
+    New-Item -ItemType Directory -Path $env:VCPKG_DEFAULT_BINARY_CACHE -Force |
+        Out-Null
+}
 if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
     $BuildDirectory = Join-Path $RepositoryRoot 'build\phase0-upstream-release'
 }
