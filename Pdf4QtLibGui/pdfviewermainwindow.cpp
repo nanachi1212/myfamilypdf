@@ -336,6 +336,10 @@ PDFViewerMainWindow::~PDFViewerMainWindow()
     viewerDocumentWindows().removeAll(this);
     removeDeletedViewerWindows();
 
+    if (m_programController)
+    {
+        m_programController->closeDocument();
+    }
     delete m_programController;
     m_programController = nullptr;
 
