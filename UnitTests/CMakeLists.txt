@@ -66,5 +66,12 @@ if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
         SIGNATURE_PLUGIN_PATH="$<TARGET_FILE:SignaturePlugin>"
         SOFTPROOFING_PLUGIN_PATH="$<TARGET_FILE:SoftProofingPlugin>")
     add_dependencies(UnitTestsViewer EditorPlugin SignaturePlugin SoftProofingPlugin release_translations)
+    add_custom_command(TARGET UnitTestsViewer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:UnitTestsViewer>/translations"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_TRANS_DIR}"
+            "$<TARGET_FILE_DIR:UnitTestsViewer>/translations"
+        VERBATIM)
     set_tests_properties(UnitTestsViewer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 120)
 endif()
