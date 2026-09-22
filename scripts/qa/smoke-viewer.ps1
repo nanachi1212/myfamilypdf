@@ -32,7 +32,7 @@ $arguments = @(
     '--theme-light',
     ('"{0}"' -f $PdfFile)
 )
-$process = Start-Process -FilePath $viewer -ArgumentList $arguments -PassThru -WindowStyle Hidden
+$process = Start-Process -FilePath $viewer -ArgumentList $arguments -PassThru -WindowStyle Normal
 $title = ''
 try {
     $deadline = [DateTime]::UtcNow.AddSeconds(30)
