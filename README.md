@@ -9,6 +9,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - 書籤建立、導入、自動產生、文字顏色與可收合資料夾，以及跨 Viewer／Editor 重啟保存。
 - PDF 合併與拆分；合併前可選單數頁、雙數頁或輸入 `1-3,8,10-12` 等頁碼範圍。
 - Viewer／Editor 可一次開啟多份 PDF；每份文件使用獨立視窗，所有視窗頂端都有同步文件分頁可快速切換，並支援工作階段還原、縮圖、頁碼跳轉與完整縮放操作。
+- Viewer 頁面右鍵選單提供複製文字、全選／取消選取、文字／表格／放大鏡工具、游標所在頁面的書籤、側欄及縮放操作；點在頁面間空白處時不會誤加其他頁面的書籤。
 - 文件比較：`Pdf4QtDiff.exe` 可同時載入兩份 PDF，自動比對文字、圖片、向量圖形、著色與頁面移動；支援合併、左側、右側與疊加檢視、上一個／下一個差異，以及輸出標示差異的 PDF report 或 XML。
 - 安全儲存、外部檔案變更偵測、自動復原快照與最多三份隱藏備份。
 - PDF 密碼安全：可使用 AES-256 加密、設定使用者／擁有者密碼及限制權限；可由擁有者密碼解密。忘記密碼時不提供繞過機制。
@@ -74,7 +75,7 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\qa\smoke-acrobat-document-edit.ps1
 ```
 
-建置腳本會在缺少時自動安裝 Qt／vcpkg 建置工具；安裝程式腳本會下載並驗證 Inno Setup 的 Authenticode 簽章。開發工具預設放在 `E:\CodexProject\FamilyPDF-tools`。
+建置腳本會在缺少時自動安裝 Qt／vcpkg 建置工具；安裝程式腳本會下載並驗證 Inno Setup 的 Authenticode 簽章。開發工具預設放在 repository 同層的 `FamilyPDF-tools`，也可用 `FAMILYPDF_TOOLS_ROOT` 覆寫。
 
 ## 開源基底
 

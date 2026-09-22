@@ -8,12 +8,14 @@
 
 - Inno Setup 覆蓋升級契約：沿用既有 FamilyPDF `AppId`、安裝目錄、語言、元件與工作選項，不要求先解除安裝 0.2.2。
 - 書籤原子替換失敗回歸、外部程式 timeout 契約與工具鏈路徑可攜性驗證。
+- Viewer 頁面右鍵選單：複製文字、全選／取消選取、文字／表格／放大鏡工具、游標頁面書籤、側欄、縮放與符合頁面／寬度。
 
 ### Changed
 
 - Office Export 與 Windows WIA Scanner 加入可設定 watchdog，取消或逾時時會終止外部程序。
 - 主視窗套用一致的 FamilyPDF light/dark visual system：工具列、Dock、分頁、按鈕、輸入框、選單、狀態列與捲軸具有統一間距、邊框、hover、pressed、focus 狀態。
 - Viewer、Editor、PageMaster、Diff 改用一致的 FamilyPDF SVG 應用程式圖標。
+- 標準化語意狀態圖標的配色：accept/reject/result 等對話框狀態圖標的綠／紅／琥珀／藍色階各自收斂為單一色階（green-600、red-600、amber-600），其中「資訊」藍改為與 QSS 主題強調色一致的 `#2563EB`。
 - FamilyPDF 工具根目錄預設從 repository 同層解析，也可用 `FAMILYPDF_TOOLS_ROOT` 覆寫。
 - Editor、Reader、PageMaster 與 Diff 的顯示名稱和內部設定名稱統一改為 FamilyPDF；本版不搬移舊 PDF4QT 偏好設定。
 
@@ -33,6 +35,7 @@
 - Appx、WiX、Debian、Flatpak、AppStream 與 desktop metadata 的可見產品名稱、版本與來源統一為 FamilyPDF；為保留既有 Windows／Linux 升級識別，技術 package ID 維持原值。
 - 新增跨平台 metadata 與 AES 安全契約，接入 GitHub validation；新增 1160 頁 PDF 的繁中／簡中 Windows runtime 啟動、回應性與記憶體採樣 smoke。
 - installer 編譯腳本支援指定 runtime package 路徑，避免同步工具鎖定舊套件時無法產生可驗證的新 installer。
+- Viewer 右鍵書籤以滑鼠實際點擊頁面為目標；點在頁面間空白處時停用，避免誤加最低可見頁面。
 
 ## [0.2.2-beta] - 2026-08-10
 

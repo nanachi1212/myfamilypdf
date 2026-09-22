@@ -11,6 +11,13 @@ Set-StrictMode -Version Latest
 $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $RepositoryRoot 'scripts\common\Resolve-FamilyPDFToolsRoot.ps1')
 $ToolsRoot = Resolve-FamilyPDFToolsRoot -RepositoryRoot $RepositoryRoot
+if (-not [string]::IsNullOrWhiteSpace($env:VCPKG_DEFAULT_BINARY_CACHE)) {
+    $env:VCPKG_DEFAULT_BINARY_CACHE = [IO.Path]::GetFullPath(
+        $env:VCPKG_DEFAULT_BINARY_CACHE
+    )
+    New-Item -ItemType Directory -Path $env:VCPKG_DEFAULT_BINARY_CACHE -Force |
+        Out-Null
+}
 if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
     $BuildDirectory = Join-Path $RepositoryRoot 'build\phase0-upstream-release'
 }
@@ -35,6 +42,8 @@ $Targets = @(
     'UnitTests',
     'UnitTestsImageOptimizer',
     'UnitTestsFontEncoding',
+    'UnitTestsSecurity',
+    'UnitTestsViewer',
     'UnitTestsBookmarks',
     'UnitTestsForms',
     'UnitTestsDocumentEdit',
@@ -123,9 +132,21 @@ function Invoke-LoggedNative {
     $startArguments = @($ArgumentList | ForEach-Object {
         '"' + $_.Replace('"', '\"') + '"'
     })
-    $process = Start-Process -FilePath $FilePath -ArgumentList $startArguments -NoNewWindow -Wait -PassThru `
-        -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+    $processArguments = @{
+        FilePath = $FilePath
+        ArgumentList = $startArguments
+        NoNewWindow = $true
+        PassThru = $true
+        RedirectStandardOutput = $stdoutPath
+        RedirectStandardError = $stderrPath
+    }
+    $process = Start-Process @processArguments
+    # Wait for the requested command, not persistent compiler descendants such
+    # as mspdbsrv.exe. Cache the handle before a short-lived command can exit.
+    $null = $process.Handle
+    $process.WaitForExit()
     $exitCode = $process.ExitCode
+    $process.Dispose()
     $output = @(
         if (Test-Path -LiteralPath $stdoutPath) { Get-Content -LiteralPath $stdoutPath }
         if (Test-Path -LiteralPath $stderrPath) { Get-Content -LiteralPath $stderrPath }
