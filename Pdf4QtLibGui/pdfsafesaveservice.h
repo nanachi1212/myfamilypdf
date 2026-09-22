@@ -13,6 +13,7 @@
 #include <QStorageInfo>
 #include <QUuid>
 
+#include <cstdio>
 #include <functional>
 #include <cstdio>
 
@@ -224,8 +225,8 @@ public:
             return result;
         }
 
-        if (QFileInfo(sourcePath).absolutePath().compare(QFileInfo(candidatePath).absolutePath(),
-                                                         Qt::CaseInsensitive) != 0)
+        if (QFileInfo(sourcePath).absolutePath().compare(
+                QFileInfo(candidatePath).absolutePath(), pathCaseSensitivity()) != 0)
         {
             result.status = Status::CandidateInvalid;
             result.errorMessage = QStringLiteral("The temporary file must be in the source folder.");
@@ -361,7 +362,7 @@ public:
             return result;
         }
         if (QFileInfo(destinationPath).absolutePath().compare(
-                QFileInfo(candidatePath).absolutePath(), Qt::CaseInsensitive) != 0)
+                QFileInfo(candidatePath).absolutePath(), pathCaseSensitivity()) != 0)
         {
             result.status = Status::CandidateInvalid;
             result.errorMessage =
@@ -412,6 +413,15 @@ public:
     }
 
 private:
+    static Qt::CaseSensitivity pathCaseSensitivity()
+    {
+#ifdef Q_OS_WIN
+        return Qt::CaseInsensitive;
+#else
+        return Qt::CaseSensitive;
+#endif
+    }
+
     static void setError(QString* errorMessage, const QString& message)
     {
         if (errorMessage)

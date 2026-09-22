@@ -4,12 +4,14 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from docx import Document
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from familypdf_office_export.cli import (
+    EXIT_ERROR,
     EXIT_MISSING_TEXT_LAYER,
     parse_page_range,
     run,
@@ -47,6 +49,54 @@ def _write_two_page_pdf(path: Path) -> None:
 
 
 class CliTest(unittest.TestCase):
+    def test_failed_export_preserves_existing_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.pdf"
+            output = root / "output.docx"
+            source.write_bytes(b"pdf")
+            output.write_bytes(b"existing document")
+
+            def fail_after_write(_extracted, candidate):
+                candidate.write_bytes(b"partial document")
+                raise RuntimeError("simulated writer failure")
+
+            with (
+                patch("familypdf_office_export.cli.extract_document"),
+                patch(
+                    "familypdf_office_export.cli.write_docx",
+                    side_effect=fail_after_write,
+                ),
+            ):
+                exit_code = run(
+                    [
+                        "--input", str(source),
+                        "--output", str(output),
+                        "--format", "docx",
+                        "--allow-empty-text",
+                    ]
+                )
+
+            self.assertEqual(EXIT_ERROR, exit_code)
+            self.assertEqual(b"existing document", output.read_bytes())
+            self.assertEqual([], list(root.glob(".output.docx.*.tmp")))
+
+    def test_input_cannot_be_overwritten_by_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.pdf"
+            source.write_bytes(b"pdf")
+
+            exit_code = run(
+                [
+                    "--input", str(source),
+                    "--output", str(source),
+                    "--format", "docx",
+                ]
+            )
+
+            self.assertEqual(EXIT_ERROR, exit_code)
+            self.assertEqual(b"pdf", source.read_bytes())
+
     def test_parse_page_range_keeps_order_and_removes_duplicates(self) -> None:
         self.assertEqual(parse_page_range("3,1-2,2,5"), [3, 1, 2, 5])
         self.assertIsNone(parse_page_range(""))

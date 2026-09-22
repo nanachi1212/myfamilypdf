@@ -78,7 +78,7 @@ cd E:\CodexProject\FamilyPDF
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File .\scripts\phase0\build-full-installer.ps1 -SkipBasePackage -SkipOcrPackage
 ```
 
-建置工具位於 `E:\CodexProject\FamilyPDF-tools`。OCR 語言資料與相依套件缺少時，封裝腳本會自動下載。
+建置工具位於 `E:\Codex project\FamilyPDF-tools`。OCR 語言資料與相依套件缺少時，封裝腳本會自動下載。
 
 ## 已知限制
 
