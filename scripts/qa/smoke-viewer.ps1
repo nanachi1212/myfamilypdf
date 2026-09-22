@@ -34,6 +34,7 @@ $arguments = @(
 )
 $process = Start-Process -FilePath $viewer -ArgumentList $arguments -PassThru -WindowStyle Normal
 $title = ''
+$expectedTitle = [IO.Path]::GetFileName($PdfFile)
 try {
     $deadline = [DateTime]::UtcNow.AddSeconds(30)
     do {
@@ -43,13 +44,13 @@ try {
             throw "Viewer exited during startup with exit code $($process.ExitCode)."
         }
         $title = $process.MainWindowTitle
-    } while ((-not $process.Responding -or [string]::IsNullOrWhiteSpace($title)) -and
+    } while ((-not $process.Responding -or [string]::IsNullOrWhiteSpace($title) -or
+            $title -notlike "*$expectedTitle*") -and
         [DateTime]::UtcNow -lt $deadline)
 
     if (-not $process.Responding) {
         throw 'Viewer did not become responsive within 30 seconds.'
     }
-    $expectedTitle = [IO.Path]::GetFileName($PdfFile)
     if ($title -notlike "*$expectedTitle*") {
         throw "Viewer did not report the opened PDF in its title. Actual title: $title"
     }
