@@ -15,9 +15,9 @@
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QDockWidget>
+#include <QFile>
 #include <QMenu>
 #include <QPainter>
-#include <QPdfWriter>
 #include <QPluginLoader>
 #include <QSvgRenderer>
 #include <QTemporaryDir>
@@ -62,19 +62,46 @@ void ViewerContextMenuTest::initTestCase()
     pdf::PDFSettings::setSettingsPath(m_temp.filePath("settings"));
     pdf::PDFWidgetUtils::setDarkTheme(true, false);
     m_pdfPath = m_temp.filePath("three-pages.pdf");
+
+    // Build the fixture with a PDF base font. QPdfWriter depends on fonts from
+    // the platform plugin, while the offscreen CI plugin intentionally has no
+    // system font directory and would otherwise produce pages without text.
+    QList<QByteArray> objects;
+    objects << "<< /Type /Catalog /Pages 2 0 R >>"
+            << "<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>";
+    for (int page = 0; page < 3; ++page)
     {
-        QPdfWriter writer(m_pdfPath);
-        writer.setResolution(72);
-        writer.setPageSize(QPageSize(QPageSize::A5));
-        QPainter painter(&writer);
-        painter.setFont(QFont("Arial", 16));
-        for (int page = 0; page < 3; ++page)
-        {
-            if (page) QVERIFY(writer.newPage());
-            painter.drawText(30, 60, QStringLiteral("FamilyPDF smoke page %1").arg(page + 1));
-        }
-        QVERIFY(painter.end());
+        const int contentObject = 4 + page * 2;
+        objects << QByteArray("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 420 595] ")
+                       + "/Resources << /Font << /F1 9 0 R >> >> /Contents "
+                       + QByteArray::number(contentObject) + " 0 R >>";
+        const QByteArray stream = "BT /F1 16 Tf 30 535 Td (FamilyPDF smoke page "
+                                + QByteArray::number(page + 1) + ") Tj ET\n";
+        objects << QByteArray("<< /Length ") + QByteArray::number(stream.size())
+                       + " >>\nstream\n" + stream + "endstream";
     }
+    objects << "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+
+    QByteArray pdfData = "%PDF-1.4\n";
+    QList<qsizetype> offsets;
+    offsets << 0;
+    for (qsizetype index = 0; index < objects.size(); ++index)
+    {
+        offsets << pdfData.size();
+        pdfData += QByteArray::number(index + 1) + " 0 obj\n" + objects[index] + "\nendobj\n";
+    }
+    const qsizetype xrefOffset = pdfData.size();
+    pdfData += "xref\n0 " + QByteArray::number(objects.size() + 1) + "\n";
+    pdfData += "0000000000 65535 f \n";
+    for (qsizetype index = 1; index < offsets.size(); ++index)
+        pdfData += QByteArray::number(offsets[index]).rightJustified(10, '0') + " 00000 n \n";
+    pdfData += "trailer\n<< /Size " + QByteArray::number(objects.size() + 1)
+             + " /Root 1 0 R >>\nstartxref\n" + QByteArray::number(xrefOffset) + "\n%%EOF\n";
+
+    QFile fixture(m_pdfPath);
+    QVERIFY(fixture.open(QIODevice::WriteOnly));
+    QCOMPARE(fixture.write(pdfData), pdfData.size());
+    fixture.close();
     const QString artifactDirectory = qEnvironmentVariable("FAMILYPDF_TEST_ARTIFACT_DIR");
     if (!artifactDirectory.isEmpty())
     {
