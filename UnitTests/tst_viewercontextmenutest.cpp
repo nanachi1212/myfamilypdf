@@ -298,7 +298,7 @@ void ViewerContextMenuTest::traditionalChineseMenuAndSvgResources()
     translator.setLanguage(pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_TRADITIONAL);
     translator.installTranslator();
     init();
-    QVERIFY(action("actionBookmarkPage")->text().contains(QString::fromUtf8("\xE6\x9B\xB8\xE7\xB1\xA4")));
+    QVERIFY(action("actionBookmarkPage")->text().contains(QString::fromUtf8("\xE6\x94\xB6\xE8\x97\x8F")));
     withMenu(pagePoint(0), [&](QMenu* menu) {
         QMenu* tools = nullptr;
         for (QAction* entry : menu->actions()) if (entry->menu()) tools = entry->menu();
