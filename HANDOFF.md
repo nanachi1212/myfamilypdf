@@ -86,3 +86,15 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - 尚未驗證：本次圖標變更未經實機建置／執行驗證（僅瀏覽器渲染比對），建議下次有建置環境時重新編譯四個桌面程式並用實際 Settings 對話框、Editor/Signature 外掛面板做視覺回歸。
 
 最後更新：2026-09-14。
+## 9. 2026-09-22 主線整理結果
+
+- PR #2（`feat: add reliable PDF page context menu`）已正常合併，merge commit：`e7699d0aa57dc2f92cf111c01b9d215d9249f314`。
+- `main` 已由完整的 OCR／Viewer lineage 與 `codex/phase0-baseline` 正常 merge 建立，保留 baseline 的內容編輯器、TTS、Office Export 與安全修正。
+- Viewer 右鍵選單已加入 Qt 回歸驗證：Copy Text、Select All、Deselect、Tools、Select Text、Select Table、Magnifier、Bookmark Page、Sidebar、Zoom In/Out、Fit Page、Fit Width；書籤以游標實際點擊頁面為目標，頁面間空白區不會誤加書籤。
+- GitHub Windows runner 已驗證 Viewer、Editor、PageMaster、Diff 建置、CTest 8/8、Viewer standalone smoke、Office Export 13/13、PowerShell／contract tests 與 CodeQL。
+- 本機 configure/build 已完成；本機直接執行 Qt 測試受 Windows Code Integrity 阻擋 workspace 內未簽署的第三方 DLL，未停用安全功能，完整 runtime 結果以 GitHub runner 為準。
+- 本機沒有 1160 頁 smoke fixture，未下載外部文件。
+- 主要開發分支為 `main`；`feature/pdf-context-menu`、`codex/auto-ocr-v0.2.0`、`codex/phase0-baseline` 均保留作為功能、release 與歷史 provenance。
+- 建置工具由 repository 同層的 `FamilyPDF-tools` 提供，也可用 `FAMILYPDF_TOOLS_ROOT` 覆寫。
+
+最後更新：2026-09-22。

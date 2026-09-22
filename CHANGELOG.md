@@ -95,3 +95,5 @@
 [0.2.1-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.1-beta
 [0.2.2-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.2-beta
 [0.2.3-beta]: https://github.com/nanachi1212/myfamilypdf/releases/tag/v0.2.3-beta
+
+- Viewer 關閉文件時先解除 PDF view 綁定，避免 teardown 期間的 Qt 例外；右鍵選單與 standalone smoke test 已納入 CI。
