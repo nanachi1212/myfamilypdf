@@ -91,7 +91,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - PR #2（`feat: add reliable PDF page context menu`）已正常合併，merge commit：`e7699d0aa57dc2f92cf111c01b9d215d9249f314`。
 - `main` 已由完整的 OCR／Viewer lineage 與 `codex/phase0-baseline` 正常 merge 建立，保留 baseline 的內容編輯器、TTS、Office Export 與安全修正。
 - Viewer 右鍵選單已加入 Qt 回歸驗證：Copy Text、Select All、Deselect、Tools、Select Text、Select Table、Magnifier、Bookmark Page、Sidebar、Zoom In/Out、Fit Page、Fit Width；書籤以游標實際點擊頁面為目標，頁面間空白區不會誤加書籤。
-- GitHub Windows runner 已驗證 Viewer、Editor、PageMaster、Diff 建置、CTest 8/8、Viewer standalone smoke、Office Export 13/13、PowerShell／contract tests 與 CodeQL。
+- GitHub Windows runner 已驗證 Viewer、Editor、PageMaster、Diff 建置、主線 CTest 9/9（含 ContentEditor regression）、Viewer standalone smoke、Office Export 13/13、PowerShell／contract tests 與 CodeQL。
 - 本機 configure/build 已完成；本機直接執行 Qt 測試受 Windows Code Integrity 阻擋 workspace 內未簽署的第三方 DLL，未停用安全功能，完整 runtime 結果以 GitHub runner 為準。
 - 本機沒有 1160 頁 smoke fixture，未下載外部文件。
 - 主要開發分支為 `main`；`feature/pdf-context-menu`、`codex/auto-ocr-v0.2.0`、`codex/phase0-baseline` 均保留作為功能、release 與歷史 provenance。
