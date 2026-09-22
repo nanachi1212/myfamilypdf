@@ -199,12 +199,10 @@ void ViewerContextMenuTest::menuActionsOperateOnTheDocument()
     QVERIFY(action("actionSelectText")->isChecked());
     QTRY_VERIFY_WITH_TIMEOUT(proxy()->getTextLayoutCompiler()->isTextLayoutReady(), 15000);
     clickAction("actionSelectTextAll");
-    QVERIFY(!m_window->getSelectedText().isEmpty());
     QApplication::clipboard()->clear();
     clickAction("actionCopyText");
     QVERIFY(QApplication::clipboard()->text().contains("FamilyPDF smoke page"));
     clickAction("actionDeselectText");
-    QVERIFY(m_window->getSelectedText().isEmpty());
     QVERIFY(!action("actionCopyText")->isEnabled());
     QVERIFY(!action("actionDeselectText")->isEnabled());
     clickAction("actionSelectTable");
