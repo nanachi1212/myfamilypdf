@@ -64,7 +64,7 @@ E:\CodexProject\FamilyPDF\dist\FamilyPDF-OCR-Plugin-windows-x64.zip
 - 完整／精簡安裝後的核心與 OCR payload 已逐檔比對目前可攜包 SHA-256。
 - AES-256 PDF 密碼安全 smoke 已通過，結果見 `build\\pdf-security-smoke\\summary.json`；已接入最終回歸及 Full/Core 安裝驗證。
 
-完整證據見 `docs\RELEASE-STATUS.md`、`docs\REQUIREMENTS-AUDIT.md` 與 `docs\qa\release-checklist.md`。
+完整證據見 `docs\REQUIREMENTS-AUDIT.md` 與 `docs\qa\release-checklist.md`。
 
 ## 重建方式
 
