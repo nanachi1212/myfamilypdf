@@ -94,7 +94,6 @@ Adobe Acrobat 文件級編輯互通：
 - [x] `dist\FamilyPDF-OCR-Plugin-windows-x64.zip`
 - [x] 主程式與 OCR 外掛分開封裝。
 - [x] 同時提供預設含 OCR、可取消 OCR 的一鍵完整安裝程式。
-- [x] SHA-256 與檔案大小更新至 `docs\RELEASE-STATUS.md`。
 
 ## 仍需人工執行的跨產品／實機驗收
 

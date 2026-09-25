@@ -2,7 +2,7 @@
 
 更新日期：2026-08-03
 
-> 本文件保留 2026-07-29 的歷史驗證紀錄；目前版本與最新可重建證據請以 `docs\\RELEASE-STATUS.md`、`docs\\REQUIREMENTS-AUDIT.md` 及 `build\\final-regression-20260803-153018\\summary.json` 為準。
+> 本文件保留 2026-07-29 的歷史驗證紀錄；目前版本請以 `VERSION` 與 `CHANGELOG.md`、最新測試結果請以 GitHub Actions、需求現況請以 `docs\REQUIREMENTS-AUDIT.md` 為準。
 
 ## 非 OCR 完成版回歸（2026-07-29）
 

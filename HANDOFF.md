@@ -8,14 +8,14 @@
 
 ## 2. 目前已知入口與邊界
 
-AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/RELEASE-STATUS.md、docs/WORKSPACE-HANDOFF.md 和目前 Git 狀態。
+AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/WORKSPACE-HANDOFF.md 和目前 Git 狀態。
 
 ## 3. 接手順序
 
 1. 確認目前工作目錄是含有本檔的 repository 根目錄。
 2. 若存在 AGENTS.md、CLAUDE.md、README.md 或 README.MD，按順序讀完相關規則，再讀專案入口與測試。
 3. 執行唯讀盤點：git status --short --branch、git remote -v、git log -1 --oneline；若不是 Git repository，明確記錄這一點。
-4. 先提出「目標、影響檔案、驗證命令、風險」，未得到必要確認前不要 push、刪除、安裝或修改秘密。
+4. 先提出「目標、影響檔案、驗證命令、風險」。一般 commit、push、PR、CI、review 與 squash merge 不需另外確認；破壞性刪除、安裝軟體、修改 secrets／credentials、production deployment／正式 release 須先確認。
 5. 修改後實際執行適用的測試／lint／smoke check，並回報命令與結果；不要用「理論上可以」代替證據。
 
 ## 4. 安全規則
@@ -38,4 +38,4 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - 建置工具由 repository 同層的 `FamilyPDF-tools` 提供，也可用 `FAMILYPDF_TOOLS_ROOT` 覆寫。
 - 主要開發分支為 `main`。
 - 本機直接執行 Qt 測試可能被 Windows Code Integrity 阻擋 workspace 內未簽署的第三方 DLL；不要停用安全功能，完整 runtime 驗證以 GitHub runner 為準。
-- 版本以 `VERSION` 與 `CHANGELOG.md` 為準，測試結果以最新的 GitHub Actions 為準，歷史以 Git 為準，本文不記錄。`docs/RELEASE-STATUS.md` 可能落後於現況，引用前先核對。
+- 版本以 `VERSION` 與 `CHANGELOG.md` 為準，測試結果以最新的 GitHub Actions 為準，歷史以 Git 為準，本文不記錄。

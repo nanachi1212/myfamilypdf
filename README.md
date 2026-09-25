@@ -51,7 +51,6 @@ FamilyPDF 是以開源 PDF4QT 為基底製作的免費 Windows x64 PDF 工具組
 - [1,160 頁 PDF 互動與語系驗證](docs/qa/large-pdf-interaction.md)
 - [Microsoft Office 互通性驗證](docs/qa/office-interoperability.md)
 - [Adobe 文件級編輯互通性驗證](docs/qa/document-edit-interoperability.md)
-- [目前交付狀態與 SHA-256](docs/RELEASE-STATUS.md)
 
 ## 建置
 
