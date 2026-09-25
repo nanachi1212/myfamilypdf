@@ -38,4 +38,4 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - 建置工具由 repository 同層的 `FamilyPDF-tools` 提供，也可用 `FAMILYPDF_TOOLS_ROOT` 覆寫。
 - 主要開發分支為 `main`。
 - 本機直接執行 Qt 測試可能被 Windows Code Integrity 阻擋 workspace 內未簽署的第三方 DLL；不要停用安全功能，完整 runtime 驗證以 GitHub runner 為準。
-- 版本、測試結果與歷史以 `VERSION`、`CHANGELOG.md`、`docs/RELEASE-STATUS.md` 與 Git 為準，本文不記錄。
+- 版本以 `VERSION` 與 `CHANGELOG.md` 為準，測試結果以最新的 GitHub Actions 為準，歷史以 Git 為準，本文不記錄。`docs/RELEASE-STATUS.md` 可能落後於現況，引用前先核對。
