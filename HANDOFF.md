@@ -12,7 +12,7 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 
 ## 3. 接手順序
 
-1. 確認目前工作目錄就是：E:\\CodexProject\\FamilyPDF。
+1. 確認目前工作目錄是含有本檔的 repository 根目錄。
 2. 若存在 AGENTS.md、CLAUDE.md、README.md 或 README.MD，按順序讀完相關規則，再讀專案入口與測試。
 3. 執行唯讀盤點：git status --short --branch、git remote -v、git log -1 --oneline；若不是 Git repository，明確記錄這一點。
 4. 先提出「目標、影響檔案、驗證命令、風險」，未得到必要確認前不要 push、刪除、安裝或修改秘密。
@@ -33,68 +33,9 @@ AGENTS.md、README.md、docs/；不要未經要求執行 build。先看 docs/REL
 - Git 分支與未提交變更
 - 尚未驗證或需要使用者決定的事項
 
-## 6. 目前已完成狀態（2026-08-27）
+## 6. 建置與測試注意事項
 
-- FamilyPDF 版本：`0.2.3`。
-- 已完成核心 Bug、安全儲存、外部程序 timeout、路徑可攜性、品牌名稱與 Qt platform plugin 測試修正。
-- 依優先級補強簽署 PDF／附件的 `QSaveFile` 原子輸出，以及 TTS proxy、語音引擎、播放文件與同步控制項的 Release null guard；相關靜態契約已納入 GitHub validation workflow。
-- `UnitTestsBookmarks` 已固定使用 Qt `offscreen` 平台並部署對應 plugin，修正測試啟動時可能出現的 platform plugin 初始化錯誤。
-- TTS 的 `updateUI()`、`setSettings()` 已補上 UI 初始化與 null 設定防護，避免 public lifecycle 呼叫順序造成 Release crash。
-- `UnitTests/CMakeLists.txt` 已將重複的測試 target 設定集中到共用函式；各測試 target 與 CTest 行為維持不變。
-- Office Export 的 DOCX／XLSX writer 已改用同目錄暫存檔與原子替換，Python 測試由 11/11 增至 13/13，並納入 GitHub validation。
-- recovery snapshot 與 `PDFSafeSaveService` 的非 Windows 覆蓋提交已改用 POSIX `std::rename` 原子替換，不再先刪除既有目標檔；新增 `test-posix-atomic-replacement-contract.ps1` 並接入 GitHub validation。
-- Editor、Reader、PageMaster、Diff 的顯示名稱與內部設定名稱均已統一為 FamilyPDF。
-- 已加入 `.github/dependabot.yml` 與 `.github/workflows/codeql.yml`。
-- AES 解密已拒絕截斷、非區塊對齊與錯誤 padding；新增 `UnitTestsSecurity`，並加入 AES 靜態安全契約。
-- Appx、WiX、Debian、Flatpak、AppStream 與 desktop metadata 的可見品牌／版本／來源已統一；技術 package ID 刻意保留以維持升級相容性。
-- 新增跨平台 branding contract，並將其與 AES contract 接入 GitHub validation。
-- Windows installer 編譯支援指定 runtime package 路徑，已避開同步工具鎖定舊 package 的本機封裝問題。
-- UI 已加入一致的 FamilyPDF light/dark visual system，統一工具列、Dock、分頁、按鈕、輸入框、選單、狀態列與捲軸的間距、色彩與互動狀態。
-- Viewer、Editor、PageMaster、Diff 已改用一致的 FamilyPDF SVG 應用程式圖標。
-- 已建立 Inno Setup 覆蓋升級流程；保留正式 FamilyPDF AppId，0.2.2 可直接升級至 0.2.3，不需先解除安裝。
-- 本機正式安裝已完成覆蓋升級，登錄版本為 `0.2.3`；安裝目錄中的主要 EXE 已與最終 package 雜湊一致。
-- 最終安裝包：`dist\\FamilyPDF-Full-Setup-x64.exe`。
-- 升級說明：`docs\\UPGRADE-v0.2.3.md`。
-
-## 7. 最近驗證結果
-
-- CTest：`7/7 passed`，包含 `UnitTestsSecurity` 的 AES-256 邊界、fresh IV、截斷 ciphertext 與錯誤 padding 測試。
-- Office Export Python unittest：`11/11 passed`。
-- OCR manifest、下載雜湊與竄改拒絕測試：通過。
-- Branding、installer upgrade、external process timeout、toolchain path contracts：通過。
-- Atomic output and TTS proxy contracts：通過；SignaturePlugin、Pdf4QtLibGui 與 Pdf4QtViewer 相關 target 建置成功。
-- Qt test platform contract、`UnitTestsBookmarks` 直接執行與完整 CTest：通過（6/6）。
-- TTS lifecycle null-safety contract：通過；`Pdf4QtLibGui.dll` 增量建置成功。
-- 測試 CMake 重構後重新配置、建置 6 個測試 target，並通過完整 CTest 6/6。
-- Office Export Python unittest：13/13 通過；原子輸出回歸測試 2/2 通過。
-- POSIX atomic replacement contract：通過；Windows 分支仍使用既有 `ReplaceFileW`／`MoveFileExW`。
-- PowerShell scripts 語法解析與 GitHub workflow YAML：通過。
-- 隔離安裝升級測試：`0.2.2 -> 0.2.3 passed`。
-- `git diff --check`：通過。
-- AES security contract、cross-platform branding contract：通過。
-- 1160 頁 PDF Windows locale smoke：繁中／簡中各通過 10 秒載入、回應性與記憶體採樣；正式安裝後再次通過。
-- 本機現有裸安裝覆蓋升級：installer exit code `0`，登錄版本 `0.2.3`，runtime `Pdf4QtLibCore.dll` 雜湊與新 package 一致。
-- UI 美化版重新編譯四個桌面程式、產生完整 installer；安裝後 Viewer 繁中／簡中 1160 頁 PDF smoke 均通過。
-- 標準化對話框語意狀態圖標的配色：16 個 accept/reject/result-* 圖標（Editor、Signature 外掛，以及通用的 result-ok/error/warning/information）的色階收斂為 Tailwind 色系（綠 #16A34A、紅 #DC2626、琥珀 #D97706），「資訊」藍改用與 QSS 主題強調色相同的 `#2563EB`。保留 settings 對話框內 12 個功能圖標（cache、cms、engine、form-settings、plugins、rendering、security、shading、shortcuts、signature、speech、ui）的原始多色設計，因為使用者反饋多色版本更能區分不同功能區域。變更前後皆用瀏覽器渲染做視覺比對，並以 XML parser 驗證所有圖標仍為合法 SVG；純色彩調整，未變更任何圖標的形狀路徑或程式碼。
-
-## 8. GitHub 狀態
-
-- Repository：`https://github.com/nanachi1212/myfamilypdf`
-- Branch：`feature/pdf-context-menu`
-- 本分支已將狀態圖標配色與 PDF 頁面右鍵選單整理為獨立提交；右鍵書籤會以游標實際點擊的頁面為目標。
-- 本文件的後續更新應另建提交並推送；不要把使用者秘密或未核准的個人檔案加入 Git。
-- 尚未驗證：本次圖標變更未經實機建置／執行驗證（僅瀏覽器渲染比對），建議下次有建置環境時重新編譯四個桌面程式並用實際 Settings 對話框、Editor/Signature 外掛面板做視覺回歸。
-
-最後更新：2026-09-14。
-## 9. 2026-09-22 主線整理結果
-
-- PR #2（`feat: add reliable PDF page context menu`）已正常合併，merge commit：`e7699d0aa57dc2f92cf111c01b9d215d9249f314`。
-- `main` 已由完整的 OCR／Viewer lineage 與 `codex/phase0-baseline` 正常 merge 建立，保留 baseline 的內容編輯器、TTS、Office Export 與安全修正。
-- Viewer 右鍵選單已加入 Qt 回歸驗證：Copy Text、Select All、Deselect、Tools、Select Text、Select Table、Magnifier、Bookmark Page、Sidebar、Zoom In/Out、Fit Page、Fit Width；書籤以游標實際點擊頁面為目標，頁面間空白區不會誤加書籤。
-- GitHub Windows runner 已驗證 Viewer、Editor、PageMaster、Diff 建置、主線 CTest 9/9（含 ContentEditor regression）、Viewer standalone smoke、Office Export 13/13、PowerShell／contract tests 與 CodeQL。
-- 本機 configure/build 已完成；本機直接執行 Qt 測試受 Windows Code Integrity 阻擋 workspace 內未簽署的第三方 DLL，未停用安全功能，完整 runtime 結果以 GitHub runner 為準。
-- 本機沒有 1160 頁 smoke fixture，未下載外部文件。
-- 主要開發分支為 `main`；`feature/pdf-context-menu`、`codex/auto-ocr-v0.2.0`、`codex/phase0-baseline` 均保留作為功能、release 與歷史 provenance。
 - 建置工具由 repository 同層的 `FamilyPDF-tools` 提供，也可用 `FAMILYPDF_TOOLS_ROOT` 覆寫。
-
-最後更新：2026-09-22。
+- 主要開發分支為 `main`。
+- 本機直接執行 Qt 測試可能被 Windows Code Integrity 阻擋 workspace 內未簽署的第三方 DLL；不要停用安全功能，完整 runtime 驗證以 GitHub runner 為準。
+- 版本、測試結果與歷史以 `VERSION`、`CHANGELOG.md`、`docs/RELEASE-STATUS.md` 與 Git 為準，本文不記錄。
