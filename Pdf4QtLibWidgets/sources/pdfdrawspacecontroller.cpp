@@ -485,8 +485,18 @@ PDFDrawWidgetProxy::PDFDrawWidgetProxy(QObject* parent) :
     connect(m_controller, &PDFDrawSpaceController::drawSpaceChanged, this, &PDFDrawWidgetProxy::update);
     connect(m_controller, &PDFDrawSpaceController::repaintNeeded, this, &PDFDrawWidgetProxy::repaintNeeded);
     connect(m_controller, &PDFDrawSpaceController::pageImageChanged, this, &PDFDrawWidgetProxy::pageImageChanged);
-    connect(m_compiler, &PDFAsynchronousPageCompiler::renderingError, this, &PDFDrawWidgetProxy::renderingError);
+    connect(m_compiler, &PDFAsynchronousPageCompiler::renderingError, this, [this](PDFInteger page, const QList<PDFRenderError>& errors)
+    {
+        m_failedCompilationPages.insert(page);
+        Q_EMIT renderingError(page, errors);
+        Q_EMIT pageImageChanged(false, {page});
+        Q_EMIT repaintNeeded();
+    });
     connect(m_compiler, &PDFAsynchronousPageCompiler::pageImageChanged, this, &PDFDrawWidgetProxy::pageImageChanged);
+    connect(this, &PDFDrawWidgetProxy::pageImageChanged, this, [this](bool all, const std::vector<PDFInteger>&)
+    {
+        if (all) m_failedCompilationPages.clear();
+    });
     connect(m_textLayoutCompiler, &PDFAsynchronousTextLayoutCompiler::textLayoutChanged, this, &PDFDrawWidgetProxy::onTextLayoutChanged);
     connect(m_cacheClearTimer, &QTimer::timeout, this, &PDFDrawWidgetProxy::performPageCacheClear);
 }
@@ -500,6 +510,7 @@ void PDFDrawWidgetProxy::setDocument(const PDFModifiedDocument& document, std::v
 {
     if (getDocument() != document)
     {
+        m_failedCompilationPages.clear();
         m_cacheClearTimer->stop();
         m_compiler->stop(document.hasReset() || document.hasPageContentsChanged());
         m_textLayoutCompiler->stop(document.hasReset() || document.hasPageContentsChanged());
@@ -824,6 +835,7 @@ void PDFDrawWidgetProxy::drawPages(QPainter* painter, QRect rect, PDFRenderer::F
     PDFRenderer::applyFeaturesToColorConvertor(features, convertor);
 
     // Iterate trough pages and display them on the painter device
+    m_compiler->setPriorityPages(getPagesIntersectingRect(m_widget->rect()));
     for (const LayoutItem& item : m_layout.items)
     {
         // The offsets m_horizontalOffset and m_verticalOffset are offsets to the
@@ -840,7 +852,8 @@ void PDFDrawWidgetProxy::drawPages(QPainter* painter, QRect rect, PDFRenderer::F
                 painter->fillRect(placedRect, paperColor);
             }
 
-            const PDFPrecompiledPage* compiledPage = m_compiler->getCompiledPage(item.pageIndex, true);
+            const bool failed = m_failedCompilationPages.count(item.pageIndex) != 0;
+            const PDFPrecompiledPage* compiledPage = m_compiler->getCompiledPage(item.pageIndex, !failed);
             if (compiledPage && compiledPage->isValid())
             {
                 QElapsedTimer timer;
@@ -966,6 +979,18 @@ void PDFDrawWidgetProxy::drawPages(QPainter* painter, QRect rect, PDFRenderer::F
                     Q_EMIT renderingError(item.pageIndex, qMove(errors));
                 }
             }
+            else if (!compiledPage || std::any_of(compiledPage->getErrors().cbegin(), compiledPage->getErrors().cend(), [](const PDFRenderError& error)
+                     { return error.type == RenderErrorType::Error || error.type == RenderErrorType::NotSupported || error.type == RenderErrorType::NotImplemented; }))
+            {
+                painter->save();
+                painter->setFont(m_widget->font());
+                painter->setPen(QColor(96, 96, 96));
+                painter->drawText(placedRect.intersected(rect), Qt::AlignCenter,
+                                  compiledPage || failed ? PDFTranslationContext::tr("Unable to render this page.")
+                                               : PDFTranslationContext::tr("Loading page %1...").arg(item.pageIndex + 1));
+                painter->restore();
+                if (compiledPage) Q_EMIT renderingError(item.pageIndex, compiledPage->getErrors());
+            }
         }
     }
 }
@@ -988,18 +1013,32 @@ QImage PDFDrawWidgetProxy::drawThumbnailImage(PDFInteger pageIndex, int pixelSiz
 
         if (imageSize.isValid())
         {
-            const PDFPrecompiledPage* compiledPage = m_compiler->getCompiledPage(pageIndex, true);
+            const bool failed = m_failedCompilationPages.count(pageIndex) != 0;
+            const PDFPrecompiledPage* compiledPage = m_compiler->getCompiledPage(pageIndex, !failed);
             if (compiledPage && compiledPage->isValid())
             {
                 // Rasterize the image.
+                QElapsedTimer thumbnailTimer;
+                thumbnailTimer.start();
                 PDFCMSPointer cms = getCMSManager()->getCurrentCMS();
                 image = m_rasterizer->render(pageIndex, page, compiledPage, imageSize, m_features, m_widget->getAnnotationManager(), cms.data(), PageRotation::None);
+                if (qEnvironmentVariableIsSet("FAMILYPDF_RENDER_PROFILE"))
+                    qInfo() << "RENDER thumbnail_page" << pageIndex + 1 << "rasterize_downsample_ms" << thumbnailTimer.elapsed() << "target_size" << imageSize << "compile_ms" << compiledPage->getCompilingTimeNS() / 1000000.0;
             }
 
             if (image.isNull())
             {
                 image = QImage(imageSize, QImage::Format_RGBA8888_Premultiplied);
                 image.fill(Qt::white);
+                const bool renderFailed = failed || (compiledPage && std::any_of(compiledPage->getErrors().cbegin(), compiledPage->getErrors().cend(), [](const PDFRenderError& error)
+                    { return error.type == RenderErrorType::Error || error.type == RenderErrorType::NotSupported || error.type == RenderErrorType::NotImplemented; }));
+                if (!compiledPage || renderFailed)
+                {
+                    QPainter painter(&image);
+                    painter.setPen(QColor(96, 96, 96));
+                    painter.drawText(image.rect(), Qt::AlignCenter, renderFailed ? PDFTranslationContext::tr("Error")
+                                                                               : PDFTranslationContext::tr("Loading..."));
+                }
             }
         }
     }
@@ -1363,6 +1402,11 @@ PDFReal PDFDrawWidgetProxy::getZoomHintForPage(ZoomHint hint, PDFInteger pageInd
 
 void PDFDrawWidgetProxy::goToPage(PDFInteger pageIndex)
 {
+    if (getDocument() && pageIndex >= 0 && pageIndex < PDFInteger(getDocument()->getCatalog()->getPageCount()))
+    {
+        m_compiler->setPriorityPages({pageIndex});
+        m_compiler->getCompiledPage(pageIndex, true);
+    }
     if (m_zoomMode != ZoomMode::Custom)
     {
         applyZoomMode(m_zoomMode, pageIndex);
@@ -1776,6 +1820,10 @@ void PDFDrawWidgetProxy::updateRenderer(RendererEngine rendererEngine)
 
 void PDFDrawWidgetProxy::prefetchPages(PDFInteger pageIndex)
 {
+    auto visiblePages = getPagesIntersectingRect(m_widget->rect());
+    if (visiblePages.empty()) visiblePages.push_back(pageIndex);
+    m_compiler->setPriorityPages(visiblePages);
+    for (PDFInteger visiblePage : visiblePages) m_compiler->getCompiledPage(visiblePage, true);
     // Determine number of pages, which should be prefetched. In case of two or more pages,
     // we need to prefetch more pages (for example, two for two columns/two pages display mode).
     int prefetchCount = 0;

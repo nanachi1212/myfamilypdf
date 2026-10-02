@@ -6,6 +6,9 @@
 #include "pdfdocumentdecoration.h"
 #include "pdfdocumentreader.h"
 #include "pdfdocumentwriter.h"
+#include "pdfdocumentmanipulator.h"
+#include "pdfutils.h"
+#include <QSaveFile>
 
 #include <QDir>
 #include <QFileInfo>
@@ -19,6 +22,9 @@ class DocumentEditTest : public QObject
     Q_OBJECT
 
 private slots:
+    void extractionSelection_data();
+    void extractionSelection();
+    void extractedPagesRoundTrip();
     void decorationsRespectPageSelectionAndLayerOrder();
     void imageBackgroundRoundTrips();
     void pageGeometryAndRotationRoundTrip();
@@ -321,6 +327,82 @@ void DocumentEditTest::pageGeometryAndRotationRoundTrip()
     QVERIFY(qAbs(secondPage->getMediaBox().size().height() -
                  210.0 * pdf::PDF_MM_TO_POINT) < 0.0001);
     QCOMPARE(secondPage->getCropBox(), secondPage->getMediaBox());
+}
+
+void DocumentEditTest::extractionSelection_data()
+{
+    QTest::addColumn<QString>("input");
+    QTest::addColumn<QString>("expected");
+    QTest::newRow("single") << QStringLiteral("5") << QStringLiteral("5");
+    QTest::newRow("range") << QStringLiteral("176-195") << QStringLiteral("176-195");
+    QTest::newRow("mixed") << QStringLiteral("1-3,8,10-12") << QStringLiteral("1-3,8,10-12");
+    QTest::newRow("duplicates-and-order") << QStringLiteral("8,1-3,3,10-12,8") << QStringLiteral("1-3,8,10-12");
+    QTest::newRow("spaces") << QStringLiteral(" 1 - 3 , 8 ") << QStringLiteral("1-3,8");
+    for (const char* input : {"", "0", "-5", "5-", "5-2", "365", "1-365", "1,abc", "1,,3", "1,", "1.5", "99999999999999999999999999"})
+        QTest::newRow(input) << QString::fromLatin1(input) << QString();
+}
+
+void DocumentEditTest::extractionSelection()
+{
+    QFETCH(QString, input);
+    QFETCH(QString, expected);
+    QString error;
+    const auto pages = pdf::PDFClosedIntervalSet::parsePageSelection(364, input, &error);
+    if (expected.isEmpty())
+    {
+        QVERIFY(pages.isEmpty());
+        QVERIFY(!error.isEmpty());
+    }
+    else
+    {
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        const auto expectedPages = pdf::PDFClosedIntervalSet::parse(1, 364, expected, &error);
+        QVERIFY(pages.unfold() == expectedPages.unfold());
+    }
+}
+
+void DocumentEditTest::extractedPagesRoundTrip()
+{
+    pdf::PDFDocumentBuilder builder;
+    for (int page = 1; page <= 12; ++page)
+        builder.appendPage(QRectF(0, 0, 300 + page, 400));
+    const pdf::PDFDocument source = builder.build();
+    QString error;
+    const auto selection = pdf::PDFClosedIntervalSet::parsePageSelection(12, "1-3,8,10-12", &error);
+    pdf::PDFDocumentManipulator manipulator;
+    manipulator.setOutlineMode(pdf::PDFDocumentManipulator::OutlineMode::NoOutline);
+    manipulator.addDocument(0, &source);
+    const auto allPages = pdf::PDFDocumentManipulator::createAllDocumentPages(0, &source);
+    pdf::PDFDocumentManipulator::AssembledPages selected;
+    for (auto page : selection.unfold()) selected.push_back(allPages[page - 1]);
+    auto result = manipulator.assemble(selected);
+    QVERIFY2(bool(result), qPrintable(result.getErrorMessage()));
+    QTemporaryDir directory;
+    const QString path = directory.filePath("extracted.pdf");
+    QSaveFile output(path);
+    QVERIFY(output.open(QIODevice::WriteOnly));
+    pdf::PDFDocumentWriter writer(nullptr);
+    result = writer.write(&output, &manipulator.getAssembledDocument());
+    QVERIFY2(bool(result), qPrintable(result.getErrorMessage()));
+    QVERIFY(output.commit());
+    pdf::PDFDocumentReader reader(nullptr, {}, true, false);
+    const auto restored = reader.readFromFile(path);
+    QCOMPARE(reader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
+    QCOMPARE(restored.getCatalog()->getPageCount(), size_t(7));
+    const auto pages = selection.unfold();
+    for (size_t i = 0; i < pages.size(); ++i)
+        QCOMPARE(restored.getCatalog()->getPage(i)->getMediaBox().width(), qreal(300 + pages[i]));
+    // A cancelled replacement leaves the existing PDF byte-for-byte intact.
+    QFile existing(path);
+    QVERIFY(existing.open(QIODevice::ReadOnly));
+    const QByteArray original = existing.readAll();
+    existing.close();
+    QSaveFile cancelled(path);
+    QVERIFY(cancelled.open(QIODevice::WriteOnly));
+    cancelled.write("partial");
+    cancelled.cancelWriting();
+    QVERIFY(existing.open(QIODevice::ReadOnly));
+    QCOMPARE(existing.readAll(), original);
 }
 
 QTEST_MAIN(DocumentEditTest)

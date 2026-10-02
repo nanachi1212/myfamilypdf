@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdfutils.h"
+#include <QRegularExpression>
 #include "pdfexception.h"
 #include "pdfblpainter.h"
 
@@ -488,6 +489,43 @@ PDFClosedIntervalSet PDFClosedIntervalSet::parse(PDFInteger first, PDFInteger la
 
     result.normalize();
     return result;
+}
+
+PDFClosedIntervalSet PDFClosedIntervalSet::parsePageSelection(PDFInteger pageCount, const QString& text, QString* errorMessage)
+{
+    *errorMessage = QString();
+    if (text.trimmed().isEmpty())
+    {
+        *errorMessage = PDFTranslationContext::tr("Enter at least one page number.");
+        return PDFClosedIntervalSet();
+    }
+
+    static const QRegularExpression partPattern(QStringLiteral("^([0-9]+)(?:\\s*-\\s*([0-9]+))?$"));
+    for (const QString& part : text.split(',', Qt::KeepEmptyParts))
+    {
+        const auto match = partPattern.match(part.trimmed());
+        if (!match.hasMatch())
+        {
+            *errorMessage = PDFTranslationContext::tr("Invalid page selection '%1'. Use page numbers or ranges such as 1-3,8,10-12.").arg(part.trimmed());
+            return PDFClosedIntervalSet();
+        }
+        bool lowOK = false;
+        bool highOK = false;
+        const PDFInteger low = match.captured(1).toLongLong(&lowOK);
+        const PDFInteger high = match.captured(2).isEmpty() ? low : match.captured(2).toLongLong(&highOK);
+        highOK = match.captured(2).isEmpty() || highOK;
+        if (!lowOK || !highOK || low < 1 || high > pageCount || low > pageCount || high < 1)
+        {
+            *errorMessage = PDFTranslationContext::tr("Page numbers must be between 1 and %1.").arg(pageCount);
+            return PDFClosedIntervalSet();
+        }
+        if (low > high)
+        {
+            *errorMessage = PDFTranslationContext::tr("Range '%1' is reversed. Put the smaller page number first.").arg(part.trimmed());
+            return PDFClosedIntervalSet();
+        }
+    }
+    return parse(1, pageCount, text, errorMessage);
 }
 
 void PDFClosedIntervalSet::normalize()

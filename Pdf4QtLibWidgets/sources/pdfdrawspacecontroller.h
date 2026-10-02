@@ -548,6 +548,7 @@ private:
 
     /// Page compiler
     PDFAsynchronousPageCompiler* m_compiler;
+    std::set<PDFInteger> m_failedCompilationPages;
 
     /// Text layout compiler
     PDFAsynchronousTextLayoutCompiler* m_textLayoutCompiler;

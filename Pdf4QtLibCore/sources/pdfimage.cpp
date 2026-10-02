@@ -39,6 +39,8 @@
 #include <cstring>
 #include <memory>
 #include <QString>
+#include <QElapsedTimer>
+#include <QDebug>
 #include <cstdint>
 
 #include "pdfdbgheap.h"
@@ -1047,6 +1049,8 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
     }
     else if (imageFilterName == "JPXDecode")
     {
+        QElapsedTimer decodeTimer;
+        decodeTimer.start();
         PDFJPEG2000ImageData imageData;
         imageData.byteArray = &content;
         imageData.position = 0;
@@ -1124,6 +1128,9 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
 
             opj_stream_destroy(opjStream);
             opj_destroy_codec(codec);
+
+            if (qEnvironmentVariableIsSet("FAMILYPDF_RENDER_PROFILE"))
+                qInfo() << "RENDER jpx_decode_ms" << decodeTimer.elapsed();
 
             opjStream = nullptr;
             codec = nullptr;
@@ -1541,7 +1548,12 @@ QImage PDFImage::getImage(const PDFCMS* cms,
     const bool isImageMask = m_imageData.getMaskingType() == PDFImageData::MaskingType::ImageMask;
     if (m_colorSpace && !isImageMask)
     {
-        return m_colorSpace->getImage(m_imageData, m_softMask, cms, m_renderingIntent, reporter, operationControl);
+        QElapsedTimer timer;
+        timer.start();
+        QImage image = m_colorSpace->getImage(m_imageData, m_softMask, cms, m_renderingIntent, reporter, operationControl);
+        if (qEnvironmentVariableIsSet("FAMILYPDF_RENDER_PROFILE"))
+            qInfo() << "RENDER color_conversion_ms" << timer.elapsed() << "source_size" << image.size();
+        return image;
     }
     else if (isImageMask)
     {
