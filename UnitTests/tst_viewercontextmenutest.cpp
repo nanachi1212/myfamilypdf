@@ -436,11 +436,14 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
 
     bool menuInspected = false;
     QTimer menuTimer;
-    menuTimer.setSingleShot(true);
     connect(&menuTimer, &QTimer::timeout, &editor, [&]()
     {
         auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
-        QVERIFY(menu);
+        if (!menu)
+        {
+            return;
+        }
+        menuTimer.stop();
         const QStringList requiredActions = {
             "thumbnailExtractPagesAction",
             "thumbnailDeletePagesAction",
@@ -454,7 +457,7 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
         menuInspected = true;
         menu->close();
     });
-    menuTimer.start(0);
+    menuTimer.start(10);
     const QPoint contextPoint = thumbnails->visualRect(thumbnails->model()->index(2, 0)).center();
     QContextMenuEvent contextEvent(QContextMenuEvent::Mouse, contextPoint, thumbnails->viewport()->mapToGlobal(contextPoint));
     QApplication::sendEvent(thumbnails->viewport(), &contextEvent);
