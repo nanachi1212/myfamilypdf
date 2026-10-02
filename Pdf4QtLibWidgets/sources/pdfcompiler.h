@@ -115,6 +115,9 @@ public:
     /// \param compile Compile the page, if it is not found in the cache
     const PDFPrecompiledPage* getCompiledPage(PDFInteger pageIndex, bool compile);
 
+    /// Updates visible-page priority on the GUI thread. Running work is retained.
+    void setPriorityPages(const std::vector<PDFInteger>& pages);
+
     /// Performs smart cache clear. Too old pages are removed from the cache,
     /// but only if these pages are not in active pages. Use this function to
     /// clear cache to avoid huge memory consumption.
@@ -155,6 +158,7 @@ private:
     /// This task is protected by mutex. Every access to this
     /// variable must be done with locked mutex.
     std::map<PDFInteger, CompileTask> m_tasks;
+    std::vector<PDFInteger> m_priorityPages; // Protected by m_mutex, like m_tasks.
 };
 
 class PDF4QTLIBWIDGETSSHARED_EXPORT PDFAsynchronousTextLayoutCompiler : public QObject

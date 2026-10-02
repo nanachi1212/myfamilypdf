@@ -735,6 +735,10 @@ public:
     /// \param[out] errorMessage Error message
     static PDFClosedIntervalSet parse(PDFInteger first, PDFInteger last, const QString& text, QString* errorMessage);
 
+    /// Parses explicit page numbers/ranges, validates bounds and removes duplicates.
+    /// Pages are returned in document order; open ranges are not accepted.
+    static PDFClosedIntervalSet parsePageSelection(PDFInteger pageCount, const QString& text, QString* errorMessage);
+
 private:
     /// Normalizes interval ranges - merges adjacent intervals
     void normalize();

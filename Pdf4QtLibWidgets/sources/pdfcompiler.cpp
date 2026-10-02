@@ -51,70 +51,76 @@ void PDFAsynchronousPageCompilerWorkerThread::run()
     QMutexLocker locker(m_mutex);
     while (!isInterruptionRequested())
     {
-        if (m_waitCondition->wait(locker.mutex(), QDeadlineTimer(QDeadlineTimer::Forever)))
+        // Re-read the visible pages between bounded batches, so a navigation
+        // request never waits for the entire thumbnail queue to drain.
+        std::vector<PDFAsynchronousPageCompiler::CompileTask> tasks;
+        for (PDFInteger page : m_compiler->m_priorityPages)
         {
-            while (!isInterruptionRequested())
+            auto it = m_compiler->m_tasks.find(page);
+            if (it != m_compiler->m_tasks.end() && !it->second.finished)
+                tasks.push_back(it->second);
+            if (tasks.size() == 2) break;
+        }
+        if (tasks.empty())
+        {
+            auto selected = m_compiler->m_tasks.end();
+            const PDFInteger current = m_compiler->m_priorityPages.empty() ? 0 : m_compiler->m_priorityPages.front();
+            for (auto it = m_compiler->m_tasks.begin(); it != m_compiler->m_tasks.end(); ++it)
+                if (!it->second.finished && (selected == m_compiler->m_tasks.end() ||
+                    qAbs(it->first - current) < qAbs(selected->first - current))) selected = it;
+            // One background page at a time bounds the delay for new foreground work.
+            if (selected != m_compiler->m_tasks.end()) tasks.push_back(selected->second);
+        }
+
+        if (!tasks.empty())
+        {
+            locker.unlock();
+
+            // Perform page compilation
+            auto proxy = m_compiler->getProxy();
+            proxy->getFontCache()->setCacheShrinkEnabled(this, false);
+
+            auto compilePage = [this, proxy](PDFAsynchronousPageCompiler::CompileTask& task) -> PDFPrecompiledPage
             {
-                std::vector<PDFAsynchronousPageCompiler::CompileTask> tasks;
-                for (auto& task : m_compiler->m_tasks)
+                PDFPrecompiledPage compiledPage;
+                PDFCMSPointer cms = proxy->getCMSManager()->getCurrentCMS();
+                PDFRenderer renderer(proxy->getDocument(), proxy->getFontCache(), cms.data(), proxy->getOptionalContentActivity(), proxy->getFeatures(), proxy->getMeshQualitySettings());
+                renderer.setOperationControl(m_compiler);
+                renderer.compile(&task.precompiledPage, task.pageIndex);
+                task.finished = true;
+                return compiledPage;
+            };
+            PDFExecutionPolicy::execute(PDFExecutionPolicy::Scope::Page, tasks.begin(), tasks.end(), compilePage);
+
+            proxy->getFontCache()->setCacheShrinkEnabled(this, true);
+
+            // Relock the mutex to write the tasks
+            locker.relock();
+
+            // Now, write compiled pages
+            bool isSomethingWritten = false;
+            for (auto& task : tasks)
+            {
+                if (task.finished)
                 {
-                    if (!task.second.finished)
-                    {
-                        tasks.push_back(task.second);
-                    }
-                }
-
-                if (!tasks.empty())
-                {
-                    locker.unlock();
-
-                    // Perform page compilation
-                    auto proxy = m_compiler->getProxy();
-                    proxy->getFontCache()->setCacheShrinkEnabled(this, false);
-
-                    auto compilePage = [this, proxy](PDFAsynchronousPageCompiler::CompileTask& task) -> PDFPrecompiledPage
-                    {
-                        PDFPrecompiledPage compiledPage;
-                        PDFCMSPointer cms = proxy->getCMSManager()->getCurrentCMS();
-                        PDFRenderer renderer(proxy->getDocument(), proxy->getFontCache(), cms.data(), proxy->getOptionalContentActivity(), proxy->getFeatures(), proxy->getMeshQualitySettings());
-                        renderer.setOperationControl(m_compiler);
-                        renderer.compile(&task.precompiledPage, task.pageIndex);
-                        task.finished = true;
-                        return compiledPage;
-                    };
-                    PDFExecutionPolicy::execute(PDFExecutionPolicy::Scope::Page, tasks.begin(), tasks.end(), compilePage);
-
-                    proxy->getFontCache()->setCacheShrinkEnabled(this, true);
-
-                    // Relock the mutex to write the tasks
-                    locker.relock();
-
-                    // Now, write compiled pages
-                    bool isSomethingWritten = false;
-                    for (auto& task : tasks)
-                    {
-                        if (task.finished)
-                        {
-                            isSomethingWritten = true;
-                            m_compiler->m_tasks[task.pageIndex] = std::move(task);
-                        }
-                    }
-
-                    if (isSomethingWritten)
-                    {
-                        // Why we are unlocking the mutex? Because
-                        // we do not want to emit signals with locked mutexes.
-                        // If direct connection is applied, this can lead to deadlock.
-                        locker.unlock();
-                        Q_EMIT pageCompiled();
-                        locker.relock();
-                    }
-                }
-                else
-                {
-                    break;
+                    isSomethingWritten = true;
+                    m_compiler->m_tasks[task.pageIndex] = std::move(task);
                 }
             }
+
+            if (isSomethingWritten)
+            {
+                // Why we are unlocking the mutex? Because
+                // we do not want to emit signals with locked mutexes.
+                // If direct connection is applied, this can lead to deadlock.
+                locker.unlock();
+                Q_EMIT pageCompiled();
+                locker.relock();
+            }
+        }
+        else
+        {
+            m_waitCondition->wait(locker.mutex(), QDeadlineTimer(QDeadlineTimer::Forever));
         }
     }
 }
@@ -191,6 +197,7 @@ void PDFAsynchronousPageCompiler::stop(bool clearCache)
             // It is safe to do not use mutex, because
             // we have ended the work thread.
             m_tasks.clear();
+            m_priorityPages.clear();
 
             if (clearCache)
             {
@@ -218,7 +225,9 @@ void PDFAsynchronousPageCompiler::reset()
 
 void PDFAsynchronousPageCompiler::setCacheLimit(qsizetype limit)
 {
+    const bool changed = m_cache->maxCost() != limit;
     m_cache->setMaxCost(limit);
+    if (changed) Q_EMIT pageImageChanged(true, {});
 }
 
 const PDFPrecompiledPage* PDFAsynchronousPageCompiler::getCompiledPage(PDFInteger pageIndex, bool compile)
@@ -247,6 +256,16 @@ const PDFPrecompiledPage* PDFAsynchronousPageCompiler::getCompiledPage(PDFIntege
     }
 
     return page;
+}
+
+void PDFAsynchronousPageCompiler::setPriorityPages(const std::vector<PDFInteger>& pages)
+{
+    QMutexLocker locker(&m_mutex);
+    if (m_priorityPages != pages)
+    {
+        m_priorityPages = pages;
+        m_waitCondition.wakeOne();
+    }
 }
 
 void PDFAsynchronousPageCompiler::smartClearCache(const int milisecondsLimit, const std::vector<PDFInteger>& activePages)

@@ -11897,6 +11897,13 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <source>Precompiled page size is too high (%1 kB). Cache size is %2 kB. Increase the cache size!</source>
         <translation>預編譯頁面大小過高（%1 kB）。緩存大小為 %2 kB。請增加緩存大小！</translation>
     </message>
+    <message><source>Enter at least one page number.</source><translation>請至少輸入一個頁碼。</translation></message>
+    <message><source>Invalid page selection '%1'. Use page numbers or ranges such as 1-3,8,10-12.</source><translation>頁碼選取「%1」無效。請輸入頁碼或範圍，例如 1-3,8,10-12。</translation></message>
+    <message><source>Page numbers must be between 1 and %1.</source><translation>頁碼必須介於 1 到 %1。</translation></message>
+    <message><source>Range '%1' is reversed. Put the smaller page number first.</source><translation>範圍「%1」順序相反，請將較小的頁碼放在前面。</translation></message>
+    <message><source>Loading page %1...</source><translation>正在載入第 %1 頁…</translation></message>
+    <message><source>Loading...</source><translation>載入中…</translation></message>
+    <message><source>Unable to render this page.</source><translation>無法顯示此頁面。</translation></message>
 </context>
 <context>
     <name>pdf::PDFWidgetAnnotationManager</name>
@@ -14390,6 +14397,12 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>document</source><translation>文件</translation></message>
     <message><source>Save Extracted Pages</source><translation>儲存提取的頁面</translation></message>
     <message><source>Saved %1 pages to %2.</source><translation>已將 %1 頁儲存到 %2。</translation></message>
+    <message><source>Repeated pages are included once, in document order.</source><translation>重複頁碼只保留一次，並依文件頁碼順序輸出。</translation></message>
+    <message><source>FamilyPDF OCR</source><translation>FamilyPDF OCR</translation></message>
+    <message><source>Open a saved PDF before starting OCR.</source><translation>請先開啟已儲存的 PDF，再啟動 OCR。</translation></message>
+    <message><source>The optional FamilyPDF OCR plugin is not installed.</source><translation>尚未安裝選用的 FamilyPDF OCR 外掛。</translation></message>
+    <message><source>Save searchable OCR PDF</source><translation>儲存可搜尋的 OCR PDF</translation></message>
+    <message><source>Could not start the FamilyPDF OCR plugin.</source><translation>無法啟動 FamilyPDF OCR 外掛。</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFRecentFileManager</name>
@@ -15248,11 +15261,6 @@ Do you want to perform this action?</source>
 </context>
 <context>
     <name>PDFProgramController</name>
-    <message><source>FamilyPDF OCR</source><translation>FamilyPDF OCR</translation></message>
-    <message><source>Open a saved PDF before starting OCR.</source><translation>請先開啟已儲存的 PDF，再啟動 OCR。</translation></message>
-    <message><source>The optional FamilyPDF OCR plugin is not installed.</source><translation>尚未安裝選用的 FamilyPDF OCR 外掛。</translation></message>
-    <message><source>Save searchable OCR PDF</source><translation>儲存可搜尋的 OCR PDF</translation></message>
-    <message><source>Could not start the FamilyPDF OCR plugin.</source><translation>無法啟動 FamilyPDF OCR 外掛。</translation></message>
     <message><source>Safe save</source><translation>安全儲存</translation></message>
     <message><source>Safe save failed</source><translation>安全儲存失敗</translation></message>
     <message><source>FamilyPDF is still establishing the safe-save baseline. Please use Save As or try again after the document finishes loading.</source><translation>FamilyPDF 正在建立安全儲存基準。請使用「另存新檔」，或等待文件載入完成後再試一次。</translation></message>

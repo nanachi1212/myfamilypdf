@@ -68,6 +68,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QSaveFile>
 #include <QtConcurrent/QtConcurrent>
 #include <QInputDialog>
 #include <QMainWindow>
@@ -3104,17 +3105,18 @@ void PDFProgramController::extractPages()
     bool ok = false;
     const QString rangeText = QInputDialog::getText(m_mainWindow,
                                                     tr("Extract Pages"),
-                                                    tr("Pages to extract, for example 1-3,8,10-12 (document has %1 pages):").arg(pageCount),
+                                                    tr("Pages to extract, for example 1-3,8,10-12 (document has %1 pages):").arg(pageCount)
+                                                        + '\n' + tr("Repeated pages are included once, in document order."),
                                                     QLineEdit::Normal,
                                                     currentPages.empty() ? QString() : QString::number(currentPages.front() + 1),
                                                     &ok);
-    if (!ok || rangeText.trimmed().isEmpty())
+    if (!ok)
     {
         return;
     }
 
     QString errorMessage;
-    const pdf::PDFClosedIntervalSet pageNumbers = pdf::PDFClosedIntervalSet::parse(1, pageCount, rangeText, &errorMessage);
+    const pdf::PDFClosedIntervalSet pageNumbers = pdf::PDFClosedIntervalSet::parsePageSelection(pageCount, rangeText, &errorMessage);
     if (!errorMessage.isEmpty() || pageNumbers.isEmpty())
     {
         QMessageBox::critical(m_mainWindow, tr("Extract Pages"), errorMessage.isEmpty() ? tr("No pages selected.") : errorMessage);
@@ -3145,7 +3147,18 @@ void PDFProgramController::extractPages()
     if (result)
     {
         pdf::PDFDocumentWriter writer(nullptr);
-        result = writer.write(fileName, &manipulator.getAssembledDocument(), QFile::exists(fileName));
+        // Commit only a complete PDF. QSaveFile's direct-write fallback stays disabled.
+        QSaveFile output(fileName);
+        if (!output.open(QIODevice::WriteOnly))
+        {
+            result = output.errorString();
+        }
+        else
+        {
+            result = writer.write(&output, &manipulator.getAssembledDocument());
+            if (result && !output.commit()) result = output.errorString();
+            if (!result) output.cancelWriting();
+        }
     }
 
     if (!result)
