@@ -56,3 +56,11 @@ $env:FAMILYPDF_RENDER_PROFILE = '1'
 ```powershell
 .\build\phase0-upstream-release\usr\bin\PdfTool.exe render 'C:\path\large.pdf' --page-select '1,20,100,200' --image-output-dir 'build\pixels' --image-res-mode pixel --image-res-pixel 1000 --image-format png
 ```
+
+## 本機 baseline runtime 診斷
+
+Viewer、Core、Gui、Widgets 和所有測試 runtime DLL 的 PE 架構均為 x64（8664）；CMake 為 Release、MSVC 14.44.35207，Qt 為 6.9.1 msvc2022_64。先前 build-only 目錄沒有部署 Qt runtime，測試使用程序內 Qt 路徑。已依既有 Prepare-TestRuntime allowlist 補齊兩份隔離測試目錄的 Qt 6.9.1 release DLL、plugins 與 offscreen plugin，未修改系統 PATH。相同名稱的 Qt/plugin 和 vcpkg DLL 在兩份目錄中 SHA-256 均一致；PE 直接依賴核對沒有缺少檔案或架構衝突。System32 MSVC runtime 為 14.51.36247，UCRT 為 10.0.26100.9444。
+
+完整 deployment 後，保存的 baseline runtime 重新執行 Viewer menu test，3 passed、0 failed；最新 UnitTestsViewer 仍被應用程式控制政策拒絕啟動。Code Integrity 3077 / 3033 明確記錄 Viewer 載入 Pdf4QtLibGui.dll 不符合 Enterprise signing level，policy ID 為 0283ac0f-fff1-49ae-ada1-8a933130cad6。這是本機政策阻擋，沒有證據指向二進位相容性 regression；未停用政策、重裝系統元件或混用舊版產品 DLL。診斷報告與完整雜湊留在本機 build/reading-v2/runtime-comparison.json。
+
+PdfTool 畫質量測使用上方完整 render 參數；診斷後確認沒有遺留 PdfTool、Viewer 或 Editor 程序。

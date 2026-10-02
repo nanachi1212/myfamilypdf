@@ -1030,12 +1030,14 @@ QImage PDFDrawWidgetProxy::drawThumbnailImage(PDFInteger pageIndex, int pixelSiz
             {
                 image = QImage(imageSize, QImage::Format_RGBA8888_Premultiplied);
                 image.fill(Qt::white);
-                if (!compiledPage || failed)
+                const bool renderFailed = failed || (compiledPage && std::any_of(compiledPage->getErrors().cbegin(), compiledPage->getErrors().cend(), [](const PDFRenderError& error)
+                    { return error.type == RenderErrorType::Error || error.type == RenderErrorType::NotSupported || error.type == RenderErrorType::NotImplemented; }));
+                if (!compiledPage || renderFailed)
                 {
                     QPainter painter(&image);
                     painter.setPen(QColor(96, 96, 96));
-                    painter.drawText(image.rect(), Qt::AlignCenter, failed ? PDFTranslationContext::tr("Error")
-                                                                         : PDFTranslationContext::tr("Loading..."));
+                    painter.drawText(image.rect(), Qt::AlignCenter, renderFailed ? PDFTranslationContext::tr("Error")
+                                                                               : PDFTranslationContext::tr("Loading..."));
                 }
             }
         }
