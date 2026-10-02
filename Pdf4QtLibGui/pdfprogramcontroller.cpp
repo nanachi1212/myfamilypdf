@@ -56,6 +56,8 @@
 #include "pdfdocumentmanipulator.h"
 
 #include <cstdio>
+#include <algorithm>
+#include <cmath>
 
 #include <QMenu>
 #include <QPrinter>
@@ -76,6 +78,8 @@
 #include <QXmlStreamWriter>
 #include <QMenuBar>
 #include <QComboBox>
+#include <QCryptographicHash>
+#include <QScrollBar>
 #include <QTimer>
 
 #include "pdfdbgheap.h"
@@ -1487,6 +1491,180 @@ void PDFProgramController::savePageLayoutPerDocument()
     }
 }
 
+QString PDFProgramController::getDocumentViewStateKey() const
+{
+    if (m_fileInfo.absoluteFilePath.isEmpty())
+    {
+        return QString();
+    }
+
+    QFileInfo fileInfo(m_fileInfo.absoluteFilePath);
+    QString stablePath = fileInfo.canonicalFilePath();
+    if (stablePath.isEmpty())
+    {
+        stablePath = fileInfo.absoluteFilePath();
+    }
+    stablePath = QDir::cleanPath(stablePath);
+#ifdef Q_OS_WIN
+    stablePath = stablePath.toCaseFolded();
+#endif
+    return QString::fromLatin1(QCryptographicHash::hash(stablePath.toUtf8(), QCryptographicHash::Sha256).toHex());
+}
+
+void PDFProgramController::saveDocumentViewState()
+{
+    if (!m_pdfDocument || m_fileInfo.absoluteFilePath.isEmpty())
+    {
+        return;
+    }
+
+    const std::vector<pdf::PDFInteger> pages = m_pdfWidget->getDrawWidget()->getCurrentPages();
+    if (pages.empty())
+    {
+        return;
+    }
+
+    const QString stateKey = getDocumentViewStateKey();
+    if (stateKey.isEmpty())
+    {
+        return;
+    }
+
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QCoreApplication::organizationName(), QCoreApplication::applicationName());
+    settings.beginGroup(QStringLiteral("DocumentViewStates"));
+    settings.beginGroup(stateKey);
+    settings.setValue(QStringLiteral("version"), 1);
+    settings.setValue(QStringLiteral("path"), m_fileInfo.absoluteFilePath);
+    settings.setValue(QStringLiteral("page"), qlonglong(pages.front()));
+    settings.setValue(QStringLiteral("zoom"), m_pdfWidget->getDrawWidgetProxy()->getZoom());
+
+    const auto saveScrollPosition = [&settings](const QString& name, const QScrollBar* scrollBar)
+    {
+        const int span = scrollBar->maximum() - scrollBar->minimum();
+        if (span > 0)
+        {
+            const qreal position = qreal(scrollBar->value() - scrollBar->minimum()) / qreal(span);
+            settings.setValue(name, position);
+        }
+        else
+        {
+            settings.remove(name);
+        }
+    };
+
+    if (!m_pdfWidget->getDrawWidgetProxy()->isBlockMode())
+    {
+        saveScrollPosition(QStringLiteral("horizontalPosition"), m_pdfWidget->getHorizontalScrollbar());
+        saveScrollPosition(QStringLiteral("verticalPosition"), m_pdfWidget->getVerticalScrollbar());
+    }
+    else
+    {
+        settings.remove(QStringLiteral("horizontalPosition"));
+        settings.remove(QStringLiteral("verticalPosition"));
+    }
+    settings.endGroup();
+    settings.endGroup();
+}
+
+void PDFProgramController::restoreDocumentViewState()
+{
+    if (!m_pdfDocument || m_fileInfo.absoluteFilePath.isEmpty())
+    {
+        return;
+    }
+
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount());
+    if (pageCount <= 0)
+    {
+        return;
+    }
+
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QCoreApplication::organizationName(), QCoreApplication::applicationName());
+    const QString stateKey = getDocumentViewStateKey();
+    settings.beginGroup(QStringLiteral("DocumentViewStates"));
+    settings.beginGroup(stateKey);
+    const bool hasSavedState = settings.value(QStringLiteral("version")).toInt() == 1;
+    const QVariant pageValue = settings.value(QStringLiteral("page"));
+    const QVariant zoomValue = settings.value(QStringLiteral("zoom"));
+    const QVariant horizontalValue = settings.value(QStringLiteral("horizontalPosition"));
+    const QVariant verticalValue = settings.value(QStringLiteral("verticalPosition"));
+    settings.endGroup();
+    settings.endGroup();
+
+    QVariant effectivePageValue = pageValue;
+    if (!hasSavedState)
+    {
+        settings.beginGroup(QStringLiteral("LastOpenedDocumentPages"));
+        effectivePageValue = settings.value(m_fileInfo.absoluteFilePath);
+        settings.endGroup();
+    }
+
+    bool pageOk = false;
+    const qlonglong savedPage = effectivePageValue.toLongLong(&pageOk);
+    if (!pageOk)
+    {
+        return;
+    }
+
+    const pdf::PDFInteger pageIndex = pdf::PDFInteger(std::clamp<qlonglong>(savedPage, 0, pageCount - 1));
+    const bool pageWasClamped = savedPage != pageIndex;
+    pdf::PDFDrawWidgetProxy* proxy = m_pdfWidget->getDrawWidgetProxy();
+    proxy->goToPage(pageIndex);
+
+    bool zoomOk = false;
+    const qreal zoom = zoomValue.toDouble(&zoomOk);
+    if (hasSavedState && zoomOk && std::isfinite(zoom) &&
+        zoom >= pdf::PDFDrawWidgetProxy::getMinZoom() &&
+        zoom <= pdf::PDFDrawWidgetProxy::getMaxZoom())
+    {
+        proxy->zoom(zoom);
+    }
+
+    const auto validPosition = [](const QVariant& value, qreal* position)
+    {
+        bool ok = false;
+        const qreal parsed = value.toDouble(&ok);
+        if (!ok || !std::isfinite(parsed) || parsed < 0.0 || parsed > 1.0)
+        {
+            return false;
+        }
+        *position = parsed;
+        return true;
+    };
+
+    qreal horizontalPosition = 0.0;
+    qreal verticalPosition = 0.0;
+    const bool restoreHorizontal = hasSavedState && !pageWasClamped && validPosition(horizontalValue, &horizontalPosition);
+    const bool restoreVertical = hasSavedState && !pageWasClamped && validPosition(verticalValue, &verticalPosition);
+    if (restoreHorizontal || restoreVertical)
+    {
+        QTimer::singleShot(0, this, [this, stateKey, restoreHorizontal, restoreVertical, horizontalPosition, verticalPosition]()
+        {
+            if (!m_pdfDocument || getDocumentViewStateKey() != stateKey || m_pdfWidget->getDrawWidgetProxy()->isBlockMode())
+            {
+                return;
+            }
+
+            const auto restoreScrollPosition = [](QScrollBar* scrollBar, qreal position)
+            {
+                const int span = scrollBar->maximum() - scrollBar->minimum();
+                if (span > 0)
+                {
+                    scrollBar->setValue(scrollBar->minimum() + qRound(position * span));
+                }
+            };
+            if (restoreHorizontal)
+            {
+                restoreScrollPosition(m_pdfWidget->getHorizontalScrollbar(), horizontalPosition);
+            }
+            if (restoreVertical)
+            {
+                restoreScrollPosition(m_pdfWidget->getVerticalScrollbar(), verticalPosition);
+            }
+        });
+    }
+}
+
 bool PDFProgramController::isFactorySettingsBeingRestored() const
 {
     return m_isFactorySettingsBeingRestored;
@@ -2496,16 +2674,7 @@ void PDFProgramController::onDocumentReadingFinished()
                 QMessageBox::warning(m_mainWindow, QApplication::applicationDisplayName(), requirementResult.message);
             }
 
-            QSettings settings(QSettings::IniFormat, QSettings::UserScope, QCoreApplication::organizationName(), QCoreApplication::applicationName());
-
-            settings.beginGroup("LastOpenedDocumentPages");
-            QVariant lastOpenedPage = settings.value(m_fileInfo.absoluteFilePath, QVariant());
-            settings.endGroup();
-
-            if (lastOpenedPage.isValid())
-            {
-                m_pdfWidget->getDrawWidgetProxy()->goToPage(lastOpenedPage.toInt());
-            }
+            restoreDocumentViewState();
 
             m_mainWindowInterface->setStatusBarMessage(tr("Document '%1' was successfully loaded!").arg(m_fileInfo.fileName), 4000);
             break;
@@ -2672,17 +2841,7 @@ void PDFProgramController::closeDocument()
 
     if (m_pdfDocument && !m_fileInfo.absoluteFilePath.isEmpty())
     {
-        std::vector<pdf::PDFInteger> pages = m_pdfWidget->getDrawWidget()->getCurrentPages();
-
-        if (!pages.empty())
-        {
-            QSettings settings(QSettings::IniFormat, QSettings::UserScope, QCoreApplication::organizationName(), QCoreApplication::applicationName());
-
-            settings.beginGroup("LastOpenedDocumentPages");
-            settings.setValue(m_fileInfo.absoluteFilePath, int(pages.front()));
-            settings.endGroup();
-        }
-
+        saveDocumentViewState();
         savePageLayoutPerDocument();
     }
 
@@ -3123,10 +3282,46 @@ void PDFProgramController::extractPages()
         return;
     }
 
+    std::vector<pdf::PDFInteger> pageIndices;
+    for (const pdf::PDFInteger pageNumber : pageNumbers.unfold())
+    {
+        pageIndices.push_back(pageNumber - 1);
+    }
+    extractPages(pageIndices);
+}
+
+void PDFProgramController::extractPages(const std::vector<pdf::PDFInteger>& pageIndices)
+{
+    const pdf::PDFDocument* document = getDocument();
+    if (!document)
+    {
+        return;
+    }
+
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(document->getCatalog()->getPageCount());
+    std::vector<pdf::PDFInteger> selectedPages = pageIndices;
+    selectedPages.erase(std::remove_if(selectedPages.begin(), selectedPages.end(), [pageCount](pdf::PDFInteger pageIndex)
+    {
+        return pageIndex < 0 || pageIndex >= pageCount;
+    }), selectedPages.end());
+    std::sort(selectedPages.begin(), selectedPages.end());
+    selectedPages.erase(std::unique(selectedPages.begin(), selectedPages.end()), selectedPages.end());
+    if (selectedPages.empty())
+    {
+        QMessageBox::critical(m_mainWindow, tr("Extract Pages"), tr("No pages selected."));
+        return;
+    }
+
     const QFileInfo sourceInfo(getOriginalFileName());
     const QString baseName = sourceInfo.completeBaseName().isEmpty() ? tr("document") : sourceInfo.completeBaseName();
     const QString suggestedDirectory = sourceInfo.absolutePath().isEmpty() ? m_settings->getDirectory() : sourceInfo.absolutePath();
-    const QString suggestedFile = QDir(suggestedDirectory).filePath(QString("%1_p%2.pdf").arg(baseName, QString(rangeText).remove(' ').replace(',', '_')));
+    QStringList selectedPageNumbers;
+    selectedPageNumbers.reserve(selectedPages.size());
+    for (const pdf::PDFInteger pageIndex : selectedPages)
+    {
+        selectedPageNumbers.push_back(QString::number(pageIndex + 1));
+    }
+    const QString suggestedFile = QDir(suggestedDirectory).filePath(QString("%1_p%2.pdf").arg(baseName, selectedPageNumbers.join('_')));
     const QString fileName = QFileDialog::getSaveFileName(m_mainWindow, tr("Save Extracted Pages"), suggestedFile, tr("PDF document (*.pdf)"));
     if (fileName.isEmpty())
     {
@@ -3135,9 +3330,9 @@ void PDFProgramController::extractPages()
 
     pdf::PDFDocumentManipulator::AssembledPages assembledPages;
     const pdf::PDFDocumentManipulator::AssembledPages allPages = pdf::PDFDocumentManipulator::createAllDocumentPages(0, document);
-    for (const pdf::PDFInteger pageNumber : pageNumbers.unfold())
+    for (const pdf::PDFInteger pageIndex : selectedPages)
     {
-        assembledPages.push_back(allPages[pageNumber - 1]);
+        assembledPages.push_back(allPages[pageIndex]);
     }
 
     pdf::PDFDocumentManipulator manipulator;
@@ -3168,6 +3363,116 @@ void PDFProgramController::extractPages()
     }
 
     QMessageBox::information(m_mainWindow, tr("Extract Pages"), tr("Saved %1 pages to %2.").arg(assembledPages.size()).arg(QDir::toNativeSeparators(fileName)));
+}
+
+void PDFProgramController::deletePages(const std::vector<pdf::PDFInteger>& pageIndices)
+{
+    if (!m_pdfDocument)
+    {
+        return;
+    }
+
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount());
+    std::vector<pdf::PDFInteger> selectedPages = pageIndices;
+    selectedPages.erase(std::remove_if(selectedPages.begin(), selectedPages.end(), [pageCount](pdf::PDFInteger pageIndex)
+    {
+        return pageIndex < 0 || pageIndex >= pageCount;
+    }), selectedPages.end());
+    std::sort(selectedPages.begin(), selectedPages.end());
+    selectedPages.erase(std::unique(selectedPages.begin(), selectedPages.end()), selectedPages.end());
+    if (selectedPages.empty())
+    {
+        return;
+    }
+    if (pdf::PDFInteger(selectedPages.size()) >= pageCount)
+    {
+        QMessageBox::warning(m_mainWindow, tr("Delete Pages"), tr("A PDF document must contain at least one page. Select fewer pages and try again."));
+        return;
+    }
+
+    const std::vector<pdf::PDFInteger> currentPages = m_pdfWidget->getDrawWidget()->getCurrentPages();
+    const pdf::PDFInteger oldCurrentPage = currentPages.empty() ? selectedPages.front() : currentPages.front();
+
+    pdf::PDFDocumentModifier modifier(m_pdfDocument.data());
+    pdf::PDFDocumentBuilder* builder = modifier.getBuilder();
+    std::vector<pdf::PDFObjectReference> pages = builder->getPages();
+    std::vector<pdf::PDFObjectReference> remainingPages;
+    remainingPages.reserve(pages.size() - selectedPages.size());
+    for (pdf::PDFInteger pageIndex = 0; pageIndex < pdf::PDFInteger(pages.size()); ++pageIndex)
+    {
+        if (!std::binary_search(selectedPages.cbegin(), selectedPages.cend(), pageIndex))
+        {
+            remainingPages.push_back(pages[pageIndex]);
+        }
+    }
+    builder->setPages(remainingPages);
+    modifier.markReset();
+    if (!modifier.finalize())
+    {
+        return;
+    }
+
+    pdf::PDFModifiedDocument::ModificationFlags flags = modifier.getFlags();
+    flags.setFlag(pdf::PDFModifiedDocument::PreserveUndoRedo);
+    onDocumentModified(pdf::PDFModifiedDocument(modifier.getDocument(), m_optionalContentActivity, flags));
+
+    const pdf::PDFInteger pagesBeforeCurrent = pdf::PDFInteger(std::count_if(selectedPages.cbegin(), selectedPages.cend(), [oldCurrentPage](pdf::PDFInteger pageIndex)
+    {
+        return pageIndex < oldCurrentPage;
+    }));
+    const pdf::PDFInteger newCurrentPage = std::clamp(oldCurrentPage - pagesBeforeCurrent,
+                                                      pdf::PDFInteger(0),
+                                                      pdf::PDFInteger(remainingPages.size() - 1));
+    m_pdfWidget->getDrawWidgetProxy()->goToPage(newCurrentPage);
+}
+
+void PDFProgramController::rotatePages(const std::vector<pdf::PDFInteger>& pageIndices, int quarterTurns)
+{
+    if (!m_pdfDocument || quarterTurns == 0)
+    {
+        return;
+    }
+
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount());
+    std::vector<pdf::PDFInteger> selectedPages = pageIndices;
+    selectedPages.erase(std::remove_if(selectedPages.begin(), selectedPages.end(), [pageCount](pdf::PDFInteger pageIndex)
+    {
+        return pageIndex < 0 || pageIndex >= pageCount;
+    }), selectedPages.end());
+    std::sort(selectedPages.begin(), selectedPages.end());
+    selectedPages.erase(std::unique(selectedPages.begin(), selectedPages.end()), selectedPages.end());
+    if (selectedPages.empty())
+    {
+        return;
+    }
+
+    QStringList pageNumbers;
+    pageNumbers.reserve(selectedPages.size());
+    for (const pdf::PDFInteger pageIndex : selectedPages)
+    {
+        pageNumbers.push_back(QString::number(pageIndex + 1));
+    }
+
+    pdf::PDFPageGeometrySettings settings;
+    settings.pageRange = pageNumbers.join(',');
+    settings.applyMediaBox = false;
+    settings.applyCropBox = false;
+    settings.rotationQuarterTurns = quarterTurns;
+
+    pdf::PDFDocumentPointer modifiedDocument(new pdf::PDFDocument(*m_pdfDocument));
+    pdf::PDFModifiedDocument::ModificationFlags flags;
+    const pdf::PDFOperationResult result = pdf::PDFPageGeometry::apply(modifiedDocument.data(), settings, &flags);
+    if (!result)
+    {
+        QMessageBox::critical(m_mainWindow, tr("Rotate Pages"), result.getErrorMessage());
+        return;
+    }
+    if (flags == pdf::PDFModifiedDocument::ModificationFlags())
+    {
+        return;
+    }
+
+    onDocumentModified(pdf::PDFModifiedDocument(modifiedDocument, m_optionalContentActivity, flags));
 }
 
 void PDFProgramController::launchOcrPlugin()

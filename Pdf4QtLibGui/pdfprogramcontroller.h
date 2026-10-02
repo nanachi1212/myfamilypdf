@@ -330,6 +330,9 @@ public:
     void performSaveAs();
     void launchOcrPlugin();
     void extractPages();
+    void extractPages(const std::vector<pdf::PDFInteger>& pageIndices);
+    void deletePages(const std::vector<pdf::PDFInteger>& pageIndices);
+    void rotatePages(const std::vector<pdf::PDFInteger>& pageIndices, int quarterTurns);
 
     void onActionTriggered(const pdf::PDFAction* action);
     void onDocumentModified(pdf::PDFModifiedDocument document);
@@ -460,6 +463,9 @@ private:
 
     void saveDocument(const QString& fileName);
     void savePageLayoutPerDocument();
+    void saveDocumentViewState();
+    void restoreDocumentViewState();
+    QString getDocumentViewStateKey() const;
 
     PDFActionManager* m_actionManager;
     QMainWindow* m_mainWindow;

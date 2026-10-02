@@ -51,6 +51,7 @@
 #include <QLineEdit>
 #include <QPainter>
 #include <QTextToSpeech>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QDialog>
@@ -94,7 +95,8 @@ PDFSidebarWidget::PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
     m_notesSortProxyTreeModel(nullptr),
     m_document(nullptr),
     m_optionalContentActivity(nullptr),
-    m_attachmentsTreeModel(nullptr)
+    m_attachmentsTreeModel(nullptr),
+    m_editableDocument(editableOutline)
 {
     ui->setupUi(this);
 
@@ -137,8 +139,12 @@ PDFSidebarWidget::PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
     int thumbnailsFontSize = QFontMetrics(ui->thumbnailsListView->font()).lineSpacing();
     m_thumbnailsModel->setExtraItemSizeHint(2 * thumbnailsMargin, thumbnailsMargin + thumbnailsFontSize);
     ui->thumbnailsListView->setModel(m_thumbnailsModel);
+    ui->thumbnailsListView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    ui->thumbnailsListView->setSelectionBehavior(QAbstractItemView::SelectItems);
+    ui->thumbnailsListView->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->thumbnailsSizeSlider, &QSlider::valueChanged, this, &PDFSidebarWidget::onThumbnailsSizeChanged);
     connect(ui->thumbnailsListView, &QListView::clicked, this, &PDFSidebarWidget::onThumbnailClicked);
+    connect(ui->thumbnailsListView, &QListView::customContextMenuRequested, this, &PDFSidebarWidget::onThumbnailContextMenuRequested);
     onThumbnailsSizeChanged(ui->thumbnailsSizeSlider->value());
 
     // Optional content
@@ -1073,6 +1079,105 @@ void PDFSidebarWidget::onThumbnailClicked(const QModelIndex& index)
     {
         m_proxy->goToPage(m_thumbnailsModel->getPageIndex(index));
     }
+}
+
+std::vector<pdf::PDFInteger> PDFSidebarWidget::getSelectedThumbnailPages() const
+{
+    std::vector<pdf::PDFInteger> result;
+    const QModelIndexList selectedIndexes = ui->thumbnailsListView->selectionModel()->selectedIndexes();
+    result.reserve(selectedIndexes.size());
+    for (const QModelIndex& index : selectedIndexes)
+    {
+        if (index.isValid())
+        {
+            result.push_back(m_thumbnailsModel->getPageIndex(index));
+        }
+    }
+
+    std::sort(result.begin(), result.end());
+    result.erase(std::unique(result.begin(), result.end()), result.end());
+    return result;
+}
+
+void PDFSidebarWidget::selectThumbnailPages(const std::vector<pdf::PDFInteger>& pageIndices)
+{
+    QItemSelectionModel* selectionModel = ui->thumbnailsListView->selectionModel();
+    selectionModel->clearSelection();
+
+    QModelIndex currentIndex;
+    for (const pdf::PDFInteger pageIndex : pageIndices)
+    {
+        const QModelIndex index = m_thumbnailsModel->index(pageIndex, 0, QModelIndex());
+        if (index.isValid())
+        {
+            selectionModel->select(index, QItemSelectionModel::Select);
+            currentIndex = index;
+        }
+    }
+
+    if (currentIndex.isValid())
+    {
+        selectionModel->setCurrentIndex(currentIndex, QItemSelectionModel::NoUpdate);
+        ui->thumbnailsListView->scrollTo(currentIndex, QListView::EnsureVisible);
+    }
+}
+
+void PDFSidebarWidget::onThumbnailContextMenuRequested(const QPoint& pos)
+{
+    const QModelIndex clickedIndex = ui->thumbnailsListView->indexAt(pos);
+    if (!clickedIndex.isValid())
+    {
+        return;
+    }
+
+    QItemSelectionModel* selectionModel = ui->thumbnailsListView->selectionModel();
+    if (!selectionModel->isSelected(clickedIndex))
+    {
+        selectionModel->setCurrentIndex(clickedIndex, QItemSelectionModel::ClearAndSelect);
+    }
+
+    const std::vector<pdf::PDFInteger> selectedPages = getSelectedThumbnailPages();
+    if (selectedPages.empty())
+    {
+        return;
+    }
+
+    QMenu menu(this);
+    QAction* extractAction = menu.addAction(tr("Extract Selected Pages to New PDF..."));
+    extractAction->setObjectName(QStringLiteral("thumbnailExtractPagesAction"));
+    connect(extractAction, &QAction::triggered, this, [this, selectedPages]()
+    {
+        Q_EMIT extractPagesRequested(selectedPages);
+    });
+
+    if (m_editableDocument)
+    {
+        menu.addSeparator();
+        QAction* deleteAction = menu.addAction(tr("Delete Selected Pages"));
+        deleteAction->setObjectName(QStringLiteral("thumbnailDeletePagesAction"));
+        connect(deleteAction, &QAction::triggered, this, [this, selectedPages]()
+        {
+            Q_EMIT deletePagesRequested(selectedPages);
+        });
+
+        QAction* rotateRightAction = menu.addAction(tr("Rotate Selected Pages 90° Clockwise"));
+        rotateRightAction->setObjectName(QStringLiteral("thumbnailRotatePagesRightAction"));
+        connect(rotateRightAction, &QAction::triggered, this, [this, selectedPages]()
+        {
+            Q_EMIT rotatePagesRequested(selectedPages, 1);
+            QTimer::singleShot(0, this, [this, selectedPages]() { selectThumbnailPages(selectedPages); });
+        });
+
+        QAction* rotateLeftAction = menu.addAction(tr("Rotate Selected Pages 90° Counterclockwise"));
+        rotateLeftAction->setObjectName(QStringLiteral("thumbnailRotatePagesLeftAction"));
+        connect(rotateLeftAction, &QAction::triggered, this, [this, selectedPages]()
+        {
+            Q_EMIT rotatePagesRequested(selectedPages, -1);
+            QTimer::singleShot(0, this, [this, selectedPages]() { selectThumbnailPages(selectedPages); });
+        });
+    }
+
+    menu.exec(ui->thumbnailsListView->viewport()->mapToGlobal(pos));
 }
 
 void PDFSidebarWidget::onSignatureCustomContextMenuRequested(const QPoint& pos)

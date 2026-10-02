@@ -2895,6 +2895,26 @@
 <context>
     <name>PDFSidebarWidget</name>
     <message>
+        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="1150"/>
+        <source>Extract Selected Pages to New PDF...</source>
+        <translation>提取選取頁面到新 PDF...</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="1162"/>
+        <source>Delete Selected Pages</source>
+        <translation>刪除選取頁面</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="1169"/>
+        <source>Rotate Selected Pages 90° Clockwise</source>
+        <translation>將選取頁面順時針旋轉 90°</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="1177"/>
+        <source>Rotate Selected Pages 90° Counterclockwise</source>
+        <translation>將選取頁面逆時針旋轉 90°</translation>
+    </message>
+    <message>
         <location filename="../Pdf4QtLibGui/pdfsidebarwidget.ui" line="84"/>
         <source>Outline</source>
         <translation>大綱</translation>
@@ -15261,6 +15281,21 @@ Do you want to perform this action?</source>
 </context>
 <context>
     <name>PDFProgramController</name>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="3320"/>
+        <source>Delete Pages</source>
+        <translation>刪除頁面</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="3320"/>
+        <source>A PDF document must contain at least one page. Select fewer pages and try again.</source>
+        <translation>PDF 文件至少必須保留一頁。請減少選取頁面後再試一次。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="3400"/>
+        <source>Rotate Pages</source>
+        <translation>旋轉頁面</translation>
+    </message>
     <message><source>Safe save</source><translation>安全儲存</translation></message>
     <message><source>Safe save failed</source><translation>安全儲存失敗</translation></message>
     <message><source>FamilyPDF is still establishing the safe-save baseline. Please use Save As or try again after the document finishes loading.</source><translation>FamilyPDF 正在建立安全儲存基準。請使用「另存新檔」，或等待文件載入完成後再試一次。</translation></message>
