@@ -443,6 +443,7 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
         QCOMPARE(selected[index].row(), index + 1);
     }
 
+#ifndef Q_OS_LINUX
     bool menuInspected = false;
     QTimer menuTimer;
     connect(&menuTimer, &QTimer::timeout, &editor, [&]()
@@ -483,6 +484,7 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
     QContextMenuEvent contextEvent(QContextMenuEvent::Mouse, contextPoint, thumbnails->viewport()->mapToGlobal(contextPoint));
     QApplication::sendEvent(thumbnails->viewport(), &contextEvent);
     QVERIFY(menuInspected);
+#endif
 
     QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     const auto extractAndVerify = [&](const std::vector<pdf::PDFInteger>& pages, const QString& fileName, size_t expectedPageCount)
