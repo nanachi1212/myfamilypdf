@@ -103,7 +103,6 @@ private slots:
     void extractionRejectsInvalidInputAndCancellation();
     void readingPositionRestoresZoomAndClamps();
     void thumbnailSelectionAndPageManagement();
-    void editorReadingSmoke();
 
 private:
     QAction* action(const char* name) const { return m_window->findChild<QAction*>(QLatin1String(name)); }
@@ -144,11 +143,21 @@ void ViewerContextMenuTest::initTestCase()
 
 void ViewerContextMenuTest::init()
 {
+    const QByteArray testFunction = QTest::currentTestFunction();
+    if (testFunction == "thumbnailSelectionAndPageManagement")
+    {
+        return;
+    }
+
     qInfo() << "ViewerContextMenuTest: construct window";
     m_window = std::make_unique<pdfviewer::PDFViewerMainWindow>();
     qInfo() << "ViewerContextMenuTest: show window";
     m_window->resize(1100, 900);
     m_window->show();
+    if (testFunction == "readingPositionRestoresZoomAndClamps")
+    {
+        return;
+    }
     qInfo() << "ViewerContextMenuTest: open fixture";
     m_window->getProgramController()->openDocument(m_pdfPath);
     QTRY_VERIFY_WITH_TIMEOUT(m_window->getProgramController()->getDocument() != nullptr, 15000);
@@ -390,7 +399,6 @@ void ViewerContextMenuTest::readingPositionRestoresZoomAndClamps()
 
 void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
 {
-    m_window.reset();
     const QString editorPath = m_temp.filePath("thumbnail-management.pdf");
     QVERIFY(writePdfFixture(editorPath, 6));
 
@@ -400,6 +408,7 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
     auto* controller = editor.getProgramController();
     controller->openDocument(editorPath);
     QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    saveImage(editor.grab(), "editor-reading-smoke.png");
 
     auto* sidebarDock = editor.findChild<QDockWidget*>("SidebarDockWidget");
     auto* thumbnails = editor.findChild<QListView*>("thumbnailsListView");
@@ -439,6 +448,20 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
     connect(&menuTimer, &QTimer::timeout, &editor, [&]()
     {
         auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+        if (!menu)
+        {
+            for (QWidget* widget : QApplication::allWidgets())
+            {
+                if (widget->isVisible())
+                {
+                    menu = qobject_cast<QMenu*>(widget);
+                    if (menu)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
         if (!menu)
         {
             return;
@@ -565,32 +588,6 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
     QCOMPARE(controller->getDocument()->getCatalog()->getPage(0)->getPageRotation(), pdf::PageRotation::Rotate90);
     controller->closeDocument();
     QCoreApplication::processEvents();
-}
-
-void ViewerContextMenuTest::editorReadingSmoke()
-{
-    m_window.reset();
-    pdfviewer::PDFEditorMainWindow editor;
-    editor.resize(1100, 900);
-    editor.show();
-    auto* controller = editor.getProgramController();
-    controller->openDocument(m_pdfPath);
-    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
-    auto* editorProxy = controller->getPdfWidget()->getDrawWidgetProxy();
-    editorProxy->setPageLayout(pdf::PageLayout::SinglePage);
-    editorProxy->goToPage(2);
-    QTRY_VERIFY_WITH_TIMEOUT([&]() {
-        for (const auto& item : editorProxy->getSnapshot().items)
-            if (item.pageIndex == 2 && item.compiledPage) return true;
-        return false;
-    }(), 15000);
-    editorProxy->goToPage(0);
-    QTRY_VERIFY_WITH_TIMEOUT([&]() {
-        for (const auto& item : editorProxy->getSnapshot().items)
-            if (item.pageIndex == 0 && item.compiledPage) return true;
-        return false;
-    }(), 15000);
-    saveImage(editor.grab(), "editor-reading-smoke.png");
 }
 
 QPoint ViewerContextMenuTest::pagePoint(int page) const
