@@ -452,13 +452,11 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
         {
             for (QWidget* widget : QApplication::allWidgets())
             {
-                if (widget->isVisible())
+                auto* candidate = qobject_cast<QMenu*>(widget);
+                if (candidate && candidate->findChild<QAction*>("thumbnailExtractPagesAction"))
                 {
-                    menu = qobject_cast<QMenu*>(widget);
-                    if (menu)
-                    {
-                        break;
-                    }
+                    menu = candidate;
+                    break;
                 }
             }
         }
