@@ -272,7 +272,7 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
 
     QAction* extractPagesAction = new QAction(tr("Extract Pages..."), this);
     ui->menuFile->insertAction(ui->actionProperties, extractPagesAction);
-    connect(extractPagesAction, &QAction::triggered, m_programController, &PDFProgramController::extractPages);
+    connect(extractPagesAction, &QAction::triggered, m_programController, [this]() { m_programController->extractPages(); });
 
     pdf::PDFWidget* pdfWidget = m_programController->getPdfWidget();
     pdfWidget->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -290,6 +290,8 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     m_sidebarDockWidget->hide();
     connect(m_sidebarWidget, &PDFSidebarWidget::actionTriggered, m_programController, &PDFProgramController::onActionTriggered);
     connect(m_sidebarWidget, &PDFSidebarWidget::documentModified, m_programController, &PDFProgramController::onDocumentModified);
+    connect(m_sidebarWidget, &PDFSidebarWidget::extractPagesRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->extractPages(pages); });
 
     ui->menuView->addSeparator();
     ui->menuView->addAction(m_sidebarDockWidget->toggleViewAction());

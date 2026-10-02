@@ -330,7 +330,7 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
 
     QAction* extractPagesAction = new QAction(tr("Extract Pages..."), this);
     ui->menuFile->insertAction(ui->actionProperties, extractPagesAction);
-    connect(extractPagesAction, &QAction::triggered, m_programController, &PDFProgramController::extractPages);
+    connect(extractPagesAction, &QAction::triggered, m_programController, [this]() { m_programController->extractPages(); });
 
     // Special tools
     QToolButton* insertStickyNoteButton = m_actionManager->createToolButtonForActionGroup(PDFActionManager::CreateStickyNoteGroup, ui->mainToolBar);
@@ -350,6 +350,12 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     m_sidebarDockWidget->hide();
     connect(m_sidebarWidget, &PDFSidebarWidget::actionTriggered, m_programController, &PDFProgramController::onActionTriggered);
     connect(m_sidebarWidget, &PDFSidebarWidget::documentModified, m_programController, &PDFProgramController::onDocumentModified);
+    connect(m_sidebarWidget, &PDFSidebarWidget::extractPagesRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->extractPages(pages); });
+    connect(m_sidebarWidget, &PDFSidebarWidget::deletePagesRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->deletePages(pages); });
+    connect(m_sidebarWidget, &PDFSidebarWidget::rotatePagesRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& pages, int quarterTurns) { m_programController->rotatePages(pages, quarterTurns); });
 
     m_advancedFindWidget = new PDFAdvancedFindWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), this);
     m_advancedFindDockWidget = new QDockWidget(tr("Advanced find"), this);

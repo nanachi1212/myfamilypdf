@@ -110,6 +110,9 @@ public:
 signals:
     void actionTriggered(const pdf::PDFAction* action);
     void documentModified(pdf::PDFModifiedDocument document);
+    void extractPagesRequested(std::vector<pdf::PDFInteger> pageIndices);
+    void deletePagesRequested(std::vector<pdf::PDFInteger> pageIndices);
+    void rotatePagesRequested(std::vector<pdf::PDFInteger> pageIndices, int quarterTurns);
 
 private:
     void updateGUI(Page preferredPage);
@@ -126,6 +129,7 @@ private:
     void onAttachmentDoubleClicked(const QModelIndex& index);
     void onAttachmentCustomContextMenuRequested(const QPoint& pos);
     void onThumbnailClicked(const QModelIndex& index);
+    void onThumbnailContextMenuRequested(const QPoint& pos);
     void onSignatureCustomContextMenuRequested(const QPoint& pos);
     void onOutlineTreeViewContextMenuRequested(const QPoint& pos);
     void onNotesTreeViewContextMenuRequested(const QPoint& pos);
@@ -145,6 +149,8 @@ private:
 
     bool saveAttachmentToFile(const pdf::PDFFileSpecification* fileSpecification, const QString& fileName);
     void openAttachment(const pdf::PDFFileSpecification* fileSpecification);
+    std::vector<pdf::PDFInteger> getSelectedThumbnailPages() const;
+    void selectThumbnailPages(const std::vector<pdf::PDFInteger>& pageIndices);
 
     Ui::PDFSidebarWidget* ui;
     pdf::PDFDrawWidgetProxy* m_proxy;
@@ -167,6 +173,7 @@ private:
     std::vector<pdf::PDFCertificateInfo> m_certificateInfos;
     std::vector<std::pair<pdf::PDFObjectReference, pdf::PDFInteger>> m_markupAnnotations;
     Page m_currentPage = Invalid;
+    bool m_editableDocument = false;
     bool m_bookmarkChangeInProgress = false;
 };
 

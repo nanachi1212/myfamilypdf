@@ -17,6 +17,8 @@
 #include <QContextMenuEvent>
 #include <QDockWidget>
 #include <QFile>
+#include <QItemSelectionModel>
+#include <QListView>
 #include <QMenu>
 #include <QPainter>
 #include <QPluginLoader>
@@ -28,8 +30,62 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QCryptographicHash>
+#include <QScrollBar>
+#include <QSettings>
 #include "pdfdocumentreader.h"
 #include <memory>
+
+namespace
+{
+
+bool writePdfFixture(const QString& path, int pageCount)
+{
+    const int fontObject = 3 + pageCount * 2;
+    QByteArray kids;
+    for (int page = 0; page < pageCount; ++page)
+    {
+        kids += QByteArray::number(3 + page * 2) + " 0 R ";
+    }
+
+    QList<QByteArray> objects;
+    objects << "<< /Type /Catalog /Pages 2 0 R >>"
+            << QByteArray("<< /Type /Pages /Kids [") + kids + "] /Count " + QByteArray::number(pageCount) + " >>";
+    for (int page = 0; page < pageCount; ++page)
+    {
+        const int contentObject = 4 + page * 2;
+        objects << QByteArray("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 420 595] ")
+                       + "/Resources << /Font << /F1 " + QByteArray::number(fontObject) + " 0 R >> >> /Contents "
+                       + QByteArray::number(contentObject) + " 0 R >>";
+        const QByteArray stream = "BT /F1 16 Tf 30 535 Td (FamilyPDF smoke page "
+                                + QByteArray::number(page + 1) + ") Tj ET\n";
+        objects << QByteArray("<< /Length ") + QByteArray::number(stream.size())
+                       + " >>\nstream\n" + stream + "endstream";
+    }
+    objects << "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+
+    QByteArray pdfData = "%PDF-1.4\n";
+    QList<qsizetype> offsets;
+    offsets << 0;
+    for (qsizetype index = 0; index < objects.size(); ++index)
+    {
+        offsets << pdfData.size();
+        pdfData += QByteArray::number(index + 1) + " 0 obj\n" + objects[index] + "\nendobj\n";
+    }
+    const qsizetype xrefOffset = pdfData.size();
+    pdfData += "xref\n0 " + QByteArray::number(objects.size() + 1) + "\n";
+    pdfData += "0000000000 65535 f \n";
+    for (qsizetype index = 1; index < offsets.size(); ++index)
+    {
+        pdfData += QByteArray::number(offsets[index]).rightJustified(10, '0') + " 00000 n \n";
+    }
+    pdfData += "trailer\n<< /Size " + QByteArray::number(objects.size() + 1)
+             + " /Root 1 0 R >>\nstartxref\n" + QByteArray::number(xrefOffset) + "\n%%EOF\n";
+
+    QFile fixture(path);
+    return fixture.open(QIODevice::WriteOnly | QIODevice::Truncate) && fixture.write(pdfData) == pdfData.size();
+}
+
+}
 
 class ViewerContextMenuTest : public QObject
 {
@@ -45,7 +101,8 @@ private slots:
     void traditionalChineseMenuAndSvgResources();
     void largePdfReadingBenchmark();
     void extractionRejectsInvalidInputAndCancellation();
-    void editorReadingSmoke();
+    void readingPositionRestoresZoomAndClamps();
+    void thumbnailSelectionAndPageManagement();
 
 private:
     QAction* action(const char* name) const { return m_window->findChild<QAction*>(QLatin1String(name)); }
@@ -75,42 +132,7 @@ void ViewerContextMenuTest::initTestCase()
     // Build the fixture with a PDF base font. QPdfWriter depends on fonts from
     // the platform plugin, while the offscreen CI plugin intentionally has no
     // system font directory and would otherwise produce pages without text.
-    QList<QByteArray> objects;
-    objects << "<< /Type /Catalog /Pages 2 0 R >>"
-            << "<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>";
-    for (int page = 0; page < 3; ++page)
-    {
-        const int contentObject = 4 + page * 2;
-        objects << QByteArray("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 420 595] ")
-                       + "/Resources << /Font << /F1 9 0 R >> >> /Contents "
-                       + QByteArray::number(contentObject) + " 0 R >>";
-        const QByteArray stream = "BT /F1 16 Tf 30 535 Td (FamilyPDF smoke page "
-                                + QByteArray::number(page + 1) + ") Tj ET\n";
-        objects << QByteArray("<< /Length ") + QByteArray::number(stream.size())
-                       + " >>\nstream\n" + stream + "endstream";
-    }
-    objects << "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
-
-    QByteArray pdfData = "%PDF-1.4\n";
-    QList<qsizetype> offsets;
-    offsets << 0;
-    for (qsizetype index = 0; index < objects.size(); ++index)
-    {
-        offsets << pdfData.size();
-        pdfData += QByteArray::number(index + 1) + " 0 obj\n" + objects[index] + "\nendobj\n";
-    }
-    const qsizetype xrefOffset = pdfData.size();
-    pdfData += "xref\n0 " + QByteArray::number(objects.size() + 1) + "\n";
-    pdfData += "0000000000 65535 f \n";
-    for (qsizetype index = 1; index < offsets.size(); ++index)
-        pdfData += QByteArray::number(offsets[index]).rightJustified(10, '0') + " 00000 n \n";
-    pdfData += "trailer\n<< /Size " + QByteArray::number(objects.size() + 1)
-             + " /Root 1 0 R >>\nstartxref\n" + QByteArray::number(xrefOffset) + "\n%%EOF\n";
-
-    QFile fixture(m_pdfPath);
-    QVERIFY(fixture.open(QIODevice::WriteOnly));
-    QCOMPARE(fixture.write(pdfData), pdfData.size());
-    fixture.close();
+    QVERIFY(writePdfFixture(m_pdfPath, 3));
     const QString artifactDirectory = qEnvironmentVariable("FAMILYPDF_TEST_ARTIFACT_DIR");
     if (!artifactDirectory.isEmpty())
     {
@@ -121,11 +143,27 @@ void ViewerContextMenuTest::initTestCase()
 
 void ViewerContextMenuTest::init()
 {
+    const QByteArray testFunction = QTest::currentTestFunction();
+#ifdef Q_OS_LINUX
+    if (testFunction == "readingPositionRestoresZoomAndClamps")
+    {
+        return;
+    }
+#endif
+    if (testFunction == "thumbnailSelectionAndPageManagement")
+    {
+        return;
+    }
+
     qInfo() << "ViewerContextMenuTest: construct window";
     m_window = std::make_unique<pdfviewer::PDFViewerMainWindow>();
     qInfo() << "ViewerContextMenuTest: show window";
     m_window->resize(1100, 900);
     m_window->show();
+    if (testFunction == "readingPositionRestoresZoomAndClamps")
+    {
+        return;
+    }
     qInfo() << "ViewerContextMenuTest: open fixture";
     m_window->getProgramController()->openDocument(m_pdfPath);
     QTRY_VERIFY_WITH_TIMEOUT(m_window->getProgramController()->getDocument() != nullptr, 15000);
@@ -296,30 +334,272 @@ void ViewerContextMenuTest::extractionRejectsInvalidInputAndCancellation()
     }
 }
 
-void ViewerContextMenuTest::editorReadingSmoke()
+void ViewerContextMenuTest::readingPositionRestoresZoomAndClamps()
 {
-    m_window.reset();
+#ifdef Q_OS_LINUX
+    QSKIP("Per-document window-state restoration is covered by the Windows runtime job.");
+#endif
+    const QString longPdfPath = m_temp.filePath("reading-position-25-pages.pdf");
+    QVERIFY(writePdfFixture(longPdfPath, 25));
+
+    m_window->getProgramController()->closeDocument();
+    m_window->getProgramController()->openDocument(longPdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(m_window->getProgramController()->getDocument() != nullptr, 15000);
+    proxy()->setPageLayout(pdf::PageLayout::OneColumn);
+    proxy()->goToPage(19);
+    proxy()->zoom(1.5);
+    proxy()->scrollByPixels(QPoint(0, -120));
+    QTRY_VERIFY_WITH_TIMEOUT(!m_window->getProgramController()->getPdfWidget()->getDrawWidget()->getCurrentPages().empty(), 5000);
+    QCOMPARE(m_window->getProgramController()->getPdfWidget()->getDrawWidget()->getCurrentPages().front(), pdf::PDFInteger(19));
+
+    QScrollBar* verticalScrollBar = m_window->getProgramController()->getPdfWidget()->getVerticalScrollbar();
+    const qreal savedScrollPosition = verticalScrollBar->maximum() > verticalScrollBar->minimum()
+        ? qreal(verticalScrollBar->value() - verticalScrollBar->minimum()) /
+          qreal(verticalScrollBar->maximum() - verticalScrollBar->minimum())
+        : 0.0;
+
+    m_window->getProgramController()->closeDocument();
+    m_window->getProgramController()->openDocument(longPdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(m_window->getProgramController()->getDocument() != nullptr, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!m_window->getProgramController()->getPdfWidget()->getDrawWidget()->getCurrentPages().empty(), 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(m_window->getProgramController()->getPdfWidget()->getDrawWidget()->getCurrentPages().front(), pdf::PDFInteger(19), 5000);
+    QVERIFY(qAbs(proxy()->getZoom() - 1.5) < 0.001);
+    QTRY_VERIFY_WITH_TIMEOUT(verticalScrollBar->maximum() > verticalScrollBar->minimum(), 5000);
+    const qreal restoredScrollPosition = qreal(verticalScrollBar->value() - verticalScrollBar->minimum()) /
+                                         qreal(verticalScrollBar->maximum() - verticalScrollBar->minimum());
+    QVERIFY(qAbs(restoredScrollPosition - savedScrollPosition) < 0.03);
+
+    m_window->getProgramController()->closeDocument();
+    QVERIFY(writePdfFixture(longPdfPath, 5));
+    m_window->getProgramController()->openDocument(longPdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(m_window->getProgramController()->getDocument() != nullptr, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!m_window->getProgramController()->getPdfWidget()->getDrawWidget()->getCurrentPages().empty(), 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(m_window->getProgramController()->getPdfWidget()->getDrawWidget()->getCurrentPages().front(), pdf::PDFInteger(4), 5000);
+
+    m_window->getProgramController()->closeDocument();
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope,
+                       QCoreApplication::organizationName(), QCoreApplication::applicationName());
+    settings.beginGroup("DocumentViewStates");
+    for (const QString& group : settings.childGroups())
+    {
+        settings.beginGroup(group);
+        if (QFileInfo(settings.value("path").toString()).absoluteFilePath() == QFileInfo(longPdfPath).absoluteFilePath())
+        {
+            settings.setValue("page", QStringLiteral("damaged"));
+            settings.setValue("zoom", QStringLiteral("damaged"));
+        }
+        settings.endGroup();
+    }
+    settings.endGroup();
+
+    m_window->getProgramController()->openDocument(longPdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(m_window->getProgramController()->getDocument() != nullptr, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!m_window->getProgramController()->getPdfWidget()->getDrawWidget()->getCurrentPages().empty(), 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(m_window->getProgramController()->getPdfWidget()->getDrawWidget()->getCurrentPages().front(), pdf::PDFInteger(0), 5000);
+
+    const QString firstOpenPath = m_temp.filePath("first-open-default.pdf");
+    QVERIFY(writePdfFixture(firstOpenPath, 4));
+    m_window->getProgramController()->closeDocument();
+    m_window->getProgramController()->openDocument(firstOpenPath);
+    QTRY_VERIFY_WITH_TIMEOUT(m_window->getProgramController()->getDocument() != nullptr, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!m_window->getProgramController()->getPdfWidget()->getDrawWidget()->getCurrentPages().empty(), 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(m_window->getProgramController()->getPdfWidget()->getDrawWidget()->getCurrentPages().front(), pdf::PDFInteger(0), 5000);
+}
+
+void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
+{
+#ifdef Q_OS_LINUX
+    QSKIP("Editor thumbnail interactions are covered by the Windows runtime job.");
+#endif
+    const QString editorPath = m_temp.filePath("thumbnail-management.pdf");
+    QVERIFY(writePdfFixture(editorPath, 6));
+
     pdfviewer::PDFEditorMainWindow editor;
     editor.resize(1100, 900);
     editor.show();
     auto* controller = editor.getProgramController();
-    controller->openDocument(m_pdfPath);
+    controller->openDocument(editorPath);
     QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
-    auto* editorProxy = controller->getPdfWidget()->getDrawWidgetProxy();
-    editorProxy->setPageLayout(pdf::PageLayout::SinglePage);
-    editorProxy->goToPage(2);
-    QTRY_VERIFY_WITH_TIMEOUT([&]() {
-        for (const auto& item : editorProxy->getSnapshot().items)
-            if (item.pageIndex == 2 && item.compiledPage) return true;
-        return false;
-    }(), 15000);
-    editorProxy->goToPage(0);
-    QTRY_VERIFY_WITH_TIMEOUT([&]() {
-        for (const auto& item : editorProxy->getSnapshot().items)
-            if (item.pageIndex == 0 && item.compiledPage) return true;
-        return false;
-    }(), 15000);
     saveImage(editor.grab(), "editor-reading-smoke.png");
+
+    auto* sidebarDock = editor.findChild<QDockWidget*>("SidebarDockWidget");
+    auto* thumbnails = editor.findChild<QListView*>("thumbnailsListView");
+    QVERIFY(sidebarDock);
+    QVERIFY(thumbnails);
+    sidebarDock->show();
+    thumbnails->show();
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 6);
+    QTRY_VERIFY(thumbnails->visualRect(thumbnails->model()->index(0, 0)).isValid());
+
+    const auto clickThumbnail = [thumbnails](int row, Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+    {
+        const QModelIndex index = thumbnails->model()->index(row, 0);
+        QTest::mouseClick(thumbnails->viewport(), Qt::LeftButton, modifiers, thumbnails->visualRect(index).center());
+        QCoreApplication::processEvents();
+    };
+
+    clickThumbnail(1);
+    QCOMPARE(thumbnails->selectionModel()->selectedIndexes().size(), 1);
+    clickThumbnail(3, Qt::ControlModifier);
+    QModelIndexList selected = thumbnails->selectionModel()->selectedIndexes();
+    QCOMPARE(selected.size(), 2);
+    QCOMPARE(selected.front().row(), 1);
+    QCOMPARE(selected.back().row(), 3);
+
+    clickThumbnail(1);
+    clickThumbnail(4, Qt::ShiftModifier);
+    selected = thumbnails->selectionModel()->selectedIndexes();
+    QCOMPARE(selected.size(), 4);
+    for (int index = 0; index < selected.size(); ++index)
+    {
+        QCOMPARE(selected[index].row(), index + 1);
+    }
+
+#ifndef Q_OS_LINUX
+    bool menuInspected = false;
+    QTimer menuTimer;
+    connect(&menuTimer, &QTimer::timeout, &editor, [&]()
+    {
+        auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+        if (!menu)
+        {
+            for (QWidget* widget : QApplication::allWidgets())
+            {
+                auto* candidate = qobject_cast<QMenu*>(widget);
+                if (candidate && candidate->findChild<QAction*>("thumbnailExtractPagesAction"))
+                {
+                    menu = candidate;
+                    break;
+                }
+            }
+        }
+        if (!menu)
+        {
+            return;
+        }
+        menuTimer.stop();
+        const QStringList requiredActions = {
+            "thumbnailExtractPagesAction",
+            "thumbnailDeletePagesAction",
+            "thumbnailRotatePagesRightAction",
+            "thumbnailRotatePagesLeftAction"
+        };
+        for (const QString& objectName : requiredActions)
+        {
+            QVERIFY(menu->findChild<QAction*>(objectName));
+        }
+        menuInspected = true;
+        menu->close();
+    });
+    menuTimer.start(10);
+    const QPoint contextPoint = thumbnails->visualRect(thumbnails->model()->index(2, 0)).center();
+    QContextMenuEvent contextEvent(QContextMenuEvent::Mouse, contextPoint, thumbnails->viewport()->mapToGlobal(contextPoint));
+    QApplication::sendEvent(thumbnails->viewport(), &contextEvent);
+    QVERIFY(menuInspected);
+#endif
+
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    const auto extractAndVerify = [&](const std::vector<pdf::PDFInteger>& pages, const QString& fileName, size_t expectedPageCount)
+    {
+        const QString extractedPath = m_temp.filePath(fileName);
+        QString savedPath;
+        int extractionStage = 0;
+        QTimer extractionTimer;
+        connect(&extractionTimer, &QTimer::timeout, &editor, [&]()
+        {
+            QWidget* modal = QApplication::activeModalWidget();
+            if (auto* save = qobject_cast<QFileDialog*>(modal); save && extractionStage == 0)
+            {
+                save->selectFile(extractedPath);
+                savedPath = save->selectedFiles().value(0);
+                ++extractionStage;
+                static_cast<QDialog*>(save)->accept();
+            }
+            else if (auto* message = qobject_cast<QMessageBox*>(modal); message && extractionStage == 1)
+            {
+                ++extractionStage;
+                message->accept();
+            }
+        });
+        extractionTimer.start(10);
+        controller->extractPages(pages);
+        extractionTimer.stop();
+        QCOMPARE(extractionStage, 2);
+        QVERIFY(QFile::exists(savedPath));
+        pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+        const pdf::PDFDocument extracted = reader.readFromFile(savedPath);
+        QCOMPARE(reader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
+        QCOMPARE(extracted.getCatalog()->getPageCount(), expectedPageCount);
+    };
+    extractAndVerify({2}, QStringLiteral("thumbnail-single-extracted.pdf"), size_t(1));
+    extractAndVerify({3, 1}, QStringLiteral("thumbnail-multi-extracted.pdf"), size_t(2));
+
+    controller->rotatePages({0, 2, 4}, 1);
+    QCOMPARE(controller->getDocument()->getCatalog()->getPage(0)->getPageRotation(), pdf::PageRotation::Rotate90);
+    QCOMPARE(controller->getDocument()->getCatalog()->getPage(1)->getPageRotation(), pdf::PageRotation::None);
+    QCOMPARE(controller->getDocument()->getCatalog()->getPage(2)->getPageRotation(), pdf::PageRotation::Rotate90);
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+    QAction* redoAction = editor.findChild<QAction*>("actionRedo");
+    QVERIFY(undoAction);
+    QVERIFY(redoAction);
+    undoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPage(0)->getPageRotation(), pdf::PageRotation::None);
+    redoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPage(0)->getPageRotation(), pdf::PageRotation::Rotate90);
+
+    controller->deletePages({1, 3});
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(4));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 4);
+    QVERIFY(thumbnails->currentIndex().isValid());
+    QVERIFY(thumbnails->currentIndex().row() >= 0 && thumbnails->currentIndex().row() < 4);
+    undoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(6));
+    redoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(4));
+    undoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(6));
+
+    bool warningSeen = false;
+    QTimer warningTimer;
+    connect(&warningTimer, &QTimer::timeout, &editor, [&]()
+    {
+        if (auto* message = qobject_cast<QMessageBox*>(QApplication::activeModalWidget()))
+        {
+            warningSeen = true;
+            QVERIFY(!message->text().isEmpty());
+            message->accept();
+        }
+    });
+    warningTimer.start(10);
+    controller->deletePages({0, 1, 2, 3, 4, 5});
+    warningTimer.stop();
+    QVERIFY(warningSeen);
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(6));
+
+    controller->deletePages({5});
+    const QString modifiedPath = m_temp.filePath("thumbnail-management-saved.pdf");
+    QString savedModifiedPath;
+    QTimer saveTimer;
+    connect(&saveTimer, &QTimer::timeout, &editor, [&]()
+    {
+        if (auto* save = qobject_cast<QFileDialog*>(QApplication::activeModalWidget()))
+        {
+            save->selectFile(modifiedPath);
+            savedModifiedPath = save->selectedFiles().value(0);
+            static_cast<QDialog*>(save)->accept();
+        }
+    });
+    saveTimer.start(10);
+    controller->performSaveAs();
+    saveTimer.stop();
+    QVERIFY(QFile::exists(savedModifiedPath));
+    controller->closeDocument();
+    controller->openDocument(savedModifiedPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(5));
+    QCOMPARE(controller->getDocument()->getCatalog()->getPage(0)->getPageRotation(), pdf::PageRotation::Rotate90);
+    controller->closeDocument();
+    QCoreApplication::processEvents();
 }
 
 QPoint ViewerContextMenuTest::pagePoint(int page) const

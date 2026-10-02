@@ -2895,6 +2895,26 @@
 <context>
     <name>PDFSidebarWidget</name>
     <message>
+        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="1150"/>
+        <source>Extract Selected Pages to New PDF...</source>
+        <translation>提取所选页面到新 PDF...</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="1162"/>
+        <source>Delete Selected Pages</source>
+        <translation>删除所选页面</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="1169"/>
+        <source>Rotate Selected Pages 90° Clockwise</source>
+        <translation>将所选页面顺时针旋转 90°</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="1177"/>
+        <source>Rotate Selected Pages 90° Counterclockwise</source>
+        <translation>将所选页面逆时针旋转 90°</translation>
+    </message>
+    <message>
         <location filename="../Pdf4QtLibGui/pdfsidebarwidget.ui" line="84"/>
         <source>Outline</source>
         <translation>大纲</translation>
@@ -15251,6 +15271,21 @@ Do you want to perform this action?</source>
 </context>
 <context>
     <name>PDFProgramController</name>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="3320"/>
+        <source>Delete Pages</source>
+        <translation>删除页面</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="3320"/>
+        <source>A PDF document must contain at least one page. Select fewer pages and try again.</source>
+        <translation>PDF 文档至少必须保留一页。请选择较少页面后重试。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="3400"/>
+        <source>Rotate Pages</source>
+        <translation>旋转页面</translation>
+    </message>
     <message><source>FamilyPDF OCR</source><translation>FamilyPDF OCR</translation></message>
     <message><source>Open a saved PDF before starting OCR.</source><translation>请先打开已保存的 PDF，再启动 OCR。</translation></message>
     <message><source>The optional FamilyPDF OCR plugin is not installed.</source><translation>尚未安装可选的 FamilyPDF OCR 插件。</translation></message>
