@@ -325,6 +325,7 @@ private:
     QColor m_paperColor;
     std::array<cmsHPROFILE, ProfileCount> m_profiles;
     PDFColorConvertor m_colorConvertor;
+    bool m_isDeviceRGBIdentity = false;
 
     mutable QReadWriteLock m_transformationCacheLock;
     mutable std::unordered_map<int, cmsHTRANSFORM> m_transformationCache;
@@ -365,6 +366,17 @@ bool PDFLittleCMS::fillRGBBufferFromDeviceGray(const std::vector<float>& colors,
 
 bool PDFLittleCMS::fillRGBBufferFromDeviceRGB(const std::vector<float>& colors, RenderingIntent intent, unsigned char* outputBuffer, PDFRenderErrorReporter* reporter) const
 {
+    if (m_isDeviceRGBIdentity && colors.size() % 3 == 0)
+    {
+        // sRGB -> sRGB is an identity transform. Skipping LittleCMS float transform
+        // makes large RGB images (e.g. scanned JPX pages) several times faster.
+        for (float component : colors)
+        {
+            *outputBuffer++ = static_cast<unsigned char>(qRound(qBound(0.0f, component, 1.0f) * 255.0f));
+        }
+        return true;
+    }
+
     cmsHTRANSFORM transform = getTransform(RGB, getEffectiveRenderingIntent(intent), true);
 
     if (!transform)
@@ -885,6 +897,15 @@ void PDFLittleCMS::init()
     m_profiles[CMYK] = createProfile(m_settings.deviceCMYK, m_manager->getCMYKProfiles(), m_settings.isConsiderOutputIntent);
     m_profiles[SoftProofing] = createProfile(m_settings.softProofingProfile, m_manager->getCMYKProfiles(), false);
     m_profiles[XYZ] = cmsCreateXYZProfile();
+
+    const PDFColorProfileIdentifiers& rgbProfiles = m_manager->getRGBProfiles();
+    const bool usesOutputIntentRGB = m_settings.isConsiderOutputIntent &&
+                                     std::any_of(rgbProfiles.cbegin(), rgbProfiles.cend(), [](const PDFColorProfileIdentifier& identifier) { return identifier.isOutputIntentProfile; });
+    m_isDeviceRGBIdentity = m_settings.deviceRGB == m_settings.outputCS &&
+                            m_settings.outputCS == PDFColorProfileIdentifier::createSRGB().id &&
+                            !usesOutputIntentRGB &&
+                            !m_settings.isSoftProofing &&
+                            !m_settings.isGamutChecking;
 
     cmsUInt16Number outOfGamutR = m_settings.outOfGamutColor.redF() * 0xFFFF;
     cmsUInt16Number outOfGamutG = m_settings.outOfGamutColor.greenF() * 0xFFFF;

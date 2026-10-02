@@ -329,6 +329,7 @@ public:
     void performSave();
     void performSaveAs();
     void launchOcrPlugin();
+    void extractPages();
 
     void onActionTriggered(const pdf::PDFAction* action);
     void onDocumentModified(pdf::PDFModifiedDocument document);

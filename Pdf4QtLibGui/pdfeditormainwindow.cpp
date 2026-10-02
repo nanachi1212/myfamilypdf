@@ -328,6 +328,10 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     QAction* ocrAction = ui->menuTools->addAction(tr("Create Searchable PDF with OCR..."));
     connect(ocrAction, &QAction::triggered, m_programController, &PDFProgramController::launchOcrPlugin);
 
+    QAction* extractPagesAction = new QAction(tr("Extract Pages..."), this);
+    ui->menuFile->insertAction(ui->actionProperties, extractPagesAction);
+    connect(extractPagesAction, &QAction::triggered, m_programController, &PDFProgramController::extractPages);
+
     // Special tools
     QToolButton* insertStickyNoteButton = m_actionManager->createToolButtonForActionGroup(PDFActionManager::CreateStickyNoteGroup, ui->mainToolBar);
     ui->mainToolBar->addWidget(insertStickyNoteButton);
