@@ -14050,6 +14050,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <source> / %1</source>
         <translation> / %1</translation>
     </message>
+    <message><source>Extract Pages...</source><translation>提取頁面(另存新文件)...</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFEncryptionSettingsDialog</name>
@@ -14383,6 +14384,12 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <source>Rendering of page %1: %2 errors occured.</source>
         <translation>頁面 %1 的渲染：發生了 %2 個錯誤。</translation>
     </message>
+    <message><source>Extract Pages</source><translation>提取頁面</translation></message>
+    <message><source>Pages to extract, for example 1-3,8,10-12 (document has %1 pages):</source><translation>要提取的頁碼，例如 1-3,8,10-12（本文件共 %1 頁）：</translation></message>
+    <message><source>No pages selected.</source><translation>未選取任何頁面。</translation></message>
+    <message><source>document</source><translation>文件</translation></message>
+    <message><source>Save Extracted Pages</source><translation>儲存提取的頁面</translation></message>
+    <message><source>Saved %1 pages to %2.</source><translation>已將 %1 頁儲存到 %2。</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFRecentFileManager</name>
@@ -14903,6 +14910,7 @@ Do you want to perform this action?</source>
         <source> / %1</source>
         <translation> / %1</translation>
     </message>
+    <message><source>Extract Pages...</source><translation>提取頁面(另存新文件)...</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFViewerSettingsDialog</name>

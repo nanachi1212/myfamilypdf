@@ -53,6 +53,7 @@
 #include "pdfactioncombobox.h"
 #include "pdffullscreenwidget.h"
 #include "pdfpagegeometry.h"
+#include "pdfdocumentmanipulator.h"
 
 #include <cstdio>
 
@@ -1991,6 +1992,9 @@ void PDFProgramController::onActionFindTriggered()
     }
 }
 
+// Bumped when the default toolbar layout changes, so stale saved layouts are ignored once.
+static constexpr int WINDOW_STATE_VERSION = 1;
+
 void PDFProgramController::readSettings(Settings settingsFlags)
 {
     QSettings settings(QSettings::IniFormat, QSettings::UserScope, QCoreApplication::organizationName(), QCoreApplication::applicationName());
@@ -2013,7 +2017,7 @@ void PDFProgramController::readSettings(Settings settingsFlags)
         QByteArray state = settings.value("windowState", QByteArray()).toByteArray();
         if (!state.isEmpty())
         {
-            m_mainWindow->restoreState(state);
+            m_mainWindow->restoreState(state, WINDOW_STATE_VERSION);
         }
     }
 
@@ -2921,6 +2925,10 @@ void PDFProgramController::loadPlugins()
     };
     std::sort(m_loadedPlugins.begin(), m_loadedPlugins.end(), comparator);
 
+    // Plugin toolbars go to their own row, so they do not squeeze the main toolbar
+    // (page number, zoom) out of sight.
+    m_mainWindow->addToolBarBreak();
+
     for (const auto& plugin : m_loadedPlugins)
     {
         plugin.second->setDataExchangeInterface(this);
@@ -2958,7 +2966,7 @@ void PDFProgramController::writeSettings()
 
     QSettings settings(QSettings::IniFormat, QSettings::UserScope, QCoreApplication::organizationName(), QCoreApplication::applicationName());
     settings.setValue("geometry", m_mainWindow->saveGeometry());
-    settings.setValue("windowState", m_mainWindow->saveState());
+    settings.setValue("windowState", m_mainWindow->saveState(WINDOW_STATE_VERSION));
 
     m_settings->writeSettings(settings);
 
@@ -3081,6 +3089,72 @@ void PDFProgramController::onActionOpenTriggered()
     {
         openDocument(fileName);
     }
+}
+
+void PDFProgramController::extractPages()
+{
+    const pdf::PDFDocument* document = getDocument();
+    if (!document)
+    {
+        return;
+    }
+
+    const pdf::PDFInteger pageCount = document->getCatalog()->getPageCount();
+    const std::vector<pdf::PDFInteger> currentPages = m_pdfWidget->getDrawWidget()->getCurrentPages();
+    bool ok = false;
+    const QString rangeText = QInputDialog::getText(m_mainWindow,
+                                                    tr("Extract Pages"),
+                                                    tr("Pages to extract, for example 1-3,8,10-12 (document has %1 pages):").arg(pageCount),
+                                                    QLineEdit::Normal,
+                                                    currentPages.empty() ? QString() : QString::number(currentPages.front() + 1),
+                                                    &ok);
+    if (!ok || rangeText.trimmed().isEmpty())
+    {
+        return;
+    }
+
+    QString errorMessage;
+    const pdf::PDFClosedIntervalSet pageNumbers = pdf::PDFClosedIntervalSet::parse(1, pageCount, rangeText, &errorMessage);
+    if (!errorMessage.isEmpty() || pageNumbers.isEmpty())
+    {
+        QMessageBox::critical(m_mainWindow, tr("Extract Pages"), errorMessage.isEmpty() ? tr("No pages selected.") : errorMessage);
+        return;
+    }
+
+    const QFileInfo sourceInfo(getOriginalFileName());
+    const QString baseName = sourceInfo.completeBaseName().isEmpty() ? tr("document") : sourceInfo.completeBaseName();
+    const QString suggestedDirectory = sourceInfo.absolutePath().isEmpty() ? m_settings->getDirectory() : sourceInfo.absolutePath();
+    const QString suggestedFile = QDir(suggestedDirectory).filePath(QString("%1_p%2.pdf").arg(baseName, QString(rangeText).remove(' ').replace(',', '_')));
+    const QString fileName = QFileDialog::getSaveFileName(m_mainWindow, tr("Save Extracted Pages"), suggestedFile, tr("PDF document (*.pdf)"));
+    if (fileName.isEmpty())
+    {
+        return;
+    }
+
+    pdf::PDFDocumentManipulator::AssembledPages assembledPages;
+    const pdf::PDFDocumentManipulator::AssembledPages allPages = pdf::PDFDocumentManipulator::createAllDocumentPages(0, document);
+    for (const pdf::PDFInteger pageNumber : pageNumbers.unfold())
+    {
+        assembledPages.push_back(allPages[pageNumber - 1]);
+    }
+
+    pdf::PDFDocumentManipulator manipulator;
+    manipulator.setOutlineMode(pdf::PDFDocumentManipulator::OutlineMode::NoOutline);
+    manipulator.addDocument(0, document);
+    pdf::PDFOperationResult result = manipulator.assemble(assembledPages);
+    if (result)
+    {
+        pdf::PDFDocumentWriter writer(nullptr);
+        result = writer.write(fileName, &manipulator.getAssembledDocument(), QFile::exists(fileName));
+    }
+
+    if (!result)
+    {
+        QMessageBox::critical(m_mainWindow, tr("Extract Pages"), result.getErrorMessage());
+        return;
+    }
+
+    QMessageBox::information(m_mainWindow, tr("Extract Pages"), tr("Saved %1 pages to %2.").arg(assembledPages.size()).arg(QDir::toNativeSeparators(fileName)));
 }
 
 void PDFProgramController::launchOcrPlugin()
