@@ -32,13 +32,21 @@
 #include <QCryptographicHash>
 #include <QScrollBar>
 #include <QSettings>
+#include <QLineEdit>
+#include <QLabel>
+#include <QCheckBox>
+#include <QPushButton>
+#include <QElapsedTimer>
+#include <QPointer>
+#include <QTabBar>
+#include "pdfwidgettool.h"
 #include "pdfdocumentreader.h"
 #include <memory>
 
 namespace
 {
 
-bool writePdfFixture(const QString& path, int pageCount)
+bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool withText = true, bool unicode = false)
 {
     const int fontObject = 3 + pageCount * 2;
     QByteArray kids;
@@ -56,12 +64,37 @@ bool writePdfFixture(const QString& path, int pageCount)
         objects << QByteArray("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 420 595] ")
                        + "/Resources << /Font << /F1 " + QByteArray::number(fontObject) + " 0 R >> >> /Contents "
                        + QByteArray::number(contentObject) + " 0 R >>";
-        const QByteArray stream = "BT /F1 16 Tf 30 535 Td (FamilyPDF smoke page "
-                                + QByteArray::number(page + 1) + ") Tj ET\n";
+        QByteArray stream;
+        if (withText)
+            for (int line = 0; line < lines; ++line)
+                stream += "BT /F1 16 Tf 30 " + QByteArray::number(535-line*20) + " Td ("
+                    + (unicode ? QByteArray("ABCD 2026 ABCD") : QByteArray("FamilyPDF smoke page ") + QByteArray::number(page+1)) + ") Tj ET\n";
+        else
+            stream = "q 0.7 g 20 20 300 500 re f Q\n";
         objects << QByteArray("<< /Length ") + QByteArray::number(stream.size())
                        + " >>\nstream\n" + stream + "endstream";
     }
-    objects << "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+    if (unicode)
+    {
+        // A self-contained Type 3 font keeps Unicode extraction independent of
+        // installed fonts. Glyph outlines are deliberately simple test shapes.
+        QByteArray widths;
+        for (int code = 32; code <= 68; ++code)
+            widths += "600 ";
+        const QByteArray glyphRef = QByteArray::number(fontObject + 2) + " 0 R ";
+        objects << QByteArray("<< /Type /Font /Subtype /Type3 /FontBBox [0 0 600 800] ")
+            + "/FontMatrix [0.001 0 0 0.001 0 0] /FirstChar 32 /LastChar 68 /Widths [" + widths
+            + "] /Encoding << /Type /Encoding /Differences [32 /space 48 /zero 50 /two 54 /six 65 /A /B /C /D] >> "
+            + "/CharProcs << /space " + glyphRef + "/zero " + glyphRef + "/two " + glyphRef
+            + "/six " + glyphRef + "/A " + glyphRef + "/B " + glyphRef + "/C " + glyphRef + "/D " + glyphRef
+            + ">> /Resources << >> /ToUnicode " + QByteArray::number(fontObject + 1) + " 0 R >>";
+        const QByteArray cmap = "1 begincodespacerange <00> <FF> endcodespacerange 8 beginbfchar <41> <4E2D> <42> <6587> <43> <641C> <44> <5C0B> <20> <0020> <32> <0032> <30> <0030> <36> <0036> endbfchar";
+        objects << QByteArray("<< /Length ") + QByteArray::number(cmap.size()) + " >>\nstream\n" + cmap + "\nendstream";
+        const QByteArray glyph = "600 0 0 0 600 800 d1 50 50 500 700 re f";
+        objects << QByteArray("<< /Length ") + QByteArray::number(glyph.size()) + " >>\nstream\n" + glyph + "\nendstream";
+    }
+    else
+        objects << QByteArray("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
 
     QByteArray pdfData = "%PDF-1.4\n";
     QList<qsizetype> offsets;
@@ -100,6 +133,10 @@ private slots:
     void emptyDocumentCannotBeBookmarked();
     void traditionalChineseMenuAndSvgResources();
     void largePdfReadingBenchmark();
+    void searchExperience_data();
+    void searchExperience();
+    void searchCancellationAndDocumentLifecycle();
+    void searchPerformanceBenchmark();
     void extractionRejectsInvalidInputAndCancellation();
     void readingPositionRestoresZoomAndClamps();
     void thumbnailSelectionAndPageManagement();
@@ -182,6 +219,231 @@ void ViewerContextMenuTest::init()
 void ViewerContextMenuTest::cleanup()
 {
     m_window.reset();
+}
+
+void ViewerContextMenuTest::searchExperience_data()
+{
+    QTest::addColumn<bool>("editor");
+    QTest::newRow("viewer") << false;
+    QTest::newRow("editor") << true;
+}
+
+void ViewerContextMenuTest::searchExperience()
+{
+    QFETCH(bool, editor);
+    std::unique_ptr<pdfviewer::PDFEditorMainWindow> editorWindow;
+    QMainWindow* window = m_window.get();
+    auto* controller = m_window->getProgramController();
+    if (editor)
+    {
+        editorWindow = std::make_unique<pdfviewer::PDFEditorMainWindow>();
+        window = editorWindow.get();
+        controller = editorWindow->getProgramController();
+        window->resize(1100, 900);
+        window->show();
+        controller->openDocument(m_pdfPath);
+        QTRY_VERIFY(controller->getDocument());
+        QTRY_VERIFY(!controller->getIsBusy());
+    }
+    auto* drawProxy = controller->getPdfWidget()->getDrawWidgetProxy();
+    drawProxy->setPageLayout(pdf::PageLayout::SinglePage);
+    drawProxy->zoom(1.2);
+    window->activateWindow();
+    QTest::qWait(30);
+    QTest::keyClick(window, Qt::Key_F, Qt::ControlModifier);
+    QTRY_VERIFY(controller->getToolManager()->getFindTextTool()->isActive());
+    auto* dialog = window->findChild<QDialog*>("findDialog");
+    QVERIFY(dialog);
+    auto* query = dialog->findChild<QLineEdit*>("findQuery");
+    auto* status = dialog->findChild<QLabel*>("findStatus");
+    QVERIFY(query && status);
+    QTRY_VERIFY(query->hasFocus());
+    query->setText("FamilyPDF");
+    QTRY_COMPARE_WITH_TIMEOUT(status->text(), QString("1 / 3"), 10000);
+    QCOMPARE(drawProxy->getZoom(), 1.2);
+    QCOMPARE(drawProxy->getPageLayout(), pdf::PageLayout::SinglePage);
+    QTest::keyClick(query, Qt::Key_Return);
+    QCOMPARE(status->text(), QString("2 / 3"));
+    QCOMPARE(controller->getPdfWidget()->getDrawWidget()->getCurrentPages().front(), pdf::PDFInteger(1));
+    QTest::keyClick(query, Qt::Key_Return, Qt::ShiftModifier);
+    QCOMPARE(status->text(), QString("1 / 3"));
+    dialog->findChild<QPushButton*>("findPrevious")->click();
+    QCOMPARE(status->text(), QString("3 / 3"));
+    dialog->findChild<QPushButton*>("findNext")->click();
+    QCOMPARE(status->text(), QString("1 / 3"));
+
+    query->setText("e"); // smoke + page: two hits on each page
+    QTRY_COMPARE(status->text(), QString("1 / 6"));
+    QTest::keyClick(query, Qt::Key_Return);
+    QCOMPARE(status->text(), QString("2 / 6"));
+    QCOMPARE(controller->getPdfWidget()->getDrawWidget()->getCurrentPages().front(), pdf::PDFInteger(0));
+    QTest::keyClick(query, Qt::Key_Return);
+    QCOMPARE(controller->getPdfWidget()->getDrawWidget()->getCurrentPages().front(), pdf::PDFInteger(1));
+    query->setText("familypdf");
+    QTRY_COMPARE(status->text(), QString("1 / 3"));
+    auto* caseSensitive = dialog->findChildren<QCheckBox*>().front();
+    caseSensitive->click();
+    QTRY_COMPARE(status->text(), QString("No results."));
+    QVERIFY(dialog->isVisible());
+    QTest::keyClick(query, Qt::Key_Return); // no match must not accept/hide the dialog
+    QVERIFY(dialog->isVisible());
+    caseSensitive->click();
+    query->setText("zzzz_no_results");
+    QTRY_COMPARE(status->text(), QString("No results."));
+    query->clear();
+    QCOMPARE(status->text(), QString("Enter text to search."));
+    QVERIFY(!dialog->findChild<QPushButton*>("findNext")->isEnabled());
+    query->setText("  \t ");
+    QCOMPARE(status->text(), QString("Enter text to search."));
+    QTest::keyClick(query, Qt::Key_Escape);
+    QVERIFY(!controller->getToolManager()->getFindTextTool()->isActive());
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+    const QString unicodePath = m_temp.filePath(editor ? "unicode-editor.pdf" : "unicode-viewer.pdf");
+    QVERIFY(writePdfFixture(unicodePath, 2, 1, true, true));
+    controller->closeDocument();
+    controller->openDocument(unicodePath);
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_COMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(2));
+    window->findChild<QAction*>("actionFind")->trigger();
+    dialog = window->findChild<QDialog*>("findDialog");
+    query = dialog->findChild<QLineEdit*>("findQuery");
+    status = dialog->findChild<QLabel*>("findStatus");
+    query->setText(QStringLiteral("中文搜尋"));
+    QTRY_COMPARE(status->text(), QString("1 / 4"));
+    query->setText(QStringLiteral("中文搜尋 2026"));
+    QTRY_COMPARE(status->text(), QString("1 / 2"));
+    dialog->reject();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+    const QString emptyPath = m_temp.filePath(editor ? "empty-editor.pdf" : "empty-viewer.pdf");
+    QVERIFY(writePdfFixture(emptyPath, 3, 1, false));
+    controller->closeDocument();
+    controller->openDocument(emptyPath);
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_COMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(3));
+    window->findChild<QAction*>("actionFind")->trigger();
+    dialog = window->findChild<QDialog*>("findDialog");
+    query = dialog->findChild<QLineEdit*>("findQuery");
+    status = dialog->findChild<QLabel*>("findStatus");
+    query->setText("alpha");
+    QTRY_VERIFY(status->text().contains("Use OCR"));
+    dialog->reject();
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::searchCancellationAndDocumentLifecycle()
+{
+    const QString path = m_temp.filePath("search-large.pdf");
+    QVERIFY(writePdfFixture(path, 1200, 20));
+    auto* controller = m_window->getProgramController();
+    controller->closeDocument();
+    controller->openDocument(path);
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_COMPARE_WITH_TIMEOUT(controller->getDocument()->getCatalog()->getPageCount(), size_t(1200), 15000);
+    action("actionFind")->trigger();
+    auto* dialog = m_window->findChild<QDialog*>("findDialog");
+    auto* query = dialog->findChild<QLineEdit*>("findQuery");
+    auto* status = dialog->findChild<QLabel*>("findStatus");
+    QElapsedTimer timer; timer.start();
+    query->setText("FamilyPDF");
+    QTRY_VERIFY_WITH_TIMEOUT(status->text().contains(" / ") && !status->text().contains("0 / 0"), 10000);
+    QVERIFY2(status->text().startsWith("Searching"), "First result must arrive before full scan completes.");
+    qInfo() << "SEARCH_PROGRESS first_ms=" << timer.elapsed() << status->text();
+    proxy()->goToPage(600);
+    query->setText("a");
+    query->setText("ab");
+    query->setText("abc_missing");
+    QTRY_COMPARE_WITH_TIMEOUT(status->text(), QString("No results."), 30000);
+    QTest::qWait(100);
+    QCOMPARE(status->text(), QString("No results."));
+    query->setText("FamilyPDF");
+    QTest::qWait(180);
+    query->clear();
+    QTest::qWait(100);
+    QCOMPARE(status->text(), QString("Enter text to search."));
+    // Real document-tab activation must invalidate the old worker as well.
+    {
+        auto other = std::make_unique<pdfviewer::PDFViewerMainWindow>();
+        other->show();
+        query->setText("FamilyPDF");
+        QTest::qWait(180);
+        auto* tabs = m_window->findChild<QTabBar*>();
+        QVERIFY(tabs && tabs->count() == 2);
+        tabs->setCurrentIndex(1);
+        QVERIFY(!controller->getToolManager()->getFindTextTool()->isActive());
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    }
+    action("actionFind")->trigger();
+    dialog = m_window->findChild<QDialog*>("findDialog");
+    query = dialog->findChild<QLineEdit*>("findQuery");
+    query->setText("FamilyPDF");
+    QTest::qWait(180);
+    timer.restart();
+    controller->closeDocument();
+    QVERIFY(timer.elapsed() < 2000);
+    QVERIFY(!controller->getToolManager()->getFindTextTool()->isActive());
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_COMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(3));
+    action("actionFind")->trigger();
+    dialog = m_window->findChild<QDialog*>("findDialog");
+    query = dialog->findChild<QLineEdit*>("findQuery");
+    status = dialog->findChild<QLabel*>("findStatus");
+    query->setText("FamilyPDF");
+    QTRY_COMPARE(status->text(), QString("1 / 3"));
+    controller->closeDocument();
+    controller->openDocument(path); // switching documents invalidates all old results
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_COMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(1200));
+    QVERIFY(!controller->getToolManager()->getFindTextTool()->isActive());
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    action("actionFind")->trigger();
+    dialog = m_window->findChild<QDialog*>("findDialog");
+    dialog->findChild<QLineEdit*>("findQuery")->setText("FamilyPDF");
+    QTest::qWait(180);
+    timer.restart();
+    m_window.reset();
+    QVERIFY(timer.elapsed() < 2000);
+    QTest::qWait(100); // queued result delivery after destruction must be harmless
+}
+
+void ViewerContextMenuTest::searchPerformanceBenchmark()
+{
+    const QString root = qEnvironmentVariable("FAMILYPDF_SEARCH_FIXTURES");
+    if (root.isEmpty()) QSKIP("Set FAMILYPDF_SEARCH_FIXTURES for local before/after benchmark.");
+    for (const QString& name : {QStringLiteral("text-12.pdf"), QStringLiteral("text-1200.pdf"), QStringLiteral("scan-3.pdf")})
+    {
+        auto* controller = m_window->getProgramController();
+        controller->closeDocument();
+        controller->openDocument(root + "/" + name);
+        QTRY_VERIFY(controller->getDocument());
+        QTRY_VERIFY(!controller->getIsBusy());
+        qint64 maxGap = 0;
+        QElapsedTimer clock; clock.start();
+        qint64 last = clock.elapsed();
+        QTimer heartbeat;
+        connect(&heartbeat, &QTimer::timeout, this, [&]() { const auto now = clock.elapsed(); maxGap = qMax(maxGap, now-last); last=now; });
+        heartbeat.start(10);
+        action("actionFind")->trigger();
+        auto* dialog = m_window->findChild<QDialog*>("findDialog");
+        auto* query = dialog->findChild<QLineEdit*>("findQuery");
+        auto* status = dialog->findChild<QLabel*>("findStatus");
+        query->setText("alpha");
+        qint64 first = -1;
+        while (status->text().startsWith("Searching") && clock.elapsed() < 60000)
+        {
+            QTest::qWait(1);
+            if (first < 0 && dialog->windowTitle().contains("1/")) first = clock.elapsed();
+        }
+        QVERIFY(clock.elapsed() < 60000);
+        qInfo().noquote() << "SEARCH_AFTER" << name << "first_ms=" << first << "complete_ms=" << clock.elapsed()
+                         << "max_ui_gap_ms=" << maxGap << "status=" << status->text();
+        dialog->reject();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        heartbeat.stop();
+    }
 }
 
 void ViewerContextMenuTest::largePdfReadingBenchmark()

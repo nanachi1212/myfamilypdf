@@ -289,7 +289,7 @@ public:
     /// Go to the specified page and ensures point on the page is visible
     /// \param pageIndex Page to scroll to
     /// \param ensureVisibleRect Rectangle on page, which should be visible
-    void goToPageAndEnsureVisible(PDFInteger pageIndex, QRectF ensureVisibleRect);
+    void goToPageAndEnsureVisible(PDFInteger pageIndex, QRectF ensureVisibleRect, bool center = false);
 
     /// Returns current zoom from widget space to device space. So, for example 2.00 corresponds to 200% zoom,
     /// and each 1 cm of widget area corresponds to 0.5 cm of the device space area.

@@ -2167,7 +2167,9 @@ void PDFProgramController::onActionFindTriggered()
 {
     if (m_toolManager)
     {
-        m_toolManager->setActiveTool(m_toolManager->getFindTextTool());
+        auto* findTool = m_toolManager->getFindTextTool();
+        if (!findTool->isActive()) m_toolManager->setActiveTool(findTool);
+        findTool->focusSearch();
     }
 }
 
@@ -2566,6 +2568,7 @@ void PDFProgramController::openDocument(const QString& fileName)
         QFileInfo(fileName).absoluteFilePath().compare(
             m_fileInfo.absoluteFilePath, Qt::CaseInsensitive) != 0)
     {
+        m_toolManager->getFindTextTool()->setActive(false);
         Q_EMIT openDocumentInNewTabRequested(fileName);
         return;
     }
@@ -2774,6 +2777,8 @@ void PDFProgramController::setDocument(pdf::PDFModifiedDocument document, std::v
 
     if (m_toolManager)
     {
+        if (document.hasReset() || document.hasPageContentsChanged())
+            m_toolManager->getFindTextTool()->setActive(false);
         m_toolManager->setDocument(document);
     }
 
