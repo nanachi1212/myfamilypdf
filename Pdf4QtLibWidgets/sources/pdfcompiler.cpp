@@ -354,6 +354,30 @@ void PDFAsynchronousPageCompiler::onPageCompiled()
     }
 }
 
+const PDFTextFlows* PDFSearchTextCache::getPage(PDFInteger pageIndex) const
+{
+    const auto& page = m_pages.at(size_t(pageIndex));
+    return page ? &*page : nullptr;
+}
+
+void PDFSearchTextCache::setPage(PDFInteger pageIndex, PDFTextFlows&& flows)
+{
+    auto& page = m_pages.at(size_t(pageIndex));
+    if (!page)
+    {
+        page.emplace(std::move(flows));
+        m_completedPages.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
+std::shared_ptr<PDFSearchTextCache> PDFAsynchronousTextLayoutCompiler::acquireSearchTextCache()
+{
+    Q_ASSERT(QThread::currentThread() == thread());
+    if (!m_searchTextCache)
+        m_searchTextCache = std::make_shared<PDFSearchTextCache>(m_proxy->getDocument()->getCatalog()->getPageCount());
+    return m_searchTextCache;
+}
+
 PDFAsynchronousTextLayoutCompiler::PDFAsynchronousTextLayoutCompiler(PDFDrawWidgetProxy* proxy) :
     BaseClass(proxy),
     m_proxy(proxy),
@@ -397,11 +421,14 @@ void PDFAsynchronousTextLayoutCompiler::stop(bool clearCache)
             // Stop the engine
             m_state = State::Stopping;
             m_textLayoutCompileFutureWatcher.waitForFinished();
+            onTextLayoutCreated();
 
             if (clearCache)
             {
                 m_textLayouts = std::nullopt;
                 m_cache.clear();
+                m_searchTextCache.reset();
+                Q_EMIT textLayoutInvalidated();
             }
 
             m_state = State::Inactive;
@@ -608,11 +635,14 @@ void PDFAsynchronousTextLayoutCompiler::makeTextLayout()
 
 void PDFAsynchronousTextLayoutCompiler::onTextLayoutCreated()
 {
+    if (!m_isRunning || !m_textLayoutCompileFuture.isFinished()) return;
     m_proxy->getFontCache()->setCacheShrinkEnabled(this, true);
     m_proxy->getProgress()->finish();
     m_cache.clear();
 
     m_textLayouts = m_textLayoutCompileFuture.result();
+    m_textLayoutCompileFuture = {};
+    m_textLayoutCompileFutureWatcher.setFuture({});
     m_isRunning = false;
     Q_EMIT textLayoutChanged();
 }

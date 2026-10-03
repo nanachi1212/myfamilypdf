@@ -378,6 +378,12 @@ PDFFindTextTool::PDFFindTextTool(PDFDrawWidgetProxy* proxy, QAction* prevAction,
     connect(m_prevAction, &QAction::triggered, this, &PDFFindTextTool::onActionPrevious);
     connect(m_nextAction, &QAction::triggered, this, &PDFFindTextTool::onActionNext);
 
+    connect(proxy->getTextLayoutCompiler(), &PDFAsynchronousTextLayoutCompiler::textLayoutInvalidated, this, [this]()
+    {
+        // Includes content/reset changes, optional content and renderer text flags.
+        if (isActive()) onSearchText();
+        else cancelSearch();
+    });
     updateActions();
 }
 
@@ -661,6 +667,12 @@ void PDFFindTextTool::performSearch()
     const auto cms = getProxy()->getCMSManager()->getCurrentCMS();
     const auto parameters = m_parameters;
     const auto cancelled = m_cancelled;
+    auto* compiler = getProxy()->getTextLayoutCompiler();
+    auto cache = compiler->acquireSearchTextCache();
+    // Existing completed layout storage uses implicitly shared compressed bytes.
+    // This snapshot survives document closure without touching a GUI-owned pointer.
+    std::optional<PDFTextLayoutStorage> layouts;
+    if (const auto* ready = compiler->getTextLayoutStorage()) layouts = *ready;
     std::vector<std::pair<PDFObjectReference, OCState>> states;
     const auto* activity = getProxy()->getOptionalContentActivity();
     const auto* properties = document->getCatalog()->getOptionalContentProperties();
@@ -670,7 +682,7 @@ void PDFFindTextTool::performSearch()
     // Hidden optional content cannot reliably be called a missing text layer.
     m_canDetectNoText = !properties || properties->getAllOptionalContentGroups().empty();
 
-    auto search = [document, features, quality, cms, parameters, cancelled, states](QPromise<SearchBatch>& promise)
+    auto search = [document, features, quality, cms, parameters, cancelled, states, cache, layouts](QPromise<SearchBatch>& promise) mutable
     {
         struct Cancellation final : PDFOperationControl
         {
@@ -702,15 +714,38 @@ void PDFFindTextTool::performSearch()
                 if (control.isOperationCancelled() || promise.isCanceled()) return;
                 const auto* page = catalog->getPage(pageIndex);
                 if (!page) { batch.failed = true; continue; }
-                PDFTextLayoutGenerator generator(features, page, document.get(), &fonts, cms.data(), &activity, QTransform(), quality);
-                generator.setOperationControl(&control);
-                const auto errors = generator.processContents();
-                if (control.isOperationCancelled()) return;
-                batch.failed = batch.failed || !errors.isEmpty();
-                const auto layout = generator.createTextLayout();
-                const auto flows = PDFTextFlow::createTextFlows(layout, PDFTextFlow::SeparateBlocks, pageIndex);
+                PDFTextFlows uncachedFlows;
+                const auto* flows = cache->getPage(pageIndex);
+                if (!flows)
+                {
+                    PDFTextLayout layout;
+                    bool completed = true;
+                    if (layouts)
+                        layout = layouts->getTextLayout(pageIndex);
+                    // Legacy layouts do not record extraction failures. Verify empty
+                    // pages before treating them as a successfully absent text layer.
+                    if (!layouts || layout.getTextBlocks().empty())
+                    {
+                        PDFTextLayoutGenerator generator(features, page, document.get(), &fonts, cms.data(), &activity, QTransform(), quality);
+                        generator.setOperationControl(&control);
+                        const auto errors = generator.processContents();
+                        if (control.isOperationCancelled()) return;
+                        completed = errors.isEmpty();
+                        batch.failed = batch.failed || !completed;
+                        layout = generator.createTextLayout();
+                    }
+                    uncachedFlows = PDFTextFlow::createTextFlows(layout, PDFTextFlow::SeparateBlocks, pageIndex);
+                    // Never retain a partial/error extraction. Completed pages survive
+                    // query cancellation; an invalidated document has a different owner.
+                    if (completed)
+                    {
+                        cache->setPage(pageIndex, std::move(uncachedFlows));
+                        flows = cache->getPage(pageIndex);
+                    }
+                    else flows = &uncachedFlows;
+                }
                 PDFFindResults pageResults;
-                for (const auto& flow : flows)
+                for (const auto& flow : *flows)
                 {
                     if (control.isOperationCancelled()) return;
                     batch.hasText = batch.hasText || !flow.getText().trimmed().isEmpty();
