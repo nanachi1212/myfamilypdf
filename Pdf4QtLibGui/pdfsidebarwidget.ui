@@ -595,6 +595,12 @@
         </widget>
        </item>
        <item>
+        <widget class="QLabel" name="notesEmptyLabel">
+         <property name="text"><string>No annotations</string></property>
+         <property name="alignment"><set>Qt::AlignCenter</set></property>
+        </widget>
+       </item>
+       <item>
         <widget class="QTreeView" name="notesTreeView">
          <property name="contextMenuPolicy">
           <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
