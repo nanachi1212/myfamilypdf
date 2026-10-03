@@ -26,6 +26,12 @@
 #include "pdfwidgetutils.h"
 #include "pdfpainterutils.h"
 #include "pdfcms.h"
+#include "pdftextlayoutgenerator.h"
+#include "pdfoperationcontrol.h"
+#include "pdffont.h"
+#include <QtConcurrent/QtConcurrentRun>
+#include <QElapsedTimer>
+#include <QPromise>
 #include "pdfwidgetannotation.h"
 
 #include <QLabel>
@@ -267,6 +273,23 @@ PDFFindTextToolDialog::PDFFindTextToolDialog(PDFDrawWidgetProxy* proxy, QWidget*
 
 }
 
+bool PDFFindTextToolDialog::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() == QEvent::KeyPress)
+    {
+        auto* key = static_cast<QKeyEvent*>(event);
+        if (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)
+        {
+            if (key->modifiers().testFlag(Qt::ShiftModifier))
+                Q_EMIT goToPreviousResult();
+            else
+                Q_EMIT goToNextResult();
+            return true;
+        }
+    }
+    return QDialog::eventFilter(watched, event);
+}
+
 bool PDFFindTextToolDialog::event(QEvent* event)
 {
     switch (event->type())
@@ -302,6 +325,10 @@ bool PDFFindTextToolDialog::event(QEvent* event)
                 {
                     case Qt::Key_Return:
                     case Qt::Key_Enter:
+                    {
+                        Q_EMIT goToNextResult();
+                        return true;
+                    }
                     case Qt::Key_Home:
                     {
                         keyEvent->accept();
@@ -343,12 +370,32 @@ PDFFindTextTool::PDFFindTextTool(PDFDrawWidgetProxy* proxy, QAction* prevAction,
     m_nextButton(nullptr),
     m_selectedResultIndex(0)
 {
-    PDFAsynchronousTextLayoutCompiler* compiler = getProxy()->getTextLayoutCompiler();
-    connect(compiler, &PDFAsynchronousTextLayoutCompiler::textLayoutChanged, this, &PDFFindTextTool::performSearch);
+    m_searchDelay.setSingleShot(true);
+    m_searchDelay.setInterval(120);
+    connect(&m_searchDelay, &QTimer::timeout, this, &PDFFindTextTool::performSearch);
+    connect(&m_searchWatcher, &QFutureWatcher<SearchBatch>::resultsReadyAt, this, &PDFFindTextTool::receiveSearchResults);
+    connect(&m_searchWatcher, &QFutureWatcher<SearchBatch>::finished, this, &PDFFindTextTool::finishSearch);
     connect(m_prevAction, &QAction::triggered, this, &PDFFindTextTool::onActionPrevious);
     connect(m_nextAction, &QAction::triggered, this, &PDFFindTextTool::onActionNext);
 
     updateActions();
+}
+
+PDFFindTextTool::~PDFFindTextTool()
+{
+    cancelSearch();
+    m_searchWatcher.waitForFinished();
+}
+
+void PDFFindTextTool::focusSearch()
+{
+    if (m_dialog && m_findTextEdit)
+    {
+        m_dialog->raise();
+        m_dialog->activateWindow();
+        m_findTextEdit->setFocus();
+        m_findTextEdit->selectAll();
+    }
 }
 
 void PDFFindTextTool::drawPage(QPainter* painter,
@@ -362,7 +409,17 @@ void PDFFindTextTool::drawPage(QPainter* painter,
     Q_UNUSED(compiledPage);
     Q_UNUSED(errors);
 
-    const pdf::PDFTextSelection& textSelection = getTextSelection();
+    // Results are page-ordered. Build geometry only for the page being painted,
+    // rather than rebuilding a document-wide selection on every streamed batch.
+    PDFTextSelection textSelection;
+    auto first = std::lower_bound(m_findResults.begin(), m_findResults.end(), pageIndex,
+        [](const PDFFindResult& result, PDFInteger page) { return result.textSelectionItems.front().first.pageIndex < page; });
+    for (auto it = first; it != m_findResults.end() && it->textSelectionItems.front().first.pageIndex == pageIndex; ++it)
+    {
+        const auto index = size_t(std::distance(m_findResults.begin(), it));
+        textSelection.addItems(it->textSelectionItems, index == m_selectedResultIndex ? Qt::yellow : Qt::blue);
+    }
+    textSelection.build();
     pdf::PDFTextSelectionPainter textSelectionPainter(&textSelection);
     textSelectionPainter.draw(painter, pageIndex, layoutGetter, pagePointToDevicePointMatrix, convertor);
 }
@@ -371,7 +428,6 @@ void PDFFindTextTool::clearResults()
 {
     m_findResults.clear();
     m_selectedResultIndex = 0;
-    m_textSelection.dirty();
     getProxy()->repaintNeeded();
 }
 
@@ -388,7 +444,7 @@ void PDFFindTextTool::goToCurrentResult()
 
         if (!painterPath.isEmpty())
         {
-            getProxy()->goToPageAndEnsureVisible(firstItem.start.pageIndex, painterPath.boundingRect());
+            getProxy()->goToPageAndEnsureVisible(firstItem.start.pageIndex, painterPath.boundingRect(), true);
 
         }
     }
@@ -402,11 +458,8 @@ void PDFFindTextTool::setActiveImpl(bool active)
     {
         Q_ASSERT(!m_dialog);
 
-        // For find, we will need text layout
-        getProxy()->getTextLayoutCompiler()->makeTextLayout();
-
         // Create dialog
-        m_dialog = new PDFFindTextToolDialog(getProxy(), m_parentDialog, Qt::Popup);
+        m_dialog = new PDFFindTextToolDialog(getProxy(), m_parentDialog, Qt::Tool | Qt::FramelessWindowHint);
         m_dialog->setWindowTitle(tr("Find"));
 
         QGridLayout* layout = new QGridLayout(m_dialog);
@@ -418,7 +471,15 @@ void PDFFindTextTool::setActiveImpl(bool active)
         //  - 2 checkbox for settings
         //  - 2 push buttons (previous/next)
 
+        m_dialog->setObjectName("findDialog");
         m_findTextEdit = new QLineEdit(m_dialog);
+        m_findTextEdit->setObjectName("findQuery");
+        m_findTextEdit->setAccessibleName(tr("Search text"));
+        m_findTextEdit->installEventFilter(m_dialog);
+        m_statusLabel = new QLabel(m_dialog);
+        m_statusLabel->setObjectName("findStatus");
+        m_statusLabel->setWordWrap(true);
+        m_statusLabel->setMinimumWidth(300);
         m_caseSensitiveCheckBox = new QCheckBox(tr("Case sensitive"), m_dialog);
         m_wholeWordsCheckBox = new QCheckBox(tr("Whole words only"), m_dialog);
         m_previousButton = new QPushButton(tr("Previous"), m_dialog);
@@ -429,16 +490,22 @@ void PDFFindTextTool::setActiveImpl(bool active)
         m_wholeWordsCheckBox->setChecked(m_savedIsWholeWords);
 
         m_previousButton->setDefault(false);
-        m_nextButton->setDefault(true);
+        m_nextButton->setDefault(false);
+        m_previousButton->setAutoDefault(false);
+        m_nextButton->setAutoDefault(false);
+        m_previousButton->setObjectName("findPrevious");
+        m_nextButton->setObjectName("findNext");
 
         m_previousButton->setShortcut(m_prevAction->shortcut());
         m_nextButton->setShortcut(m_nextAction->shortcut());
 
         connect(m_previousButton, &QPushButton::clicked, m_prevAction, &QAction::trigger);
         connect(m_nextButton, &QPushButton::clicked, m_nextAction, &QAction::trigger);
-        connect(m_findTextEdit, &QLineEdit::editingFinished, this, &PDFFindTextTool::onSearchText);
+        connect(m_findTextEdit, &QLineEdit::textChanged, this, &PDFFindTextTool::onSearchText);
         connect(m_caseSensitiveCheckBox, &QCheckBox::clicked, this, &PDFFindTextTool::onSearchText);
         connect(m_wholeWordsCheckBox, &QCheckBox::clicked, this, &PDFFindTextTool::onSearchText);
+        connect(m_dialog, &PDFFindTextToolDialog::goToNextResult, this, &PDFFindTextTool::onActionNext);
+        connect(m_dialog, &PDFFindTextToolDialog::goToPreviousResult, this, &PDFFindTextTool::onActionPrevious);
         connect(m_dialog, &PDFFindTextToolDialog::goToFirstResult, this, &PDFFindTextTool::onActionFirst);
         connect(m_dialog, &PDFFindTextToolDialog::goToLastResult, this, &PDFFindTextTool::onActionLast);
 
@@ -450,16 +517,21 @@ void PDFFindTextTool::setActiveImpl(bool active)
         layout->addWidget(m_findTextEdit, 1, 0, 1, -1);
         layout->addWidget(m_caseSensitiveCheckBox, 2, 0, 1, -1, Qt::AlignLeft);
         layout->addWidget(m_wholeWordsCheckBox, 3, 0, 1, -1, Qt::AlignLeft);
-        layout->addWidget(m_previousButton, 4, 0);
-        layout->addWidget(m_nextButton, 4, 1);
+        layout->addWidget(m_statusLabel, 4, 0, 1, -1);
+        layout->addWidget(m_previousButton, 5, 0);
+        layout->addWidget(m_nextButton, 5, 1);
+        auto* closeButton = new QPushButton(tr("Close"), m_dialog);
+        closeButton->setObjectName("findClose");
+        closeButton->setAutoDefault(false);
+        connect(closeButton, &QPushButton::clicked, m_dialog, &QDialog::reject);
+        layout->addWidget(closeButton, 5, 2);
         m_dialog->setFixedSize(m_dialog->sizeHint());
 
         PDFWidget* widget = getProxy()->getWidget();
         QPoint topRight = widget->mapToGlobal(widget->rect().topRight());
-        QPoint topRightParent = m_parentDialog->mapFromGlobal(topRight);
 
         m_dialog->show();
-        m_dialog->move(topRightParent - QPoint(m_dialog->width() * 1.1, 0));
+        m_dialog->move(topRight - QPoint(m_dialog->width() + 12, 0));
         m_dialog->setFocus();
         m_findTextEdit->setFocus();
         m_findTextEdit->selectAll();
@@ -470,6 +542,7 @@ void PDFFindTextTool::setActiveImpl(bool active)
     else
     {
         Q_ASSERT(m_dialog);
+        cancelSearch();
 
         m_savedText = m_findTextEdit->text();
         m_savedIsCaseSensitive = m_caseSensitiveCheckBox->isChecked();
@@ -482,40 +555,38 @@ void PDFFindTextTool::setActiveImpl(bool active)
         m_findTextEdit = nullptr;
         m_previousButton = nullptr;
         m_nextButton = nullptr;
+        m_statusLabel = nullptr;
 
         clearResults();
     }
 }
 
+void PDFFindTextTool::cancelSearch()
+{
+    ++m_generation;
+    m_searchDelay.stop();
+    m_searchPending = false;
+    if (m_cancelled) m_cancelled->store(true, std::memory_order_relaxed);
+    m_searchWatcher.cancel();
+    m_pendingNavigation = 0;
+}
+
 void PDFFindTextTool::onSearchText()
 {
-    if (!isActive())
-    {
-        return;
-    }
-
+    if (!isActive()) return;
+    cancelSearch();
     m_parameters.phrase = m_findTextEdit->text();
     m_parameters.isCaseSensitive = m_caseSensitiveCheckBox->isChecked();
     m_parameters.isWholeWordsOnly = m_wholeWordsCheckBox->isChecked();
-    m_parameters.isSearchFinished = m_parameters.phrase.isEmpty();
-
+    m_parameters.isSearchFinished = m_parameters.phrase.trimmed().isEmpty();
+    m_hasText = false;
+    m_searchFailed = false;
     clearResults();
     updateResultsUI();
-
-    if (m_parameters.isSearchFinished)
+    if (!m_parameters.isSearchFinished)
     {
-        // We have nothing to search for
-        return;
-    }
-
-    pdf::PDFAsynchronousTextLayoutCompiler* compiler = getProxy()->getTextLayoutCompiler();
-    if (compiler->isTextLayoutReady())
-    {
-        performSearch();
-    }
-    else
-    {
-        compiler->makeTextLayout();
+        m_searchPending = true;
+        m_searchDelay.start();
     }
 }
 
@@ -539,7 +610,10 @@ void PDFFindTextTool::onActionPrevious()
 {
     if (!m_findResults.empty())
     {
-        setCurrentResultIndex(m_selectedResultIndex == 0 ? m_findResults.size() - 1 : m_selectedResultIndex - 1);
+        if (m_selectedResultIndex == 0 && !m_parameters.isSearchFinished)
+            m_pendingNavigation = -1;
+        else
+            setCurrentResultIndex(m_selectedResultIndex == 0 ? m_findResults.size() - 1 : m_selectedResultIndex - 1);
     }
 }
 
@@ -547,7 +621,10 @@ void PDFFindTextTool::onActionNext()
 {
     if (!m_findResults.empty())
     {
-        setCurrentResultIndex((m_selectedResultIndex + 1) % m_findResults.size());
+        if (m_selectedResultIndex + 1 == m_findResults.size() && !m_parameters.isSearchFinished)
+            m_pendingNavigation = 1;
+        else
+            setCurrentResultIndex((m_selectedResultIndex + 1) % m_findResults.size());
     }
 }
 
@@ -555,8 +632,8 @@ void PDFFindTextTool::setCurrentResultIndex(size_t index)
 {
     if (!m_findResults.empty())
     {
+        m_pendingNavigation = 0;
         m_selectedResultIndex = index;
-        m_textSelection.dirty();
         getProxy()->repaintNeeded();
         goToCurrentResult();
         updateTitle();
@@ -570,65 +647,136 @@ void PDFFindTextTool::onDialogRejected()
 
 void PDFFindTextTool::performSearch()
 {
-    if (m_parameters.isSearchFinished)
+    if (!isActive() || !m_searchPending || m_searchInFlight || !getDocument()) return;
+    m_searchPending = false;
+    m_searchInFlight = true;
+    m_runningGeneration = m_generation;
+    m_cancelled = std::make_shared<std::atomic_bool>(false);
+
+    // Own a document snapshot and worker-local font/optional-content state.
+    // No worker dereferences the GUI, its proxy, or its document lifetime.
+    auto document = std::make_shared<PDFDocument>(*getDocument());
+    const auto features = getProxy()->getFeatures();
+    const auto quality = getProxy()->getMeshQualitySettings();
+    const auto cms = getProxy()->getCMSManager()->getCurrentCMS();
+    const auto parameters = m_parameters;
+    const auto cancelled = m_cancelled;
+    std::vector<std::pair<PDFObjectReference, OCState>> states;
+    const auto* activity = getProxy()->getOptionalContentActivity();
+    const auto* properties = document->getCatalog()->getOptionalContentProperties();
+    if (activity && properties)
+        for (const auto& group : properties->getAllOptionalContentGroups())
+            states.emplace_back(group, activity->getState(group));
+    // Hidden optional content cannot reliably be called a missing text layer.
+    m_canDetectNoText = !properties || properties->getAllOptionalContentGroups().empty();
+
+    auto search = [document, features, quality, cms, parameters, cancelled, states](QPromise<SearchBatch>& promise)
     {
-        return;
-    }
-
-    clearResults();
-    m_parameters.isSearchFinished = true;
-
-    if (m_parameters.phrase.isEmpty())
-    {
-        return;
-    }
-
-    PDFAsynchronousTextLayoutCompiler* compiler = getProxy()->getTextLayoutCompiler();
-    if (!compiler->isTextLayoutReady())
-    {
-        // Text layout is not ready yet
-        return;
-    }
-
-    // Prepare string to search
-    QString expression = m_parameters.phrase;
-
-    bool useRegularExpression = false;
-    if (m_parameters.isWholeWordsOnly)
-    {
-        expression = QString("\\b%1\\b").arg(QRegularExpression::escape(expression));
-        useRegularExpression = true;
-    }
-
-    pdf::PDFTextFlow::FlowFlags flowFlags = pdf::PDFTextFlow::SeparateBlocks;
-
-    const pdf::PDFTextLayoutStorage* textLayoutStorage = compiler->getTextLayoutStorage();
-    if (!useRegularExpression)
-    {
-        // Use simple text search
-        Qt::CaseSensitivity caseSensitivity = m_parameters.isCaseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
-        m_findResults = textLayoutStorage->find(expression, caseSensitivity, flowFlags);
-    }
-    else
-    {
-        // Use regular expression search
-        QRegularExpression::PatternOptions patternOptions = QRegularExpression::UseUnicodePropertiesOption;
-        if (!m_parameters.isCaseSensitive)
+        struct Cancellation final : PDFOperationControl
         {
-            patternOptions |= QRegularExpression::CaseInsensitiveOption;
+            explicit Cancellation(std::shared_ptr<std::atomic_bool> value) : flag(std::move(value)) {}
+            bool isOperationCancelled() const override { return flag->load(std::memory_order_relaxed); }
+            std::shared_ptr<std::atomic_bool> flag;
+        } control(cancelled);
+        SearchBatch batch;
+        try
+        {
+            PDFFontCache fonts(32, 32);
+            PDFOptionalContentActivity activity(document.get(), OCUsage::View, nullptr);
+            for (const auto& state : states) activity.setState(state.first, state.second, false);
+            fonts.setDocument(PDFModifiedDocument(document.get(), &activity));
+            QRegularExpression expression;
+            if (parameters.isWholeWordsOnly)
+            {
+                QRegularExpression::PatternOptions options = QRegularExpression::UseUnicodePropertiesOption;
+                if (!parameters.isCaseSensitive) options |= QRegularExpression::CaseInsensitiveOption;
+                expression = QRegularExpression(QString("\\b%1\\b").arg(QRegularExpression::escape(parameters.phrase)), options);
+            }
+            const auto sensitivity = parameters.isCaseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
+            QElapsedTimer publishTimer;
+            publishTimer.start();
+            bool publishedMatch = false;
+            const auto* catalog = document->getCatalog();
+            for (PDFInteger pageIndex = 0; pageIndex < PDFInteger(catalog->getPageCount()); ++pageIndex)
+            {
+                if (control.isOperationCancelled() || promise.isCanceled()) return;
+                const auto* page = catalog->getPage(pageIndex);
+                if (!page) { batch.failed = true; continue; }
+                PDFTextLayoutGenerator generator(features, page, document.get(), &fonts, cms.data(), &activity, QTransform(), quality);
+                generator.setOperationControl(&control);
+                const auto errors = generator.processContents();
+                if (control.isOperationCancelled()) return;
+                batch.failed = batch.failed || !errors.isEmpty();
+                const auto layout = generator.createTextLayout();
+                const auto flows = PDFTextFlow::createTextFlows(layout, PDFTextFlow::SeparateBlocks, pageIndex);
+                PDFFindResults pageResults;
+                for (const auto& flow : flows)
+                {
+                    if (control.isOperationCancelled()) return;
+                    batch.hasText = batch.hasText || !flow.getText().trimmed().isEmpty();
+                    auto matches = parameters.isWholeWordsOnly ? flow.find(expression) : flow.find(parameters.phrase, sensitivity);
+                    for (auto& match : matches)
+                        if (!match.textSelectionItems.empty()) pageResults.push_back(std::move(match));
+                }
+                std::sort(pageResults.begin(), pageResults.end());
+                batch.results.insert(batch.results.end(), std::make_move_iterator(pageResults.begin()), std::make_move_iterator(pageResults.end()));
+                // Publish the first match immediately, then coalesce updates.
+                if ((!publishedMatch && !batch.results.empty()) || publishTimer.elapsed() >= 40)
+                {
+                    if (control.isOperationCancelled()) return;
+                    publishedMatch = publishedMatch || !batch.results.empty();
+                    promise.addResult(std::move(batch));
+                    batch = SearchBatch();
+                    publishTimer.restart();
+                }
+            }
         }
-
-        QRegularExpression regularExpression(expression, patternOptions);
-        m_findResults = textLayoutStorage->find(regularExpression, flowFlags);
-    }
-
-    std::sort(m_findResults.begin(), m_findResults.end());
-    m_selectedResultIndex = 0;
-    m_textSelection.dirty();
-    getProxy()->repaintNeeded();
-
-    updateResultsUI();
+        catch (...)
+        {
+            batch.failed = true;
+        }
+        if (!control.isOperationCancelled() && !promise.isCanceled()) promise.addResult(std::move(batch));
+    };
+    m_searchWatcher.setFuture(QtConcurrent::run(std::move(search)));
 }
+
+void PDFFindTextTool::receiveSearchResults(int begin, int end)
+{
+    if (!isActive() || m_runningGeneration != m_generation) return;
+    const bool hadResults = !m_findResults.empty();
+    for (int index = begin; index < end; ++index)
+    {
+        const auto batch = m_searchWatcher.resultAt(index);
+        m_hasText = m_hasText || batch.hasText;
+        m_searchFailed = m_searchFailed || batch.failed;
+        m_findResults.insert(m_findResults.end(), batch.results.begin(), batch.results.end());
+    }
+    if (!hadResults && !m_findResults.empty()) goToCurrentResult();
+    if (m_pendingNavigation == 1 && m_selectedResultIndex + 1 < m_findResults.size())
+    {
+        m_pendingNavigation = 0;
+        setCurrentResultIndex(m_selectedResultIndex + 1);
+    }
+    updateResultsUI();
+    getProxy()->repaintNeeded();
+}
+
+void PDFFindTextTool::finishSearch()
+{
+    m_searchInFlight = false;
+    if (isActive() && m_runningGeneration == m_generation)
+    {
+        m_parameters.isSearchFinished = true;
+        if (m_pendingNavigation && !m_findResults.empty())
+            setCurrentResultIndex(m_pendingNavigation < 0 ? m_findResults.size() - 1 : 0);
+        m_pendingNavigation = 0;
+        updateResultsUI();
+    }
+    // A changed query waits only for the cancelled worker to unwind, not for
+    // the old document scan. At most one worker per Find tool is ever running.
+    if (m_searchPending && !m_searchDelay.isActive()) performSearch();
+}
+
 
 void PDFFindTextTool::updateActions()
 {
@@ -641,11 +789,13 @@ void PDFFindTextTool::updateActions()
 
     m_prevAction->setEnabled(enablePrevious);
     m_nextAction->setEnabled(enableNext);
+    if (m_previousButton) m_previousButton->setEnabled(enablePrevious);
+    if (m_nextButton) m_nextButton->setEnabled(enableNext);
 }
 
 void PDFFindTextTool::updateResultsUI()
 {
-    m_selectedResultIndex = qBound(size_t(0), m_selectedResultIndex, m_findResults.size());
+    m_selectedResultIndex = m_findResults.empty() ? 0 : qMin(m_selectedResultIndex, m_findResults.size() - 1);
 
     updateActions();
     updateTitle();
@@ -653,42 +803,25 @@ void PDFFindTextTool::updateResultsUI()
 
 void PDFFindTextTool::updateTitle()
 {
-    if (!m_dialog)
-    {
-        return;
-    }
-
-    if (m_findResults.empty())
-    {
-        m_dialog->setWindowTitle(tr("Find"));
-    }
+    if (!m_dialog) return;
+    QString status;
+    const auto current = m_findResults.empty() ? 0 : m_selectedResultIndex + 1;
+    if (m_parameters.phrase.trimmed().isEmpty())
+        status = tr("Enter text to search.");
+    else if (!m_parameters.isSearchFinished)
+        status = tr("Searching... %1 / %2+").arg(current).arg(m_findResults.size());
+    else if (m_searchFailed)
+        status = tr("Search incomplete. %1 / %2").arg(current).arg(m_findResults.size());
+    else if (m_findResults.empty())
+        status = !m_hasText && m_canDetectNoText
+            ? tr("This document may have no searchable text. Use OCR to create a text layer.")
+            : tr("No results.");
     else
-    {
-        m_dialog->setWindowTitle(tr("Find (%1/%2)").arg(m_selectedResultIndex + 1).arg(m_findResults.size()));
-    }
-
+        status = tr("%1 / %2").arg(current).arg(m_findResults.size());
+    m_statusLabel->setText(status);
+    m_dialog->setWindowTitle(m_findResults.empty() ? tr("Find") : tr("Find (%1/%2)").arg(current).arg(m_findResults.size()));
+    m_dialog->setFixedSize(m_dialog->sizeHint());
     m_dialog->update();
-}
-
-PDFTextSelection PDFFindTextTool::getTextSelectionImpl() const
-{
-    pdf::PDFTextSelection result;
-
-    for (size_t i = 0; i < m_findResults.size(); ++i)
-    {
-        const pdf::PDFFindResult& findResult = m_findResults[i];
-
-        QColor color(Qt::blue);
-        if (i == m_selectedResultIndex)
-        {
-            color = QColor(Qt::yellow);
-        }
-
-        result.addItems(findResult.textSelectionItems, color);
-    }
-    result.build();
-
-    return result;
 }
 
 PDFTextSelection PDFFindTextTool::getTextSelectionSelectedResultOnly() const

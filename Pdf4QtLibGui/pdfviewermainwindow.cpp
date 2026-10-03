@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdfviewermainwindow.h"
+#include "pdfwidgettool.h"
 #include "ui_pdfviewermainwindow.h"
 
 #include "pdfaboutdialog.h"
@@ -465,6 +466,7 @@ void PDFViewerMainWindow::activateDocumentTab(int index)
     {
         return;
     }
+    m_programController->getToolManager()->getFindTextTool()->setActive(false);
     windows.at(index)->showNormal();
     windows.at(index)->raise();
     windows.at(index)->activateWindow();

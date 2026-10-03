@@ -30,9 +30,14 @@
 
 #include <QDialog>
 #include <QCursor>
+#include <QFutureWatcher>
+#include <QTimer>
+#include <atomic>
+#include <memory>
 
 class QCheckBox;
 class QLineEdit;
+class QLabel;
 
 namespace pdf
 {
@@ -160,11 +165,14 @@ public:
     virtual bool event(QEvent* event) override;
 
 signals:
+    void goToNextResult();
+    void goToPreviousResult();
     void goToFirstResult();
     void goToLastResult();
 
 protected:
     virtual void paintEvent(QPaintEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     PDFDrawWidgetProxy* m_proxy;
@@ -172,7 +180,7 @@ private:
 
 /// Simple tool for find text in PDF document. It is much simpler than advanced
 /// search and can't search using regular expressions.
-class PDFFindTextTool : public PDFWidgetTool
+class PDF4QTLIBWIDGETSSHARED_EXPORT PDFFindTextTool : public PDFWidgetTool
 {
     Q_OBJECT
 
@@ -187,6 +195,8 @@ public:
     /// \param parent Parent object
     /// \param parentDialog Paret dialog for tool dialog
     explicit PDFFindTextTool(PDFDrawWidgetProxy* proxy, QAction* prevAction, QAction* nextAction, QObject* parent, QWidget* parentDialog);
+    ~PDFFindTextTool() override;
+    void focusSearch();
 
     virtual void drawPage(QPainter* painter,
                           PDFInteger pageIndex,
@@ -210,6 +220,9 @@ private:
 
     void setCurrentResultIndex(size_t index);
     void performSearch();
+    void cancelSearch();
+    void receiveSearchResults(int begin, int end);
+    void finishSearch();
     void updateResultsUI();
     void updateTitle();
     void clearResults();
@@ -226,12 +239,30 @@ private:
     QPushButton* m_previousButton;
     QPushButton* m_nextButton;
 
+    QLabel* m_statusLabel = nullptr;
+
+    struct SearchBatch
+    {
+        PDFFindResults results;
+        bool hasText = false;
+        bool failed = false;
+    };
+    QTimer m_searchDelay;
+    QFutureWatcher<SearchBatch> m_searchWatcher;
+    std::shared_ptr<std::atomic_bool> m_cancelled;
+    quint64 m_generation = 0;
+    quint64 m_runningGeneration = 0;
+    bool m_searchPending = false;
+    bool m_searchInFlight = false;
+    bool m_hasText = false;
+    bool m_searchFailed = false;
+    bool m_canDetectNoText = false;
+    int m_pendingNavigation = 0;
+
     QString m_savedText;
     bool m_savedIsCaseSensitive = false;
     bool m_savedIsWholeWords = false;
 
-    pdf::PDFTextSelection getTextSelection() const { return m_textSelection.get(this, &PDFFindTextTool::getTextSelectionImpl); }
-    pdf::PDFTextSelection getTextSelectionImpl() const;
     pdf::PDFTextSelection getTextSelectionSelectedResultOnly() const;
 
     struct SearchParameters
@@ -245,7 +276,6 @@ private:
     SearchParameters m_parameters;
     pdf::PDFFindResults m_findResults;
     size_t m_selectedResultIndex;
-    mutable pdf::PDFCachedItem<pdf::PDFTextSelection> m_textSelection;
 };
 
 /// Tool for selection of text in document

@@ -1429,7 +1429,7 @@ void PDFDrawWidgetProxy::goToPage(PDFInteger pageIndex)
     }
 }
 
-void PDFDrawWidgetProxy::goToPageAndEnsureVisible(PDFInteger pageIndex, QRectF ensureVisibleRect)
+void PDFDrawWidgetProxy::goToPageAndEnsureVisible(PDFInteger pageIndex, QRectF ensureVisibleRect, bool center)
 {
     PDFDrawSpaceController::LayoutItem layoutItem = m_controller->getLayoutItemForPage(pageIndex);
 
@@ -1451,6 +1451,13 @@ void PDFDrawWidgetProxy::goToPageAndEnsureVisible(PDFInteger pageIndex, QRectF e
         QRect displayedRect = getWidget()->getDrawWidget()->getWidget()->rect();
         QPoint topRectPoint = wishedRect.topLeft();
 
+        if (center)
+        {
+            // Search keeps the full match away from viewport edges and the Find
+            // overlay without changing zoom or the user's page layout.
+            scrollByPixels(displayedRect.center() - wishedRect.center());
+            return;
+        }
         if (!displayedRect.contains(topRectPoint))
         {
             QPoint center = displayedRect.center();

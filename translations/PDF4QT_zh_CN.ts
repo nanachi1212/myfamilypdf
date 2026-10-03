@@ -7693,6 +7693,34 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <source>Find (%1/%2)</source>
         <translation>查找(%1/%2)</translation>
     </message>
+    <message>
+        <source>Enter text to search.</source>
+        <translation>输入文字开始搜索。</translation>
+    </message>
+    <message>
+        <source>Searching... %1 / %2+</source>
+        <translation>搜索中… %1 / %2+</translation>
+    </message>
+    <message>
+        <source>Search incomplete. %1 / %2</source>
+        <translation>搜索未完成。%1 / %2</translation>
+    </message>
+    <message>
+        <source>This document may have no searchable text. Use OCR to create a text layer.</source>
+        <translation>此文档可能没有可搜索的文字内容，可使用 OCR 建立文字层。</translation>
+    </message>
+    <message>
+        <source>No results.</source>
+        <translation>找不到结果。</translation>
+    </message>
+    <message>
+        <source>%1 / %2</source>
+        <translation>%1 / %2</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
 </context>
 <context>
     <name>pdf::PDFFormFieldSignatureEditor</name>
