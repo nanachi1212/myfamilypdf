@@ -23,6 +23,7 @@
 #include "pdfprogramcontroller.h"
 #include "pdfdrawwidget.h"
 #include "pdfannotation.h"
+#include "pdfcompiler.h"
 #include "pdfform.h"
 #include "pdfdocumentwriter.h"
 #include "pdfadvancedtools.h"
@@ -747,6 +748,7 @@ void PDFProgramController::initialize(Features features,
     }
 
     initializeAnnotationManager();
+    m_annotationManager->setEditingEnabled(features.testFlag(UndoRedo));
     initializeBookmarkManager();
 
     if (features.testFlag(Forms))
@@ -1718,6 +1720,67 @@ bool PDFProgramController::askForSaveDocumentBeforeClose()
     }
 
     return true;
+}
+
+void PDFProgramController::createSelectionMarkup(pdf::AnnotationType type)
+{
+    if (!m_pdfDocument || !m_annotationManager->isEditingEnabled() ||
+        !m_pdfDocument->getStorage().getSecurityHandler()->isAllowed(pdf::PDFSecurityHandler::Permission::ModifyInteractiveItems))
+        return;
+    if (type != pdf::AnnotationType::Highlight && type != pdf::AnnotationType::Underline && type != pdf::AnnotationType::StrikeOut)
+        return;
+
+    const pdf::PDFTextSelection selection = m_toolManager ? m_toolManager->getSelectedText() : pdf::PDFTextSelection();
+    if (selection.isEmpty())
+        return;
+
+    pdf::PDFDocumentModifier modifier(m_pdfDocument.data());
+    auto* builder = modifier.getBuilder();
+    bool created = false;
+    // Select All may span pages. Each page gets its own standard annotation,
+    // while the entire operation remains a single undoable document change.
+    for (auto it = selection.begin(); it != selection.end(); )
+    {
+        const auto end = selection.nextPageRange(it);
+        const pdf::PDFInteger pageIndex = it->start.pageIndex;
+        if (pageIndex >= 0 && pageIndex < m_pdfDocument->getCatalog()->getPageCount())
+        {
+            auto layoutGetter = m_pdfWidget->getDrawWidgetProxy()->getTextLayoutCompiler()->getTextLayoutLazy(pageIndex);
+            QPolygonF quads;
+            pdf::PDFTextSelectionPainter painter(&selection);
+            const QPainterPath path = painter.prepareGeometry(pageIndex, layoutGetter, QTransform(), &quads);
+            if (!path.isEmpty() && !quads.isEmpty())
+            {
+                const auto page = m_pdfDocument->getCatalog()->getPage(pageIndex)->getPageReference();
+                pdf::PDFObjectReference annotation;
+                switch (type)
+                {
+                    case pdf::AnnotationType::Highlight:
+                        annotation = builder->createAnnotationHighlight(page, quads, Qt::yellow);
+                        builder->setAnnotationOpacity(annotation, 0.2);
+                        break;
+                    case pdf::AnnotationType::Underline:
+                        annotation = builder->createAnnotationUnderline(page, quads, Qt::red);
+                        break;
+                    case pdf::AnnotationType::StrikeOut:
+                        annotation = builder->createAnnotationStrikeout(page, quads, Qt::red);
+                        break;
+                    default: break;
+                }
+                const pdf::PDFTextLayout layout = layoutGetter;
+                builder->setAnnotationContents(annotation, layout.getTextFromSelection(it, end, pageIndex));
+                builder->updateAnnotationAppearanceStreams(annotation);
+                created = true;
+            }
+        }
+        it = end;
+    }
+    if (created)
+    {
+        modifier.markAnnotationsChanged();
+        if (modifier.finalize())
+            onDocumentModified(pdf::PDFModifiedDocument(modifier.getDocument(), nullptr, modifier.getFlags()));
+    }
 }
 
 QString PDFProgramController::getOriginalFileName() const

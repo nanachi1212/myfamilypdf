@@ -296,6 +296,8 @@ public:
     /// \param parent Parent object
     explicit PDFSelectTextTool(PDFDrawWidgetProxy* proxy, QAction* action, QAction* copyTextAction, QAction* selectAllAction, QAction* deselectAction, QObject* parent);
 
+    const PDFTextSelection& getSelection() const { return m_textSelection; }
+
     virtual void drawPage(QPainter* painter,
                           PDFInteger pageIndex,
                           const PDFPrecompiledPage* compiledPage,
@@ -627,6 +629,8 @@ public:
 
     /// Returns find text tool
     PDFFindTextTool* getFindTextTool() const;
+
+    PDFTextSelection getSelectedText() const;
 
     /// Returns magnifier tool
     PDFMagnifierTool* getMagnifierTool() const;

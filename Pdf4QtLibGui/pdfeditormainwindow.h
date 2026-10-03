@@ -100,6 +100,7 @@ protected:
     virtual void dropEvent(QDropEvent* event) override;
 
 private:
+    void onPdfContextMenuRequested(const QPoint& pos);
     void onActionQuitTriggered();
     void openDocumentInNewTab(const QString& fileName);
     void refreshDocumentTabs(bool persistSession);

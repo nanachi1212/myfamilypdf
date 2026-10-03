@@ -102,7 +102,7 @@ void PDFCreateStickyNoteTool::onActionTriggered(QAction* action)
 void PDFCreateStickyNoteTool::onPointPicked(PDFInteger pageIndex, QPointF pagePoint)
 {
     bool ok = false;
-    QString text = QInputDialog::getText(getProxy()->getWidget(), tr("Sticky note"), tr("Enter text to be displayed in the sticky note"), QLineEdit::Normal, QString(), &ok);
+    QString text = QInputDialog::getMultiLineText(getProxy()->getWidget(), tr("Add Comment"), tr("Comment"), QString(), &ok);
 
     if (ok && !text.isEmpty())
     {

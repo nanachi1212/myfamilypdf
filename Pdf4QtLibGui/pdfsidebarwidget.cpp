@@ -174,10 +174,12 @@ PDFSidebarWidget::PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
     connect(ui->addBookmarkFolderButton, &QToolButton::clicked, this, &PDFSidebarWidget::createBookmarkFolder);
 
     // Notes
+    ui->notesButton->setToolTip(tr("Annotations"));
+    ui->notesSearchLineEdit->setPlaceholderText(tr("Search annotations"));
     m_notesTreeModel = new QStandardItemModel(this);
     m_notesSortProxyTreeModel = new QSortFilterProxyModel(this);
     m_notesSortProxyTreeModel->setFilterKeyColumn(0);
-    m_notesSortProxyTreeModel->setFilterRole(Qt::DisplayRole);
+    m_notesSortProxyTreeModel->setFilterRole(Qt::UserRole + 1);
     m_notesSortProxyTreeModel->setAutoAcceptChildRows(false);
     m_notesSortProxyTreeModel->setRecursiveFilteringEnabled(true);
     m_notesSortProxyTreeModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
@@ -323,6 +325,7 @@ void PDFSidebarWidget::setDocument(const pdf::PDFModifiedDocument& document, con
 
     if (document.hasReset() || document.hasFlag(pdf::PDFModifiedDocument::Annotation))
     {
+        if (document.hasReset()) ui->notesSearchLineEdit->clear();
         updateNotes();
     }
 }
@@ -369,7 +372,7 @@ bool PDFSidebarWidget::isEmpty(Page page) const
             return m_signatures.empty();
 
         case Notes:
-            return !m_document || !m_proxy->getAnnotationManager()->hasAnyPageAnnotation();
+            return !m_document;
 
         default:
             Q_ASSERT(false);
@@ -802,86 +805,52 @@ void PDFSidebarWidget::updateSignatures(const std::vector<pdf::PDFSignatureVerif
 
 void PDFSidebarWidget::updateNotes()
 {
-    const bool updatesEnabled = ui->notesTreeView->updatesEnabled();
-    ui->notesTreeView->setUpdatesEnabled(false);
-
     m_notesTreeModel->clear();
     m_markupAnnotations.clear();
-
     if (m_document)
     {
-        QIcon bubbleIcon(":/resources/bubble.svg");
-        QIcon pageIcon(":/resources/page.svg");
-        QIcon userIcon(":/resources/user.svg");
-
-        pdf::PDFAnnotationManager annotationManager(m_proxy->getFontCache(),
-                                                    m_proxy->getCMSManager(),
-                                                    m_optionalContentActivity,
-                                                    pdf::PDFMeshQualitySettings(),
-                                                    m_proxy->getFeatures(),
-                                                    pdf::PDFAnnotationManager::Target::View,
-                                                    nullptr);
-        annotationManager.setDocument(pdf::PDFModifiedDocument(const_cast<pdf::PDFDocument*>(m_document), m_optionalContentActivity));
-
-        pdf::PDFInteger pageCount = m_document->getCatalog()->getPageCount();
-        for (pdf::PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
+        const auto* storage = &m_document->getStorage();
+        for (pdf::PDFInteger pageIndex = 0; pageIndex < m_document->getCatalog()->getPageCount(); ++pageIndex)
         {
-            const pdf::PDFAnnotationManager::PageAnnotations& pageAnnotations = annotationManager.getPageAnnotations(pageIndex);
-
-            if (pageAnnotations.isEmpty())
+            const auto* page = m_document->getCatalog()->getPage(pageIndex);
+            const auto* dictionary = m_document->getDictionaryFromObject(m_document->getObjectByReference(page->getPageReference()));
+            if (!dictionary) continue;
+            pdf::PDFDocumentDataLoaderDecorator loader(storage);
+            for (const auto reference : loader.readReferenceArrayFromDictionary(dictionary, "Annots"))
             {
-                continue;
-            }
-
-            std::map<QString, std::vector<const pdf::PDFMarkupAnnotation*>> annotations;
-
-            for (const pdf::PDFAnnotationManager::PageAnnotation& pageAnnotation : pageAnnotations.annotations)
-            {
-                if (!pageAnnotation.annotation || !pageAnnotation.annotation->asMarkupAnnotation())
+                try
                 {
-                    continue;
-                }
-
-                const pdf::PDFMarkupAnnotation* markupAnnotation = pageAnnotation.annotation->asMarkupAnnotation();
-
-                QString user = markupAnnotation->getWindowTitle();
-
-                if (user.isEmpty())
-                {
-                    user = tr("User");
-                }
-
-                annotations[user].push_back(markupAnnotation);
-            }
-
-            if (!annotations.empty())
-            {
-                QStandardItem* pageItem = new QStandardItem(pageIcon, tr("Page %1").arg(pageIndex + 1));
-                pageItem->setFlags(Qt::ItemIsEnabled);
-
-                for (const auto& annotationItem : annotations)
-                {
-                    QStandardItem* userItem = new QStandardItem(userIcon, annotationItem.first);
-                    userItem->setFlags(Qt::ItemIsEnabled);
-                    pageItem->appendRow(userItem);
-
-                    for (const pdf::PDFMarkupAnnotation* markupAnnotation : annotationItem.second)
+                    const auto annotation = pdf::PDFAnnotation::parse(storage, reference);
+                    if (!annotation || !annotation->asMarkupAnnotation()) continue;
+                    QString type;
+                    switch (annotation->getType())
                     {
-                        QStandardItem* annotationTreeItem = new QStandardItem(bubbleIcon, markupAnnotation->getGUICaption());
-                        annotationTreeItem->setData(int(m_markupAnnotations.size()), Qt::UserRole);
-                        annotationTreeItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-                        userItem->appendRow(annotationTreeItem);
-                        m_markupAnnotations.push_back(std::make_pair(markupAnnotation->getSelfReference(), pageIndex));
+                        case pdf::AnnotationType::Text: type = tr("Comment"); break;
+                        case pdf::AnnotationType::Highlight: type = tr("Highlight"); break;
+                        case pdf::AnnotationType::Underline: type = tr("Underline"); break;
+                        case pdf::AnnotationType::StrikeOut: type = tr("Strikeout"); break;
+                        default: type = tr("Annotation"); break;
                     }
+                    const QString contents = annotation->getContents();
+                    QString caption = tr("Page %1").arg(pageIndex + 1) + QStringLiteral(" | ") + type;
+                    if (!contents.isEmpty()) caption += QStringLiteral(" | ") + contents.simplified().left(160);
+                    auto* item = new QStandardItem(QIcon(":/resources/bubble.svg"), caption);
+                    item->setData(int(m_markupAnnotations.size()), Qt::UserRole);
+                    item->setData(contents, Qt::UserRole + 1);
+                    item->setToolTip(contents);
+                    item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+                    m_markupAnnotations.emplace_back(reference, pageIndex);
+                    m_notesTreeModel->appendRow(item);
                 }
-
-                m_notesTreeModel->appendRow(pageItem);
+                catch (const pdf::PDFException&)
+                {
+                    // A malformed annotation must not prevent reading the rest.
+                }
             }
         }
     }
-
-    ui->notesTreeView->setUpdatesEnabled(updatesEnabled);
-    ui->notesTreeView->expandAll();
+    ui->notesEmptyLabel->setVisible(m_markupAnnotations.empty());
+    ui->notesTreeView->setVisible(!m_markupAnnotations.empty());
 }
 
 void PDFSidebarWidget::onOutlineSearchText()
@@ -901,17 +870,7 @@ void PDFSidebarWidget::onOutlineSearchText()
 
 void PDFSidebarWidget::onNotesSearchText()
 {
-    QString text = ui->notesSearchLineEdit->text();
-    const bool isWildcard = text.contains(QChar('*')) || text.contains(QChar('?'));
-
-    if (isWildcard)
-    {
-        m_notesSortProxyTreeModel->setFilterWildcard(text);
-    }
-    else
-    {
-        m_notesSortProxyTreeModel->setFilterFixedString(text);
-    }
+    m_notesSortProxyTreeModel->setFilterFixedString(ui->notesSearchLineEdit->text());
 }
 
 void PDFSidebarWidget::onPageButtonClicked()
@@ -1590,7 +1549,7 @@ void PDFSidebarWidget::onNotesTreeViewContextMenuRequested(const QPoint& pos)
                 pdf::PDFObjectReference annotationReference = annotationItem.first;
                 pdf::PDFObjectReference pageReference = m_document->getCatalog()->getPage(annotationItem.second)->getPageReference();
 
-                m_proxy->goToPage(annotationItem.second);
+                onNotesItemClicked(index);
                 m_proxy->getAnnotationManager()->showAnnotationMenu(annotationReference, pageReference, globalPos);
             }
         }
@@ -1794,7 +1753,9 @@ void PDFSidebarWidget::onNotesItemClicked(const QModelIndex& index)
         if (i >= 0 && i < m_markupAnnotations.size())
         {
             pdf::PDFInteger pageIndex = m_markupAnnotations[i].second;
-            m_proxy->goToPage(pageIndex);
+            const auto annotation = pdf::PDFAnnotation::parse(&m_document->getStorage(), m_markupAnnotations[i].first);
+            if (annotation)
+                m_proxy->goToPageAndEnsureVisible(pageIndex, annotation->getRectangle(), true);
         }
     }
 }
