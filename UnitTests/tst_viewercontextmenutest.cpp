@@ -41,12 +41,18 @@
 #include <QTabBar>
 #include "pdfwidgettool.h"
 #include "pdfdocumentreader.h"
+#include "pdfdocumentbuilder.h"
+#include <QtConcurrent/QtConcurrentRun>
+#ifdef Q_OS_WIN
+#include <qt_windows.h>
+#include <psapi.h>
+#endif
 #include <memory>
 
 namespace
 {
 
-bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool withText = true, bool unicode = false)
+bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool withText = true, bool unicode = false, bool malformed = false)
 {
     const int fontObject = 3 + pageCount * 2;
     QByteArray kids;
@@ -71,6 +77,7 @@ bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool wit
                     + (unicode ? QByteArray("ABCD 2026 ABCD") : QByteArray("FamilyPDF smoke page ") + QByteArray::number(page+1)) + ") Tj ET\n";
         else
             stream = "q 0.7 g 20 20 300 500 re f Q\n";
+        if (malformed && page == 0) stream += "Q\n"; // Unbalanced restore after valid text.
         objects << QByteArray("<< /Length ") + QByteArray::number(stream.size())
                        + " >>\nstream\n" + stream + "endstream";
     }
@@ -135,8 +142,15 @@ private slots:
     void largePdfReadingBenchmark();
     void searchExperience_data();
     void searchExperience();
+    void searchCancellationAndDocumentLifecycle_data() { searchExperience_data(); }
     void searchCancellationAndDocumentLifecycle();
+    void searchTextCacheOwnership();
+    void searchCacheReuse_data() { searchExperience_data(); }
+    void searchCacheReuse();
+    void searchEditorContentInvalidation();
+    void searchRejectsPartialLegacyLayout();
     void searchPerformanceBenchmark();
+    void searchWarmCacheBenchmark();
     void extractionRejectsInvalidInputAndCancellation();
     void readingPositionRestoresZoomAndClamps();
     void thumbnailSelectionAndPageManagement();
@@ -322,6 +336,8 @@ void ViewerContextMenuTest::searchExperience()
     controller->openDocument(emptyPath);
     QTRY_VERIFY(controller->getDocument());
     QTRY_COMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(3));
+    drawProxy->getTextLayoutCompiler()->makeTextLayout();
+    QTRY_VERIFY(drawProxy->getTextLayoutCompiler()->isTextLayoutReady());
     window->findChild<QAction*>("actionFind")->trigger();
     dialog = window->findChild<QDialog*>("findDialog");
     query = dialog->findChild<QLineEdit*>("findQuery");
@@ -334,15 +350,26 @@ void ViewerContextMenuTest::searchExperience()
 
 void ViewerContextMenuTest::searchCancellationAndDocumentLifecycle()
 {
+    QFETCH(bool, editor);
+    std::unique_ptr<pdfviewer::PDFEditorMainWindow> editorWindow;
+    QMainWindow* window = m_window.get();
+    auto* controller = m_window->getProgramController();
+    if (editor)
+    {
+        editorWindow = std::make_unique<pdfviewer::PDFEditorMainWindow>();
+        window = editorWindow.get();
+        controller = editorWindow->getProgramController();
+        window->show();
+    }
+    auto* drawProxy = controller->getPdfWidget()->getDrawWidgetProxy();
     const QString path = m_temp.filePath("search-large.pdf");
     QVERIFY(writePdfFixture(path, 1200, 20));
-    auto* controller = m_window->getProgramController();
     controller->closeDocument();
     controller->openDocument(path);
     QTRY_VERIFY(controller->getDocument());
     QTRY_COMPARE_WITH_TIMEOUT(controller->getDocument()->getCatalog()->getPageCount(), size_t(1200), 15000);
-    action("actionFind")->trigger();
-    auto* dialog = m_window->findChild<QDialog*>("findDialog");
+    window->findChild<QAction*>("actionFind")->trigger();
+    auto* dialog = window->findChild<QDialog*>("findDialog");
     auto* query = dialog->findChild<QLineEdit*>("findQuery");
     auto* status = dialog->findChild<QLabel*>("findStatus");
     QElapsedTimer timer; timer.start();
@@ -350,7 +377,7 @@ void ViewerContextMenuTest::searchCancellationAndDocumentLifecycle()
     QTRY_VERIFY_WITH_TIMEOUT(status->text().contains(" / ") && !status->text().contains("0 / 0"), 10000);
     QVERIFY2(status->text().startsWith("Searching"), "First result must arrive before full scan completes.");
     qInfo() << "SEARCH_PROGRESS first_ms=" << timer.elapsed() << status->text();
-    proxy()->goToPage(600);
+    drawProxy->goToPage(600);
     query->setText("a");
     query->setText("ab");
     query->setText("abc_missing");
@@ -362,20 +389,21 @@ void ViewerContextMenuTest::searchCancellationAndDocumentLifecycle()
     query->clear();
     QTest::qWait(100);
     QCOMPARE(status->text(), QString("Enter text to search."));
-    // Real document-tab activation must invalidate the old worker as well.
+    // Viewer tab activation; both applications also switch documents below.
+    if (!editor)
     {
         auto other = std::make_unique<pdfviewer::PDFViewerMainWindow>();
         other->show();
         query->setText("FamilyPDF");
         QTest::qWait(180);
-        auto* tabs = m_window->findChild<QTabBar*>();
+        auto* tabs = window->findChild<QTabBar*>();
         QVERIFY(tabs && tabs->count() == 2);
         tabs->setCurrentIndex(1);
         QVERIFY(!controller->getToolManager()->getFindTextTool()->isActive());
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
     }
-    action("actionFind")->trigger();
-    dialog = m_window->findChild<QDialog*>("findDialog");
+    window->findChild<QAction*>("actionFind")->trigger();
+    dialog = window->findChild<QDialog*>("findDialog");
     query = dialog->findChild<QLineEdit*>("findQuery");
     query->setText("FamilyPDF");
     QTest::qWait(180);
@@ -387,8 +415,8 @@ void ViewerContextMenuTest::searchCancellationAndDocumentLifecycle()
     controller->openDocument(m_pdfPath);
     QTRY_VERIFY(controller->getDocument());
     QTRY_COMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(3));
-    action("actionFind")->trigger();
-    dialog = m_window->findChild<QDialog*>("findDialog");
+    window->findChild<QAction*>("actionFind")->trigger();
+    dialog = window->findChild<QDialog*>("findDialog");
     query = dialog->findChild<QLineEdit*>("findQuery");
     status = dialog->findChild<QLabel*>("findStatus");
     query->setText("FamilyPDF");
@@ -399,14 +427,226 @@ void ViewerContextMenuTest::searchCancellationAndDocumentLifecycle()
     QTRY_COMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(1200));
     QVERIFY(!controller->getToolManager()->getFindTextTool()->isActive());
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-    action("actionFind")->trigger();
-    dialog = m_window->findChild<QDialog*>("findDialog");
+    window->findChild<QAction*>("actionFind")->trigger();
+    dialog = window->findChild<QDialog*>("findDialog");
     dialog->findChild<QLineEdit*>("findQuery")->setText("FamilyPDF");
     QTest::qWait(180);
     timer.restart();
-    m_window.reset();
+    if (editor) editorWindow.reset();
+    else m_window.reset();
     QVERIFY(timer.elapsed() < 2000);
     QTest::qWait(100); // queued result delivery after destruction must be harmless
+}
+
+void ViewerContextMenuTest::searchTextCacheOwnership()
+{
+    auto storage = std::make_shared<pdf::PDFSearchTextCache>(100);
+    auto writer = QtConcurrent::run([storage]() {
+        for (int page=0; page<100; ++page) storage->setPage(page, pdf::PDFTextFlows());
+    });
+    QTRY_VERIFY(writer.isFinished());
+    QCOMPARE(storage->getCompletedPageCount(), size_t(100));
+    // Empty successfully extracted pages must also be cached.
+    QVERIFY(storage->getPage(0));
+    QVERIFY(storage->getPage(0)->empty());
+    const auto* first = storage->getPage(0);
+    storage->setPage(0, pdf::PDFTextFlows());
+    QCOMPARE(storage->getPage(0), first);
+    QCOMPARE(storage->getCompletedPageCount(), size_t(100));
+    std::weak_ptr<pdf::PDFSearchTextCache> lifetime = storage;
+    storage.reset();
+    QVERIFY(lifetime.expired());
+}
+
+void ViewerContextMenuTest::searchCacheReuse()
+{
+    QFETCH(bool, editor);
+    std::unique_ptr<pdfviewer::PDFEditorMainWindow> editorWindow;
+    QMainWindow* window = m_window.get();
+    auto* controller = m_window->getProgramController();
+    if (editor)
+    {
+        editorWindow = std::make_unique<pdfviewer::PDFEditorMainWindow>();
+        window = editorWindow.get();
+        controller = editorWindow->getProgramController();
+        window->show();
+    }
+    const QString path = m_temp.filePath("cache-large.pdf");
+    QVERIFY(writePdfFixture(path, 1200, 20));
+    controller->closeDocument();
+    controller->openDocument(path);
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_VERIFY(!controller->getIsBusy());
+    auto* compiler = controller->getPdfWidget()->getDrawWidgetProxy()->getTextLayoutCompiler();
+    auto storage = compiler->acquireSearchTextCache();
+    window->findChild<QAction*>("actionFind")->trigger();
+    auto* dialog = window->findChild<QDialog*>("findDialog");
+    auto* query = dialog->findChild<QLineEdit*>("findQuery");
+    auto* status = dialog->findChild<QLabel*>("findStatus");
+    query->setText("FamilyPDF");
+    QTRY_VERIFY(storage->getCompletedPageCount() > 0);
+    QVERIFY(storage->getCompletedPageCount() < 1200);
+    query->clear();
+    auto first = storage;
+    const auto partial = storage->getCompletedPageCount();
+    query->setText("page 1200");
+    QTRY_COMPARE_WITH_TIMEOUT(status->text(), QString("1 / 20"), 30000);
+    QCOMPARE(storage->getCompletedPageCount(), size_t(1200));
+    QCOMPARE(compiler->acquireSearchTextCache(), first);
+    QVERIFY(partial > 0);
+    query->setText("FamilyPDF");
+    QTRY_COMPARE_WITH_TIMEOUT(status->text(), QString("1 / 24000"), 15000);
+    QCOMPARE(compiler->acquireSearchTextCache(), first);
+    query->clear();
+    QCOMPARE(storage->getCompletedPageCount(), size_t(1200));
+    std::weak_ptr<pdf::PDFSearchTextCache> lifetime = first;
+    first.reset();
+    storage.reset();
+    controller->closeDocument();
+    QTRY_VERIFY_WITH_TIMEOUT(lifetime.expired(), 5000);
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY(controller->getDocument());
+    QCOMPARE(compiler->acquireSearchTextCache()->getCompletedPageCount(), size_t(0));
+    compiler->makeTextLayout();
+    QTRY_VERIFY(compiler->isTextLayoutReady());
+    QVERIFY(compiler->getVerifiedTextLayoutStorage());
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    window->findChild<QAction*>("actionFind")->trigger();
+    dialog = window->findChild<QDialog*>("findDialog");
+    dialog->findChild<QLineEdit*>("findQuery")->setText("FamilyPDF");
+    QTRY_COMPARE(dialog->findChild<QLabel*>("findStatus")->text(), QString("1 / 3"));
+    QCOMPARE(compiler->acquireSearchTextCache()->getCompletedPageCount(), size_t(3));
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::searchEditorContentInvalidation()
+{
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_VERIFY(!controller->getIsBusy());
+    auto* compiler = controller->getPdfWidget()->getDrawWidgetProxy()->getTextLayoutCompiler();
+    editor.findChild<QAction*>("actionFind")->trigger();
+    auto* dialog = editor.findChild<QDialog*>("findDialog");
+    dialog->findChild<QLineEdit*>("findQuery")->setText("FamilyPDF");
+    QTRY_COMPARE(dialog->findChild<QLabel*>("findStatus")->text(), QString("1 / 3"));
+    auto oldStorage = compiler->acquireSearchTextCache();
+    // Also retire an in-flight legacy layout compilation. Its queued finished
+    // signal must not restore the old document's cache after this edit.
+    compiler->makeTextLayout();
+    pdf::PDFDocumentModifier modifier(controller->getDocument());
+    QByteArray content("BT /F1 16 Tf 30 535 Td (Replacement) Tj ET");
+    pdf::PDFDictionary dict;
+    dict.addEntry(pdf::PDFInplaceOrMemoryString("Length"), pdf::PDFObject::createInteger(content.size()));
+    modifier.getBuilder()->setObject(pdf::PDFObjectReference(4, 0),
+        pdf::PDFObject::createStream(std::make_shared<pdf::PDFStream>(std::move(dict), std::move(content))));
+    modifier.markPageContentsChanged();
+    QVERIFY(modifier.finalize());
+    controller->onDocumentModified(pdf::PDFModifiedDocument(modifier.getDocument(), nullptr, modifier.getFlags()));
+    QVERIFY(!controller->getToolManager()->getFindTextTool()->isActive());
+    QVERIFY(compiler->acquireSearchTextCache() != oldStorage);
+    QCOMPARE(compiler->acquireSearchTextCache()->getCompletedPageCount(), size_t(0));
+    QTest::qWait(50);
+    QVERIFY(!compiler->isTextLayoutReady());
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    editor.findChild<QAction*>("actionFind")->trigger();
+    dialog = editor.findChild<QDialog*>("findDialog");
+    auto* query = dialog->findChild<QLineEdit*>("findQuery");
+    auto* status = dialog->findChild<QLabel*>("findStatus");
+    query->setText("FamilyPDF");
+    QTRY_COMPARE(status->text(), QString("1 / 2"));
+    query->setText("Replacement");
+    QTRY_COMPARE(status->text(), QString("1 / 1"));
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    editor.findChild<QAction*>("actionFind")->trigger();
+    dialog = editor.findChild<QDialog*>("findDialog");
+    dialog->findChild<QLineEdit*>("findQuery")->setText("FamilyPDF");
+    QTRY_COMPARE(dialog->findChild<QLabel*>("findStatus")->text(), QString("1 / 3"));
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::searchRejectsPartialLegacyLayout()
+{
+    const QString path = m_temp.filePath("partial-legacy-layout.pdf");
+    QVERIFY(writePdfFixture(path, 3, 1, true, false, true));
+    auto* controller = m_window->getProgramController();
+    controller->closeDocument();
+    controller->openDocument(path);
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_VERIFY(!controller->getIsBusy());
+    auto* compiler = proxy()->getTextLayoutCompiler();
+    compiler->makeTextLayout();
+    QTRY_VERIFY(compiler->isTextLayoutReady());
+    QVERIFY(!compiler->getTextLayoutStorage()->getTextLayout(0).getTextBlocks().empty());
+    QVERIFY(!compiler->getVerifiedTextLayoutStorage());
+    action("actionFind")->trigger();
+    auto* dialog = m_window->findChild<QDialog*>("findDialog");
+    auto* query = dialog->findChild<QLineEdit*>("findQuery");
+    auto* status = dialog->findChild<QLabel*>("findStatus");
+    query->setText("FamilyPDF");
+    QTRY_COMPARE(status->text(), QString("Search incomplete. 1 / 3"));
+    auto cache = compiler->acquireSearchTextCache();
+    QCOMPARE(cache->getCompletedPageCount(), size_t(2));
+    query->setText("smoke");
+    QTRY_COMPARE(status->text(), QString("Search incomplete. 1 / 3"));
+    QCOMPARE(cache->getCompletedPageCount(), size_t(2));
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::searchWarmCacheBenchmark()
+{
+    const QString root = qEnvironmentVariable("FAMILYPDF_SEARCH_FIXTURES");
+    if (root.isEmpty()) QSKIP("Set FAMILYPDF_SEARCH_FIXTURES for local benchmark.");
+    auto memory = [](const char* stage) {
+#ifdef Q_OS_WIN
+        PROCESS_MEMORY_COUNTERS_EX counters{};
+        using Query = BOOL (WINAPI*)(HANDLE, PPROCESS_MEMORY_COUNTERS, DWORD);
+        auto query = reinterpret_cast<Query>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "K32GetProcessMemoryInfo"));
+        if (query && query(GetCurrentProcess(), reinterpret_cast<PPROCESS_MEMORY_COUNTERS>(&counters), sizeof(counters)))
+            qInfo() << "SEARCH_MEMORY" << stage << "working_mb" << counters.WorkingSetSize/1048576.0 << "private_mb" << counters.PrivateUsage/1048576.0;
+#else
+        Q_UNUSED(stage);
+#endif
+    };
+    auto* controller = m_window->getProgramController();
+    controller->closeDocument();
+    controller->openDocument(root + "/text-1200.pdf");
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_VERIFY(!controller->getIsBusy());
+    memory("open");
+    action("actionFind")->trigger();
+    auto* dialog = m_window->findChild<QDialog*>("findDialog");
+    auto* query = dialog->findChild<QLineEdit*>("findQuery");
+    auto* status = dialog->findChild<QLabel*>("findStatus");
+    for (const QString& phrase : {QStringLiteral("alpha"), QStringLiteral("alpha"), QStringLiteral("中文搜尋"), QStringLiteral("EndNeedle"), QStringLiteral("ABC")})
+    {
+        query->clear();
+        QElapsedTimer timer; timer.start();
+        qint64 first=-1, last=0, maxGap=0;
+        QTimer heartbeat;
+        connect(&heartbeat, &QTimer::timeout, this, [&]() { auto now=timer.elapsed(); maxGap=qMax(maxGap, now-last); last=now; });
+        heartbeat.start(10);
+        if (phrase == "ABC") { query->setText("A"); QTest::qWait(150); query->setText("AB"); QTest::qWait(150); }
+        query->setText(phrase);
+        while (status->text().startsWith("Searching") && timer.elapsed() < 60000)
+        {
+            QTest::qWait(1);
+            if (first < 0 && dialog->windowTitle().contains("1/")) first=timer.elapsed();
+        }
+        QVERIFY(timer.elapsed() < 60000);
+        qInfo() << "SEARCH_WARM" << phrase << "first_ms" << first << "complete_ms" << timer.elapsed() << "ui_gap_ms" << maxGap << status->text();
+        memory(qPrintable(phrase));
+        heartbeat.stop();
+    }
+    query->clear();
+    memory("clear");
+    dialog->reject();
+    controller->closeDocument();
+    QTest::qWait(100);
+    memory("closed");
 }
 
 void ViewerContextMenuTest::searchPerformanceBenchmark()

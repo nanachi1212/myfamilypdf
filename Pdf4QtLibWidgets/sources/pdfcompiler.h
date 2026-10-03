@@ -32,6 +32,8 @@
 #include <QFuture>
 #include <QFutureWatcher>
 #include <QWaitCondition>
+#include <atomic>
+#include <memory>
 
 template <class Key, class T>
 class QCache;
@@ -161,6 +163,22 @@ private:
     std::vector<PDFInteger> m_priorityPages; // Protected by m_mutex, like m_tasks.
 };
 
+/// Query-independent text produced by Find. The compiler owns the document
+/// session; one Find worker at a time reads/writes pages. The GUI may replace
+/// its shared owner on invalidation but never accesses the page vectors.
+class PDF4QTLIBWIDGETSSHARED_EXPORT PDFSearchTextCache
+{
+public:
+    explicit PDFSearchTextCache(size_t pageCount) : m_pages(pageCount) {}
+    const PDFTextFlows* getPage(PDFInteger pageIndex) const;
+    void setPage(PDFInteger pageIndex, PDFTextFlows&& flows);
+    size_t getCompletedPageCount() const { return m_completedPages.load(std::memory_order_relaxed); }
+
+private:
+    std::vector<std::optional<PDFTextFlows>> m_pages;
+    std::atomic<size_t> m_completedPages = 0;
+};
+
 class PDF4QTLIBWIDGETSSHARED_EXPORT PDFAsynchronousTextLayoutCompiler : public QObject
 {
     Q_OBJECT
@@ -224,7 +242,14 @@ public:
     /// Returns text layout storage (if it is ready), or nullptr
     const PDFTextLayoutStorage* getTextLayoutStorage() const { return isTextLayoutReady() ? &m_textLayouts.value() : nullptr; }
 
+    /// Only successful full-document extraction may seed the Find cache.
+    const PDFTextLayoutStorage* getVerifiedTextLayoutStorage() const { return m_textLayoutSucceeded ? getTextLayoutStorage() : nullptr; }
+
+    /// GUI thread only. Find captures the owner, never the compiler, in its worker.
+    std::shared_ptr<PDFSearchTextCache> acquireSearchTextCache();
+
 signals:
+    void textLayoutInvalidated();
     void textLayoutChanged();
 
 private:
@@ -234,8 +259,15 @@ private:
     State m_state = State::Inactive;
     bool m_isRunning;
     std::optional<PDFTextLayoutStorage> m_textLayouts;
-    QFuture<PDFTextLayoutStorage> m_textLayoutCompileFuture;
-    QFutureWatcher<PDFTextLayoutStorage> m_textLayoutCompileFutureWatcher;
+    std::shared_ptr<PDFSearchTextCache> m_searchTextCache;
+    struct TextLayoutResult
+    {
+        PDFTextLayoutStorage layouts;
+        bool succeeded = false;
+    };
+    bool m_textLayoutSucceeded = false;
+    QFuture<TextLayoutResult> m_textLayoutCompileFuture;
+    QFutureWatcher<TextLayoutResult> m_textLayoutCompileFutureWatcher;
     PDFTextLayoutCache m_cache;
 };
 

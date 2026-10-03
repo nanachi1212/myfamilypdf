@@ -354,13 +354,37 @@ void PDFAsynchronousPageCompiler::onPageCompiled()
     }
 }
 
+const PDFTextFlows* PDFSearchTextCache::getPage(PDFInteger pageIndex) const
+{
+    const auto& page = m_pages.at(size_t(pageIndex));
+    return page ? &*page : nullptr;
+}
+
+void PDFSearchTextCache::setPage(PDFInteger pageIndex, PDFTextFlows&& flows)
+{
+    auto& page = m_pages.at(size_t(pageIndex));
+    if (!page)
+    {
+        page.emplace(std::move(flows));
+        m_completedPages.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
+std::shared_ptr<PDFSearchTextCache> PDFAsynchronousTextLayoutCompiler::acquireSearchTextCache()
+{
+    Q_ASSERT(QThread::currentThread() == thread());
+    if (!m_searchTextCache)
+        m_searchTextCache = std::make_shared<PDFSearchTextCache>(m_proxy->getDocument()->getCatalog()->getPageCount());
+    return m_searchTextCache;
+}
+
 PDFAsynchronousTextLayoutCompiler::PDFAsynchronousTextLayoutCompiler(PDFDrawWidgetProxy* proxy) :
     BaseClass(proxy),
     m_proxy(proxy),
     m_isRunning(false),
     m_cache(std::bind(&PDFAsynchronousTextLayoutCompiler::createTextLayout, this, std::placeholders::_1))
 {
-    connect(&m_textLayoutCompileFutureWatcher, &QFutureWatcher<PDFTextLayoutStorage>::finished, this, &PDFAsynchronousTextLayoutCompiler::onTextLayoutCreated);
+    connect(&m_textLayoutCompileFutureWatcher, &QFutureWatcher<TextLayoutResult>::finished, this, &PDFAsynchronousTextLayoutCompiler::onTextLayoutCreated);
 }
 
 void PDFAsynchronousTextLayoutCompiler::start()
@@ -397,11 +421,15 @@ void PDFAsynchronousTextLayoutCompiler::stop(bool clearCache)
             // Stop the engine
             m_state = State::Stopping;
             m_textLayoutCompileFutureWatcher.waitForFinished();
+            onTextLayoutCreated();
 
             if (clearCache)
             {
                 m_textLayouts = std::nullopt;
+                m_textLayoutSucceeded = false;
                 m_cache.clear();
+                m_searchTextCache.reset();
+                Q_EMIT textLayoutInvalidated();
             }
 
             m_state = State::Inactive;
@@ -574,15 +602,17 @@ void PDFAsynchronousTextLayoutCompiler::makeTextLayout()
 
     PDFCMSPointer cms = m_proxy->getCMSManager()->getCurrentCMS();
 
-    auto createTextLayout = [this, cms, catalog]() -> PDFTextLayoutStorage
+    auto createTextLayout = [this, cms, catalog]() -> TextLayoutResult
     {
         PDFTextLayoutStorage result(catalog->getPageCount());
+        std::atomic_bool failed = false;
         QMutex mutex;
-        auto generateTextLayout = [this, &result, &mutex, cms, catalog](PDFInteger pageIndex)
+        auto generateTextLayout = [this, &result, &failed, &mutex, cms, catalog](PDFInteger pageIndex)
         {
             if (!catalog->getPage(pageIndex))
             {
                 // Invalid page index
+                failed.store(true, std::memory_order_relaxed);
                 result.setTextLayout(pageIndex, PDFTextLayout(), &mutex);
                 return;
             }
@@ -591,14 +621,14 @@ void PDFAsynchronousTextLayoutCompiler::makeTextLayout()
             Q_ASSERT(page);
 
             PDFTextLayoutGenerator generator(m_proxy->getFeatures(), page, m_proxy->getDocument(), m_proxy->getFontCache(), cms.data(), m_proxy->getOptionalContentActivity(), QTransform(), m_proxy->getMeshQualitySettings());
-            generator.processContents();
+            if (!generator.processContents().isEmpty()) failed.store(true, std::memory_order_relaxed);
             result.setTextLayout(pageIndex, generator.createTextLayout(), &mutex);
             m_proxy->getProgress()->step();
         };
 
         auto pageRange = PDFIntegerRange<PDFInteger>(0, catalog->getPageCount());
         PDFExecutionPolicy::execute(PDFExecutionPolicy::Scope::Page, pageRange.begin(), pageRange.end(), generateTextLayout);
-        return result;
+        return {std::move(result), !failed.load(std::memory_order_relaxed)};
     };
 
     Q_ASSERT(!m_textLayoutCompileFuture.isRunning());
@@ -608,11 +638,16 @@ void PDFAsynchronousTextLayoutCompiler::makeTextLayout()
 
 void PDFAsynchronousTextLayoutCompiler::onTextLayoutCreated()
 {
+    if (!m_isRunning || !m_textLayoutCompileFuture.isFinished()) return;
     m_proxy->getFontCache()->setCacheShrinkEnabled(this, true);
     m_proxy->getProgress()->finish();
     m_cache.clear();
 
-    m_textLayouts = m_textLayoutCompileFuture.result();
+    const auto result = m_textLayoutCompileFuture.result();
+    m_textLayouts = result.layouts;
+    m_textLayoutSucceeded = result.succeeded;
+    m_textLayoutCompileFuture = {};
+    m_textLayoutCompileFutureWatcher.setFuture({});
     m_isRunning = false;
     Q_EMIT textLayoutChanged();
 }
