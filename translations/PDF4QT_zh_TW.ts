@@ -2950,9 +2950,8 @@
         <translation>書籤</translation>
     </message>
     <message>
-        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.ui" line="305"/>
         <source>Notes</source>
-        <translation>備註</translation>
+        <translation>註解</translation>
     </message>
     <message>
         <location filename="../Pdf4QtLibGui/pdfsidebarwidget.ui" line="318"/>
@@ -3052,6 +3051,10 @@
     <message>
         <source>No folder</source>
         <translation>不放入資料夾</translation>
+    </message>
+    <message>
+        <source>No annotations</source>
+        <translation>無註解</translation>
     </message>
 </context>
 <context>
@@ -7103,6 +7106,14 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <location filename="../Pdf4QtLibWidgets/sources/pdfadvancedtools.cpp" line="98"/>
         <source>Enter text to be displayed in the sticky note</source>
         <translation>輸入要在便籤中顯示的文本</translation>
+    </message>
+    <message>
+        <source>Add Comment</source>
+        <translation>新增註解</translation>
+    </message>
+    <message>
+        <source>Comment</source>
+        <translation>註解內容</translation>
     </message>
 </context>
 <context>
@@ -11990,6 +12001,14 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <source>Copy Annotation onto Multiple Pages</source>
         <translation>複製註釋到多頁</translation>
     </message>
+    <message>
+        <source>Edit Annotation</source>
+        <translation>編輯註解</translation>
+    </message>
+    <message>
+        <source>Delete Annotation</source>
+        <translation>刪除註解</translation>
+    </message>
 </context>
 <context>
     <name>pdf::PDFXRefTable</name>
@@ -14106,6 +14125,26 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <translation> / %1</translation>
     </message>
     <message><source>Extract Pages...</source><translation>提取頁面(另存新文件)...</translation></message>
+    <message>
+        <source>Highlight</source>
+        <translation>螢光標記</translation>
+    </message>
+    <message>
+        <source>Underline</source>
+        <translation>底線</translation>
+    </message>
+    <message>
+        <source>Strikeout</source>
+        <translation>刪除線</translation>
+    </message>
+    <message>
+        <source>Add Comment</source>
+        <translation>新增註解</translation>
+    </message>
+    <message>
+        <source>Annotations</source>
+        <translation>註解</translation>
+    </message>
 </context>
 <context>
     <name>pdfviewer::PDFEncryptionSettingsDialog</name>
@@ -14947,6 +14986,34 @@ Do you want to perform this action?</source>
         <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="1317"/>
         <source>Inherit Zoom</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Annotations</source>
+        <translation>註解</translation>
+    </message>
+    <message>
+        <source>Search annotations</source>
+        <translation>搜尋註解</translation>
+    </message>
+    <message>
+        <source>Comment</source>
+        <translation>註解</translation>
+    </message>
+    <message>
+        <source>Annotation</source>
+        <translation>註解</translation>
+    </message>
+    <message>
+        <source>Highlight</source>
+        <translation>螢光標記</translation>
+    </message>
+    <message>
+        <source>Underline</source>
+        <translation>底線</translation>
+    </message>
+    <message>
+        <source>Strikeout</source>
+        <translation>刪除線</translation>
     </message>
 </context>
 <context>

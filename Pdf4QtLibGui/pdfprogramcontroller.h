@@ -25,6 +25,7 @@
 
 #include "pdfviewerglobal.h"
 #include "pdfdocument.h"
+#include "pdfannotation.h"
 #include "pdfsignaturehandler.h"
 #include "pdfdocumentreader.h"
 #include "pdfdocumentpropertiesdialog.h"
@@ -324,6 +325,8 @@ public:
     void writeSettings();
     void resetSettings();
     void clearRecentFileHistory();
+
+    void createSelectionMarkup(pdf::AnnotationType type);
 
     void performPrint();
     void performSave();

@@ -265,6 +265,21 @@ void PDFWidgetAnnotationManager::mousePressEvent(QWidget* widget, QMouseEvent* e
     }
 }
 
+bool PDFWidgetAnnotationManager::isEditingEnabled() const
+{
+    return m_editingEnabled && m_document &&
+        m_document->getStorage().getSecurityHandler()->isAllowed(PDFSecurityHandler::Permission::ModifyInteractiveItems);
+}
+
+bool PDFWidgetAnnotationManager::canEditAnnotation(PDFObjectReference reference) const
+{
+    if (!isEditingEnabled() || !reference.isValid()) return false;
+    const auto annotation = PDFAnnotation::parse(&m_document->getStorage(), reference);
+    return annotation && PDFAnnotation::isTypeEditable(annotation->getType()) &&
+        !annotation->getEffectiveFlags().testFlag(PDFAnnotation::ReadOnly) &&
+        !annotation->getEffectiveFlags().testFlag(PDFAnnotation::Locked);
+}
+
 void PDFWidgetAnnotationManager::showAnnotationMenu(PDFObjectReference annotationReference,
                                                     PDFObjectReference pageReference,
                                                     QPoint globalMenuPosition)
@@ -272,19 +287,22 @@ void PDFWidgetAnnotationManager::showAnnotationMenu(PDFObjectReference annotatio
     m_editableAnnotation = annotationReference;
     m_editableAnnotationPage = pageReference;
 
-    if (m_editableAnnotation.isValid())
+    if (m_document && m_editableAnnotation.isValid())
     {
+        const auto annotation = PDFAnnotation::parse(&m_document->getStorage(), m_editableAnnotation);
+        if (!annotation) return;
         PDFWidget* pdfWidget = m_proxy->getWidget();
 
         QMenu menu(tr("Annotation"), pdfWidget);
-        QAction* showPopupAction = menu.addAction(tr("Show Popup Window"));
-        QAction* copyAction = menu.addAction(tr("Copy to Multiple Pages"));
-        QAction* editAction = menu.addAction(tr("Edit"));
-        QAction* deleteAction = menu.addAction(tr("Delete"));
-        connect(showPopupAction, &QAction::triggered, this, &PDFWidgetAnnotationManager::onShowPopupAnnotation);
-        connect(copyAction, &QAction::triggered, this, &PDFWidgetAnnotationManager::onCopyAnnotation);
-        connect(editAction, &QAction::triggered, this, &PDFWidgetAnnotationManager::onEditAnnotation);
-        connect(deleteAction, &QAction::triggered, this, &PDFWidgetAnnotationManager::onDeleteAnnotation);
+        if (annotation->asMarkupAnnotation())
+            menu.addAction(tr("Show Popup Window"), this, &PDFWidgetAnnotationManager::onShowPopupAnnotation);
+        if (canEditAnnotation(m_editableAnnotation))
+        {
+            menu.addAction(tr("Copy to Multiple Pages"), this, &PDFWidgetAnnotationManager::onCopyAnnotation);
+            menu.addAction(tr("Edit Annotation"), this, &PDFWidgetAnnotationManager::onEditAnnotation)->setObjectName("editAnnotation");
+            menu.addAction(tr("Delete Annotation"), this, &PDFWidgetAnnotationManager::onDeleteAnnotation)->setObjectName("deleteAnnotation");
+        }
+        if (menu.isEmpty()) return;
 
         m_editableAnnotationGlobalPosition = globalMenuPosition;
         menu.exec(m_editableAnnotationGlobalPosition);
@@ -344,6 +362,7 @@ void PDFWidgetAnnotationManager::mouseDoubleClickEvent(QWidget* widget, QMouseEv
 
 bool PDFWidgetAnnotationManager::canAcceptAnnotationDrag(const QMimeData* data) const
 {
+    if (!isEditingEnabled()) return false;
     AnnotationDragPayload payload;
     if (!deserializePayload(data, payload))
     {
@@ -361,11 +380,12 @@ bool PDFWidgetAnnotationManager::canAcceptAnnotationDrag(const QMimeData* data) 
         return false;
     }
 
-    return annotation->getType() != AnnotationType::Link;
+    return annotation->getType() != AnnotationType::Link && canEditAnnotation(payload.annotationReference);
 }
 
 bool PDFWidgetAnnotationManager::handleAnnotationDrop(const QMimeData* data, const QPoint& widgetPos, Qt::DropAction action)
 {
+    if (!isEditingEnabled()) return false;
     AnnotationDragPayload payload;
     if (!deserializePayload(data, payload))
     {
@@ -378,7 +398,7 @@ bool PDFWidgetAnnotationManager::handleAnnotationDrop(const QMimeData* data, con
     }
 
     PDFAnnotationPtr annotation = PDFAnnotation::parse(&m_document->getStorage(), payload.annotationReference);
-    if (!annotation || annotation->getType() == AnnotationType::Link)
+    if (!annotation || annotation->getType() == AnnotationType::Link || !canEditAnnotation(payload.annotationReference))
     {
         return false;
     }
@@ -766,6 +786,7 @@ void PDFWidgetAnnotationManager::updateFromMouseEvent(QMouseEvent* event)
 
 bool PDFWidgetAnnotationManager::beginAnnotationDrag(QMouseEvent* event)
 {
+    if (!isEditingEnabled()) return false;
     if (!m_document)
     {
         return false;
@@ -1150,6 +1171,7 @@ void PDFWidgetAnnotationManager::onShowPopupAnnotation()
 
 void PDFWidgetAnnotationManager::onCopyAnnotation()
 {
+    if (!canEditAnnotation(m_editableAnnotation)) return;
     pdf::PDFSelectPagesDialog dialog(tr("Copy Annotation"), tr("Copy Annotation onto Multiple Pages"),
                                      m_document->getCatalog()->getPageCount(), m_proxy->getWidget()->getDrawWidget()->getCurrentPages(), m_proxy->getWidget());
     if (dialog.exec() == QDialog::Accepted)
@@ -1190,6 +1212,7 @@ void PDFWidgetAnnotationManager::onCopyAnnotation()
 
 void PDFWidgetAnnotationManager::onEditAnnotation()
 {
+    if (!canEditAnnotation(m_editableAnnotation)) return;
     PDFEditObjectDialog dialog(EditObjectType::Annotation, m_proxy->getWidget());
 
     PDFObject originalObject = m_document->getObjectByReference(m_editableAnnotation);
@@ -1215,6 +1238,7 @@ void PDFWidgetAnnotationManager::onEditAnnotation()
 
 void PDFWidgetAnnotationManager::onDeleteAnnotation()
 {
+    if (!canEditAnnotation(m_editableAnnotation)) return;
     if (m_editableAnnotation.isValid())
     {
         PDFDocumentModifier modifier(m_document);

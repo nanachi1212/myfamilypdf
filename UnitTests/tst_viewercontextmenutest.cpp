@@ -42,6 +42,12 @@
 #include "pdfwidgettool.h"
 #include "pdfdocumentreader.h"
 #include "pdfdocumentbuilder.h"
+#include "pdfannotation.h"
+#include "pdfwidgetannotation.h"
+#include <QToolButton>
+#include <QTreeView>
+#include <QTextBrowser>
+#include <QMimeData>
 #include <QtConcurrent/QtConcurrentRun>
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -154,6 +160,10 @@ private slots:
     void extractionRejectsInvalidInputAndCancellation();
     void readingPositionRestoresZoomAndClamps();
     void thumbnailSelectionAndPageManagement();
+    void annotationMarkupWorkflow_data();
+    void annotationMarkupWorkflow();
+    void annotationNoteWorkflow();
+    void annotationListLargeDocument();
 
 private:
     QAction* action(const char* name) const { return m_window->findChild<QAction*>(QLatin1String(name)); }
@@ -201,7 +211,7 @@ void ViewerContextMenuTest::init()
         return;
     }
 #endif
-    if (testFunction == "thumbnailSelectionAndPageManagement")
+    if (testFunction == "thumbnailSelectionAndPageManagement" || testFunction.startsWith("annotation"))
     {
         return;
     }
@@ -1314,6 +1324,397 @@ void ViewerContextMenuTest::traditionalChineseMenuAndSvgResources()
     painter.end();
     QCOMPARE(index, 16);
     saveImage(sheet, "semantic-icons.png");
+}
+
+
+namespace
+{
+QList<pdf::PDFAnnotationPtr> annotations(pdfviewer::PDFProgramController* controller, int pageIndex = 0)
+{
+    QList<pdf::PDFAnnotationPtr> result;
+    auto* doc = controller->getDocument();
+    if (!doc) return result;
+    const auto* page = doc->getCatalog()->getPage(pageIndex);
+    const auto* dictionary = doc->getDictionaryFromObject(doc->getObjectByReference(page->getPageReference()));
+    pdf::PDFDocumentDataLoaderDecorator loader(&doc->getStorage());
+    for (const auto ref : loader.readReferenceArrayFromDictionary(dictionary, "Annots"))
+        if (auto annotation = pdf::PDFAnnotation::parse(&doc->getStorage(), ref); annotation && annotation->asMarkupAnnotation()) result.append(annotation);
+    return result;
+}
+
+bool annotationSaveAs(pdfviewer::PDFProgramController* controller, QWidget* owner, const QString& path)
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    bool selected = false;
+    bool timedOut = false;
+    QTimer timer;
+    QTimer deadline;
+    deadline.setSingleShot(true);
+    QObject::connect(&deadline, &QTimer::timeout, owner, [&]() {
+        timedOut = true;
+        timer.stop();
+        for (auto* dialog : owner->findChildren<QDialog*>())
+            if (dialog->isVisible()) dialog->reject();
+    });
+    QObject::connect(&timer, &QTimer::timeout, owner, [&]() {
+        for (auto* dialog : owner->findChildren<QFileDialog*>())
+        {
+            if (!dialog->isVisible()) continue;
+            // selectFile() can preserve the focused, prefilled filename on
+            // Linux. Enter the destination in the actual nonnative widget.
+            dialog->setDirectory(QFileInfo(path).absolutePath());
+            dialog->selectFile(QFileInfo(path).fileName());
+            if (auto* filename = dialog->findChild<QLineEdit*>("fileNameEdit"))
+                filename->setText(path);
+            selected = dialog->selectedFiles().value(0) == path;
+            qInfo() << "Annotation Save As destination" << dialog->selectedFiles();
+            timer.stop();
+            if (selected) static_cast<QDialog*>(dialog)->accept();
+            else dialog->reject();
+            return;
+        }
+    });
+    deadline.start(5000);
+    timer.start(10);
+    controller->performSaveAs();
+    return selected && !timedOut;
+}
+
+void annotationMenu(pdf::PDFWidgetAnnotationManager* manager, pdf::PDFObjectReference reference,
+                    pdf::PDFObjectReference page, QWidget* owner, const char* actionName,
+                    bool& found)
+{
+    QTimer timer;
+    QObject::connect(&timer, &QTimer::timeout, owner, [&]() {
+        if (auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget()))
+        {
+            timer.stop();
+            auto* action = menu->findChild<QAction*>(QLatin1String(actionName));
+            found = action != nullptr;
+            menu->close();
+            if (action) action->trigger();
+        }
+    });
+    timer.start(10);
+    manager->showAnnotationMenu(reference, page, owner->mapToGlobal(QPoint(100, 100)));
+}
+}
+
+void ViewerContextMenuTest::annotationMarkupWorkflow_data()
+{
+    QTest::addColumn<int>("type");
+    QTest::newRow("highlight") << int(pdf::AnnotationType::Highlight);
+    QTest::newRow("underline") << int(pdf::AnnotationType::Underline);
+    QTest::newRow("strikeout") << int(pdf::AnnotationType::StrikeOut);
+}
+
+void ViewerContextMenuTest::annotationMarkupWorkflow()
+{
+    QFETCH(int, type);
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    const QString path = m_temp.filePath(QString("markup-%1.pdf").arg(type));
+    QVERIFY(writePdfFixture(path, 3, 2));
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    auto* widget = controller->getPdfWidget();
+    auto* drawProxy = widget->getDrawWidgetProxy();
+    auto* tree = editor.findChild<QTreeView*>("notesTreeView");
+    auto* filter = editor.findChild<QLineEdit*>("notesSearchLineEdit");
+    auto* notesButton = editor.findChild<QToolButton*>("notesButton");
+    QVERIFY(tree && filter && notesButton);
+    QCOMPARE(tree->model()->rowCount(), 0);
+    QVERIFY(notesButton->isEnabled());
+    editor.findChild<QAction*>("actionSelectText")->trigger();
+    QTRY_VERIFY_WITH_TIMEOUT(drawProxy->getTextLayoutCompiler()->isTextLayoutReady(), 15000);
+    editor.findChild<QAction*>("actionSelectTextAll")->trigger();
+    QVERIFY(!controller->getToolManager()->getSelectedText().isEmpty());
+    const auto originalPage = controller->getDocument()->getCatalog()->getPage(0)->getPageReference();
+    const auto* dictionary = controller->getDocument()->getDictionaryFromObject(controller->getDocument()->getObjectByReference(originalPage));
+    const auto originalContents = controller->getDocument()->getObject(dictionary->get("Contents"));
+
+    // Exercise the actual Editor context menu, using the active text selection.
+    bool clicked = false;
+    QTimer timer;
+    connect(&timer, &QTimer::timeout, &editor, [&]() {
+        if (auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget()))
+        {
+            timer.stop();
+            auto* mark = menu->findChild<QAction*>(QString("selectionMarkup%1").arg(type));
+            QVERIFY(mark && mark->isEnabled());
+            clicked = true;
+            menu->close();
+            mark->trigger();
+        }
+    });
+    timer.start(10);
+    Q_EMIT widget->customContextMenuRequested(QPoint(100, 100));
+    QVERIFY(clicked);
+    QCOMPARE(tree->model()->rowCount(), 3); // One annotation per page, ordered by page.
+    for (int page = 0; page < 3; ++page)
+    {
+        const auto items = annotations(controller, page);
+        QCOMPARE(items.size(), 1);
+        QCOMPARE(int(items.front()->getType()), type);
+        QVERIFY(items.front()->getContents().contains(QString("FamilyPDF smoke page %1").arg(page + 1)));
+        const auto* markup = dynamic_cast<const pdf::PDFHighlightAnnotation*>(items.front().data());
+        QVERIFY(markup);
+        QCOMPARE(markup->getHiglightArea().getQuadrilaterals().size(), size_t(2));
+        QVERIFY(markup->getRectangle().isValid());
+        auto* doc = controller->getDocument();
+        const auto* dict = doc->getDictionaryFromObject(doc->getObjectByReference(items.front()->getSelfReference()));
+        const auto* appearance = doc->getDictionaryFromObject(dict->get("AP"));
+        QVERIFY(appearance && doc->getObject(appearance->get("N")).isStream());
+        QVERIFY(tree->model()->index(page, 0).data().toString().contains(QString::number(page + 1)));
+    }
+    const auto* currentDictionary = controller->getDocument()->getDictionaryFromObject(controller->getDocument()->getObjectByReference(originalPage));
+    QCOMPARE(controller->getDocument()->getObject(currentDictionary->get("Contents")), originalContents);
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QCOMPARE(tree->model()->rowCount(), 0);
+    editor.findChild<QAction*>("actionRedo")->trigger();
+    QCOMPARE(tree->model()->rowCount(), 3);
+    filter->setText("SMOKE PAGE 2");
+    QCOMPARE(tree->model()->rowCount(), 1);
+    filter->clear();
+    QCOMPARE(tree->model()->rowCount(), 3);
+    editor.findChild<QDockWidget*>("SidebarDockWidget")->show();
+    notesButton->click();
+    drawProxy->zoom(2.0);
+    Q_EMIT tree->clicked(tree->model()->index(2, 0));
+    QTRY_VERIFY([&]() { const auto pages = widget->getDrawWidget()->getCurrentPages(); return std::find(pages.begin(), pages.end(), 2) != pages.end(); }());
+    const QRectF annotationRect = annotations(controller, 2).front()->getRectangle();
+    bool visible = false;
+    for (const auto& item : drawProxy->getSnapshot().items)
+        if (item.pageIndex == 2)
+            visible = widget->getDrawWidget()->getWidget()->rect().intersects(item.pageToDeviceMatrix.mapRect(annotationRect).toAlignedRect());
+    QVERIFY(visible);
+
+    controller->performSave();
+    controller->closeDocument();
+    QCOMPARE(tree->model()->rowCount(), 0);
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QCOMPARE(annotations(controller, 0).size(), 1);
+    QCOMPARE(annotations(controller, 2).size(), 1);
+    const QString copyPath = m_temp.filePath(QString("markup-save-as-%1.pdf").arg(type));
+    QVERIFY(annotationSaveAs(controller, &editor, copyPath));
+    QVERIFY(QFile::exists(copyPath));
+    controller->closeDocument();
+    controller->openDocument(copyPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QCOMPARE(int(annotations(controller).front()->getType()), type);
+
+    // A real drag selects only the requested part of two lines, even over an existing mark.
+    drawProxy->goToPage(0);
+    editor.findChild<QAction*>("actionFitPage")->trigger();
+    editor.findChild<QAction*>("actionSelectText")->trigger();
+    QTRY_VERIFY_WITH_TIMEOUT(drawProxy->getTextLayoutCompiler()->isTextLayoutReady(), 15000);
+    QTRY_VERIFY(!drawProxy->getSnapshot().items.empty());
+    const auto matrix = drawProxy->getSnapshot().items.front().pageToDeviceMatrix;
+    auto* draw = widget->getDrawWidget()->getWidget();
+    const QPoint start = matrix.map(QPointF(60, 541)).toPoint();
+    const QPoint end = matrix.map(QPointF(180, 521)).toPoint();
+    QTest::mousePress(draw, Qt::LeftButton, Qt::NoModifier, start);
+    QTest::mouseMove(draw, end);
+    QTest::mouseRelease(draw, Qt::LeftButton, Qt::NoModifier, end);
+    const auto partialSelection = controller->getToolManager()->getSelectedText();
+    QVERIFY(!partialSelection.isEmpty());
+    auto layout = drawProxy->getTextLayoutCompiler()->getTextLayoutLazy(0);
+    QPolygonF expectedQuads;
+    pdf::PDFTextSelectionPainter selectionPainter(&partialSelection);
+    selectionPainter.prepareGeometry(0, layout, QTransform(), &expectedQuads);
+    controller->createSelectionMarkup(pdf::AnnotationType(type));
+    QCOMPARE(annotations(controller).size(), 2);
+    QCOMPARE(annotations(controller, 1).size(), 1);
+    const auto partialItems = annotations(controller);
+    const auto* partial = dynamic_cast<const pdf::PDFHighlightAnnotation*>(partialItems.back().data());
+    QVERIFY(partial);
+    QCOMPARE(partial->getHiglightArea().getQuadrilaterals().size(), size_t(expectedQuads.size() / 4));
+    for (size_t i = 0; i < partial->getHiglightArea().getQuadrilaterals().size(); ++i)
+        for (int corner = 0; corner < 4; ++corner)
+            QCOMPARE(partial->getHiglightArea().getQuadrilaterals()[i][corner], expectedQuads[int(i) * 4 + corner]);
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QCOMPARE(annotations(controller).size(), 1);
+    controller->performSave();
+
+    pdfviewer::PDFViewerMainWindow viewer;
+    viewer.show();
+    auto* reader = viewer.getProgramController();
+    reader->openDocument(copyPath);
+    QTRY_VERIFY_WITH_TIMEOUT(reader->getDocument(), 15000);
+    auto* manager = reader->getPdfWidget()->getDrawWidgetProxy()->getAnnotationManager();
+    QVERIFY(!manager->isEditingEnabled());
+    bool editFound = true;
+    annotationMenu(manager, annotations(reader).front()->getSelfReference(), reader->getDocument()->getCatalog()->getPage(0)->getPageReference(), &viewer, "editAnnotation", editFound);
+    QVERIFY(!editFound);
+    bool deleteFound = true;
+    annotationMenu(manager, annotations(reader).front()->getSelfReference(), reader->getDocument()->getCatalog()->getPage(0)->getPageReference(), &viewer, "deleteAnnotation", deleteFound);
+    QVERIFY(!deleteFound);
+    QMimeData mime;
+    QVERIFY(!manager->canAcceptAnnotationDrag(&mime));
+    QVERIFY(!manager->handleAnnotationDrop(&mime, QPoint(), Qt::MoveAction));
+    reader->createSelectionMarkup(pdf::AnnotationType(type));
+    QCOMPARE(annotations(reader).size(), 1);
+    QTRY_COMPARE(reader->getPdfWidget()->getPageRenderingErrorCount(), 0);
+    reader->closeDocument();
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::annotationNoteWorkflow()
+{
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    const QString path = m_temp.filePath("note-workflow.pdf");
+    QVERIFY(writePdfFixture(path, 3));
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    auto* widget = controller->getPdfWidget();
+    auto* drawProxy = widget->getDrawWidgetProxy();
+    auto* manager = drawProxy->getAnnotationManager();
+    auto* tree = editor.findChild<QTreeView*>("notesTreeView");
+    auto* filter = editor.findChild<QLineEdit*>("notesSearchLineEdit");
+    const QString contents = QString::fromUtf8("中文註解 English comment\n第二行");
+    editor.findChild<QAction*>("actionFitPage")->trigger();
+    QTRY_VERIFY(!drawProxy->getSnapshot().items.empty());
+    const QPoint point = drawProxy->getSnapshot().items.front().pageToDeviceMatrix.map(QPointF(100, 300)).toPoint();
+    bool entered = false;
+    QTimer inputTimer;
+    connect(&inputTimer, &QTimer::timeout, &editor, [&]() {
+        if (auto* dialog = qobject_cast<QInputDialog*>(QApplication::activeModalWidget()))
+        {
+            inputTimer.stop(); entered = true;
+            dialog->setTextValue(contents);
+            dialog->accept();
+        }
+    });
+    editor.findChild<QAction*>("actionStickyNoteNote")->trigger();
+    inputTimer.start(10);
+    QTest::mouseMove(widget->getDrawWidget()->getWidget(), point);
+    QTest::mouseClick(widget->getDrawWidget()->getWidget(), Qt::LeftButton, Qt::NoModifier, point);
+    QVERIFY(entered);
+    QCOMPARE(annotations(controller).size(), 1);
+    QCOMPARE(annotations(controller).front()->getType(), pdf::AnnotationType::Text);
+    QCOMPARE(annotations(controller).front()->getContents(), contents);
+    QCOMPARE(tree->model()->rowCount(), 1);
+    controller->performSave();
+    controller->closeDocument();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QCOMPARE(annotations(controller).front()->getContents(), contents);
+    filter->setText(QString::fromUtf8("中文"));
+    QCOMPARE(tree->model()->rowCount(), 1);
+    filter->setText("ENGLISH");
+    QCOMPARE(tree->model()->rowCount(), 1);
+    filter->setText("absent");
+    QCOMPARE(tree->model()->rowCount(), 0);
+    filter->clear();
+
+    const auto reference = annotations(controller).front()->getSelfReference();
+    const auto page = controller->getDocument()->getCatalog()->getPage(0)->getPageReference();
+    const QString changed = QString::fromUtf8("修改後 Updated comment");
+    bool edited = false;
+    QTimer editTimer;
+    connect(&editTimer, &QTimer::timeout, &editor, [&]() {
+        if (auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget()))
+        {
+            for (auto* browser : dialog->findChildren<QTextBrowser*>())
+                if (browser->toPlainText() == contents)
+                {
+                    editTimer.stop();
+                    QVERIFY(!browser->isReadOnly());
+                    browser->setPlainText(changed);
+                    edited = true;
+                    dialog->accept();
+                    return;
+                }
+        }
+    });
+    editTimer.start(10);
+    bool found = false;
+    annotationMenu(manager, reference, page, &editor, "editAnnotation", found);
+    editTimer.stop();
+    QVERIFY(found && edited);
+    QCOMPARE(annotations(controller).front()->getContents(), changed);
+    filter->setText(QString::fromUtf8("修改後"));
+    QCOMPARE(tree->model()->rowCount(), 1);
+    filter->clear();
+    controller->performSave();
+    controller->closeDocument();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QCOMPARE(annotations(controller).front()->getContents(), changed);
+    annotationMenu(manager, annotations(controller).front()->getSelfReference(), page, &editor, "deleteAnnotation", found);
+    QVERIFY(found);
+    QCOMPARE(tree->model()->rowCount(), 0);
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QCOMPARE(annotations(controller).front()->getContents(), changed);
+    QCOMPARE(tree->model()->rowCount(), 1);
+    editor.findChild<QAction*>("actionRedo")->trigger();
+    QCOMPARE(annotations(controller).size(), 0);
+    controller->performSave();
+    controller->closeDocument();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QCOMPARE(annotations(controller).size(), 0);
+
+    // Unsupported and malformed annotation entries cannot poison the list.
+    pdf::PDFDocumentModifier modifier(controller->getDocument());
+    auto* builder = modifier.getBuilder();
+    const auto valid = builder->createAnnotationText(page, QRectF(50, 50, 24, 24), pdf::TextAnnotationIcon::Note, QString(), QString(), contents, false);
+    const auto invalid = builder->createAnnotationText(page, QRectF(90, 50, 24, 24), pdf::TextAnnotationIcon::Note, QString(), QString(), QString(), false);
+    builder->setObject(invalid, pdf::PDFObject());
+    const auto unsupported = builder->createAnnotationText(page, QRectF(130, 50, 24, 24), pdf::TextAnnotationIcon::Note, QString(), QString(), QString(), false);
+    pdf::PDFObjectFactory factory;
+    factory.beginDictionary(); factory.beginDictionaryItem("Subtype"); factory << pdf::PDFObject::createName("UnsupportedV5"); factory.endDictionaryItem(); factory.endDictionary();
+    builder->mergeTo(unsupported, factory.takeObject());
+    Q_UNUSED(valid);
+    modifier.markAnnotationsChanged();
+    QVERIFY(modifier.finalize());
+    controller->onDocumentModified(pdf::PDFModifiedDocument(modifier.getDocument(), nullptr, modifier.getFlags()));
+    QCOMPARE(tree->model()->rowCount(), 1);
+    filter->setText("absent");
+    controller->closeDocument();
+    QCOMPARE(tree->model()->rowCount(), 0);
+    QVERIFY(filter->text().isEmpty());
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QCOMPARE(tree->model()->rowCount(), 0);
+    controller->closeDocument();
+}
+
+
+void ViewerContextMenuTest::annotationListLargeDocument()
+{
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    const QString path = m_temp.filePath("annotations-500-pages.pdf");
+    QVERIFY(writePdfFixture(path, 500));
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    pdf::PDFDocumentModifier modifier(controller->getDocument());
+    for (int page = 0; page < 500; page += 5)
+        modifier.getBuilder()->createAnnotationText(controller->getDocument()->getCatalog()->getPage(page)->getPageReference(),
+            QRectF(50, 50, 24, 24), pdf::TextAnnotationIcon::Comment, QString(), QString(),
+            QString::fromUtf8("中文 Comment %1").arg(page), false);
+    modifier.markAnnotationsChanged();
+    QVERIFY(modifier.finalize());
+    QElapsedTimer timer;
+    timer.start();
+    controller->onDocumentModified(pdf::PDFModifiedDocument(modifier.getDocument(), nullptr, modifier.getFlags()));
+    auto* tree = editor.findChild<QTreeView*>("notesTreeView");
+    QCOMPARE(tree->model()->rowCount(), 100);
+    qInfo() << "500-page / 100-note list refresh ms:" << timer.elapsed();
+    timer.restart();
+    editor.findChild<QLineEdit*>("notesSearchLineEdit")->setText("Comment 495");
+    QCOMPARE(tree->model()->rowCount(), 1);
+    qInfo() << "Annotation filter ms:" << timer.elapsed();
+    controller->closeDocument();
 }
 
 QTEST_MAIN(ViewerContextMenuTest)

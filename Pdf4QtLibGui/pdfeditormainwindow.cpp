@@ -49,6 +49,7 @@
 #include "pdfwidgetutils.h"
 #include "pdfactioncombobox.h"
 #include "pdfsessionmanager.h"
+#include "pdfwidgetannotation.h"
 
 #include <QPainter>
 #include <QFileDialog>
@@ -341,6 +342,8 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     m_programController->initialize(PDFProgramController::AllFeatures, this, this, m_actionManager, m_progress);
     setCentralWidget(m_programController->getPdfWidget());
     setFocusProxy(m_programController->getPdfWidget());
+    m_programController->getPdfWidget()->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_programController->getPdfWidget(), &QWidget::customContextMenuRequested, this, &PDFEditorMainWindow::onPdfContextMenuRequested);
 
     m_sidebarWidget = new PDFSidebarWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), m_programController->getTextToSpeech(), m_programController->getCertificateStore(), m_programController->getBookmarkManager(), m_programController->getSettings(), true, this);
     m_sidebarDockWidget = new QDockWidget(tr("&Sidebar"), this);
@@ -417,6 +420,39 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
 #ifndef NDEBUG
     pdf::PDFWidgetUtils::checkMenuAccessibility(this);
 #endif
+}
+
+void PDFEditorMainWindow::onPdfContextMenuRequested(const QPoint& pos)
+{
+    auto* widget = m_programController->getPdfWidget();
+    QMenu menu(widget);
+    menu.addAction(ui->actionCopyText);
+    menu.addAction(ui->actionSelectTextAll);
+    menu.addAction(ui->actionDeselectText);
+    menu.addSeparator();
+    const bool canMark = ui->actionCopyText->isEnabled() && ui->actionCreateTextHighlight->isEnabled();
+    const std::pair<pdf::AnnotationType, QString> markups[] = {
+        { pdf::AnnotationType::Highlight, tr("Highlight") },
+        { pdf::AnnotationType::Underline, tr("Underline") },
+        { pdf::AnnotationType::StrikeOut, tr("Strikeout") }
+    };
+    for (const auto& markup : markups)
+    {
+        QAction* action = menu.addAction(markup.second, this, [this, type = markup.first]() {
+            m_programController->createSelectionMarkup(type);
+        });
+        action->setObjectName(QStringLiteral("selectionMarkup%1").arg(int(markup.first)));
+        action->setEnabled(canMark);
+    }
+    menu.addSeparator();
+    QAction* note = menu.addAction(tr("Add Comment"), m_actionManager->getAction(PDFActionManager::CreateStickyNoteNote), &QAction::trigger);
+    note->setEnabled(m_actionManager->getAction(PDFActionManager::CreateStickyNoteNote)->isEnabled());
+    menu.addAction(ui->actionSelectText);
+    menu.addAction(tr("Annotations"), this, [this]() {
+        m_sidebarDockWidget->show();
+        m_sidebarWidget->selectPage(PDFSidebarWidget::Notes);
+    })->setEnabled(m_programController->getDocument());
+    menu.exec(widget->mapToGlobal(pos));
 }
 
 PDFEditorMainWindow::~PDFEditorMainWindow()

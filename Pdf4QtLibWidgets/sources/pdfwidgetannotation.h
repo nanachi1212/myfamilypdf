@@ -81,6 +81,9 @@ public:
                             pdf::PDFObjectReference pageReference,
                             QPoint globalMenuPosition);
 
+    void setEditingEnabled(bool enabled) { m_editingEnabled = enabled; }
+    bool isEditingEnabled() const;
+
     bool canAcceptAnnotationDrag(const QMimeData* data) const;
     bool handleAnnotationDrop(const QMimeData* data, const QPoint& widgetPos, Qt::DropAction action);
 
@@ -133,6 +136,9 @@ private:
     PDFDrawWidgetProxy* m_proxy;
     QString m_tooltip;
     std::optional<QCursor> m_cursor;
+    bool m_editingEnabled = false;
+    bool canEditAnnotation(PDFObjectReference reference) const;
+
     QPoint m_editableAnnotationGlobalPosition; ///< Position, where action on annotation was executed
     PDFObjectReference m_editableAnnotation;    ///< Annotation to be edited or deleted
     PDFObjectReference m_editableAnnotationPage;    ///< Page of annotation above

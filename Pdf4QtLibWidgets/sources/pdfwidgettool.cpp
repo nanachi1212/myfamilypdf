@@ -904,6 +904,13 @@ void PDFSelectTextTool::mousePressEvent(QWidget* widget, QMouseEvent* event)
 {
     Q_UNUSED(widget);
 
+    if (event->button() == Qt::RightButton && !m_textSelection.isEmpty())
+    {
+        // Keep the selection context menu reachable over existing annotations.
+        event->accept();
+        return;
+    }
+
     if (event->button() == Qt::LeftButton)
     {
         QPointF pagePoint;
@@ -1084,6 +1091,13 @@ void PDFSelectTextTool::setSelection(PDFTextSelection&& textSelection)
         getProxy()->repaintNeeded();
         updateActions();
     }
+}
+
+PDFTextSelection PDFToolManager::getSelectedText() const
+{
+    if (auto* tool = qobject_cast<PDFSelectTextTool*>(getActiveTool()))
+        return tool->getSelection();
+    return PDFTextSelection();
 }
 
 PDFToolManager::PDFToolManager(PDFDrawWidgetProxy* proxy, Actions actions, QObject* parent, QWidget* parentDialog) :
