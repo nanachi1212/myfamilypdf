@@ -52,7 +52,7 @@
 namespace
 {
 
-bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool withText = true, bool unicode = false)
+bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool withText = true, bool unicode = false, bool malformed = false)
 {
     const int fontObject = 3 + pageCount * 2;
     QByteArray kids;
@@ -77,6 +77,7 @@ bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool wit
                     + (unicode ? QByteArray("ABCD 2026 ABCD") : QByteArray("FamilyPDF smoke page ") + QByteArray::number(page+1)) + ") Tj ET\n";
         else
             stream = "q 0.7 g 20 20 300 500 re f Q\n";
+        if (malformed && page == 0) stream += "Q\n"; // Unbalanced restore after valid text.
         objects << QByteArray("<< /Length ") + QByteArray::number(stream.size())
                        + " >>\nstream\n" + stream + "endstream";
     }
@@ -147,6 +148,7 @@ private slots:
     void searchCacheReuse_data() { searchExperience_data(); }
     void searchCacheReuse();
     void searchEditorContentInvalidation();
+    void searchRejectsPartialLegacyLayout();
     void searchPerformanceBenchmark();
     void searchWarmCacheBenchmark();
     void extractionRejectsInvalidInputAndCancellation();
@@ -507,6 +509,7 @@ void ViewerContextMenuTest::searchCacheReuse()
     QCOMPARE(compiler->acquireSearchTextCache()->getCompletedPageCount(), size_t(0));
     compiler->makeTextLayout();
     QTRY_VERIFY(compiler->isTextLayoutReady());
+    QVERIFY(compiler->getVerifiedTextLayoutStorage());
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
     window->findChild<QAction*>("actionFind")->trigger();
     dialog = window->findChild<QDialog*>("findDialog");
@@ -562,6 +565,34 @@ void ViewerContextMenuTest::searchEditorContentInvalidation()
     dialog = editor.findChild<QDialog*>("findDialog");
     dialog->findChild<QLineEdit*>("findQuery")->setText("FamilyPDF");
     QTRY_COMPARE(dialog->findChild<QLabel*>("findStatus")->text(), QString("1 / 3"));
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::searchRejectsPartialLegacyLayout()
+{
+    const QString path = m_temp.filePath("partial-legacy-layout.pdf");
+    QVERIFY(writePdfFixture(path, 3, 1, true, false, true));
+    auto* controller = m_window->getProgramController();
+    controller->closeDocument();
+    controller->openDocument(path);
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_VERIFY(!controller->getIsBusy());
+    auto* compiler = proxy()->getTextLayoutCompiler();
+    compiler->makeTextLayout();
+    QTRY_VERIFY(compiler->isTextLayoutReady());
+    QVERIFY(!compiler->getTextLayoutStorage()->getTextLayout(0).getTextBlocks().empty());
+    QVERIFY(!compiler->getVerifiedTextLayoutStorage());
+    action("actionFind")->trigger();
+    auto* dialog = m_window->findChild<QDialog*>("findDialog");
+    auto* query = dialog->findChild<QLineEdit*>("findQuery");
+    auto* status = dialog->findChild<QLabel*>("findStatus");
+    query->setText("FamilyPDF");
+    QTRY_COMPARE(status->text(), QString("Search incomplete. 1 / 3"));
+    auto cache = compiler->acquireSearchTextCache();
+    QCOMPARE(cache->getCompletedPageCount(), size_t(2));
+    query->setText("smoke");
+    QTRY_COMPARE(status->text(), QString("Search incomplete. 1 / 3"));
+    QCOMPARE(cache->getCompletedPageCount(), size_t(2));
     controller->closeDocument();
 }
 

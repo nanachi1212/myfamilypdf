@@ -672,7 +672,7 @@ void PDFFindTextTool::performSearch()
     // Existing completed layout storage uses implicitly shared compressed bytes.
     // This snapshot survives document closure without touching a GUI-owned pointer.
     std::optional<PDFTextLayoutStorage> layouts;
-    if (const auto* ready = compiler->getTextLayoutStorage()) layouts = *ready;
+    if (const auto* ready = compiler->getVerifiedTextLayoutStorage()) layouts = *ready;
     std::vector<std::pair<PDFObjectReference, OCState>> states;
     const auto* activity = getProxy()->getOptionalContentActivity();
     const auto* properties = document->getCatalog()->getOptionalContentProperties();
@@ -722,9 +722,7 @@ void PDFFindTextTool::performSearch()
                     bool completed = true;
                     if (layouts)
                         layout = layouts->getTextLayout(pageIndex);
-                    // Legacy layouts do not record extraction failures. Verify empty
-                    // pages before treating them as a successfully absent text layer.
-                    if (!layouts || layout.getTextBlocks().empty())
+                    else
                     {
                         PDFTextLayoutGenerator generator(features, page, document.get(), &fonts, cms.data(), &activity, QTransform(), quality);
                         generator.setOperationControl(&control);

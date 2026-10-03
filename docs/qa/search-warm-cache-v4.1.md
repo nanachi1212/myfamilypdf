@@ -14,7 +14,7 @@ The compiler owns one shared search-cache object. At most one Find worker access
 
 `stop(true)` replaces the cache owner through the existing reset/page-content/optional-content/features invalidation path and cancels/restarts an active query. An old worker owns its document snapshot and retired cache, so it cannot populate a new document's cache. The existing query generation gate rejects stale batches. Destruction cancels and joins the Find worker. Weak-owner tests verify that document close actually releases the cache, and reopen gets a different empty owner.
 
-The legacy layout future is consumed before invalidation and then released. Its later queued completion cannot reinstall an old document's layout. Editor content replacement and Undo exercise this path. Legacy completed layouts have no extraction-error provenance, so empty layouts are verified through extraction before asserting that a document has no text layer.
+The legacy layout future is consumed before invalidation and then released. Its later queued completion cannot reinstall an old document's layout. Editor content replacement and Undo exercise this path. The legacy layout result now carries full-extraction success provenance. Find reuses that storage only when every page succeeded; otherwise it uses normal extraction and caches only successful pages. A malformed page containing valid text followed by an invalid graphics-state restore verifies that partial legacy text never becomes a successful warm-cache entry.
 
 ## Windows Release evidence
 
@@ -56,3 +56,5 @@ Cold-search working-set growth is 145.13 MiB Viewer / 144.36 MiB Editor, versus 
 - New cache tests cover successful empty pages, shared ownership, cancelled partial-page reuse, completed warm reuse, legacy full-layout reuse, document-close release, content replacement, stale legacy completion and Undo invalidation.
 - Release build completed using the existing build script. The deployed `dist/FamilyPDF` has 80 x64 PE binaries with no missing direct/delay imports, including Qt/FFmpeg/plugins. Desktop smoke uses only Windows/System32 and Windows on PATH and rejects developer-toolchain DLL loads.
 - Local artifacts, fixtures, timing logs and screenshots remain under ignored `build/search-v4.1`. `.ai-memory.toml` is untouched. Full tests are delegated to the existing CI jobs.
+
+- One Codex GitHub review identified partial legacy-layout success provenance (P2). The consolidated fix adds verified extraction status and `searchRejectsPartialLegacyLayout`; the follow-up targeted suite passed 11 tests, including cancellation/lifetime and Editor invalidation. No repeat review loop.

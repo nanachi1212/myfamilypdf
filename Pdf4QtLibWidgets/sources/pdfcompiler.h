@@ -242,6 +242,9 @@ public:
     /// Returns text layout storage (if it is ready), or nullptr
     const PDFTextLayoutStorage* getTextLayoutStorage() const { return isTextLayoutReady() ? &m_textLayouts.value() : nullptr; }
 
+    /// Only successful full-document extraction may seed the Find cache.
+    const PDFTextLayoutStorage* getVerifiedTextLayoutStorage() const { return m_textLayoutSucceeded ? getTextLayoutStorage() : nullptr; }
+
     /// GUI thread only. Find captures the owner, never the compiler, in its worker.
     std::shared_ptr<PDFSearchTextCache> acquireSearchTextCache();
 
@@ -257,8 +260,14 @@ private:
     bool m_isRunning;
     std::optional<PDFTextLayoutStorage> m_textLayouts;
     std::shared_ptr<PDFSearchTextCache> m_searchTextCache;
-    QFuture<PDFTextLayoutStorage> m_textLayoutCompileFuture;
-    QFutureWatcher<PDFTextLayoutStorage> m_textLayoutCompileFutureWatcher;
+    struct TextLayoutResult
+    {
+        PDFTextLayoutStorage layouts;
+        bool succeeded = false;
+    };
+    bool m_textLayoutSucceeded = false;
+    QFuture<TextLayoutResult> m_textLayoutCompileFuture;
+    QFutureWatcher<TextLayoutResult> m_textLayoutCompileFutureWatcher;
     PDFTextLayoutCache m_cache;
 };
 
