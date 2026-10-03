@@ -1342,19 +1342,42 @@ QList<pdf::PDFAnnotationPtr> annotations(pdfviewer::PDFProgramController* contro
     return result;
 }
 
-void annotationSaveAs(pdfviewer::PDFProgramController* controller, QWidget* owner, const QString& path)
+bool annotationSaveAs(pdfviewer::PDFProgramController* controller, QWidget* owner, const QString& path)
 {
     QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    bool selected = false;
+    bool timedOut = false;
     QTimer timer;
-    QObject::connect(&timer, &QTimer::timeout, owner, [path]() {
-        if (auto* dialog = qobject_cast<QFileDialog*>(QApplication::activeModalWidget()))
+    QTimer deadline;
+    deadline.setSingleShot(true);
+    QObject::connect(&deadline, &QTimer::timeout, owner, [&]() {
+        timedOut = true;
+        timer.stop();
+        for (auto* dialog : owner->findChildren<QDialog*>())
+            if (dialog->isVisible()) dialog->reject();
+    });
+    QObject::connect(&timer, &QTimer::timeout, owner, [&]() {
+        for (auto* dialog : owner->findChildren<QFileDialog*>())
         {
-            dialog->selectFile(path);
-            static_cast<QDialog*>(dialog)->accept();
+            if (!dialog->isVisible()) continue;
+            // selectFile() can preserve the focused, prefilled filename on
+            // Linux. Enter the destination in the actual nonnative widget.
+            dialog->setDirectory(QFileInfo(path).absolutePath());
+            dialog->selectFile(QFileInfo(path).fileName());
+            if (auto* filename = dialog->findChild<QLineEdit*>("fileNameEdit"))
+                filename->setText(path);
+            selected = dialog->selectedFiles().value(0) == path;
+            qInfo() << "Annotation Save As destination" << dialog->selectedFiles();
+            timer.stop();
+            if (selected) static_cast<QDialog*>(dialog)->accept();
+            else dialog->reject();
+            return;
         }
     });
+    deadline.start(5000);
     timer.start(10);
     controller->performSaveAs();
+    return selected && !timedOut;
 }
 
 void annotationMenu(pdf::PDFWidgetAnnotationManager* manager, pdf::PDFObjectReference reference,
@@ -1476,7 +1499,7 @@ void ViewerContextMenuTest::annotationMarkupWorkflow()
     QCOMPARE(annotations(controller, 0).size(), 1);
     QCOMPARE(annotations(controller, 2).size(), 1);
     const QString copyPath = m_temp.filePath(QString("markup-save-as-%1.pdf").arg(type));
-    annotationSaveAs(controller, &editor, copyPath);
+    QVERIFY(annotationSaveAs(controller, &editor, copyPath));
     QVERIFY(QFile::exists(copyPath));
     controller->closeDocument();
     controller->openDocument(copyPath);
