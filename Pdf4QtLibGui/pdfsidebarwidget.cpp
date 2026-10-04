@@ -627,8 +627,7 @@ void PDFSidebarWidget::updateSignatures(const std::vector<pdf::PDFSignatureVerif
         QTreeWidgetItem* rootItem = new QTreeWidgetItem(QStringList(text));
 
         const bool verified = signature.isSignatureValid();
-        const bool invalid = signature.hasFlag(pdf::PDFSignatureVerificationResult::Error_Signature_DigestFailure)
-            || signature.hasFlag(pdf::PDFSignatureVerificationResult::Error_Signature_Invalid);
+        const bool invalid = signature.hasSignatureError();
         const QString validity = verified ? tr("Valid") : invalid ? tr("Invalid") : tr("Unknown");
         const QString trust = signature.isCertificateValid() ? tr("Trusted")
             : signature.hasCertificateError() ? tr("Untrusted") : tr("Unknown");

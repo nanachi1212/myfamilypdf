@@ -15,13 +15,17 @@ role; both applications display signature verification information.
 - Save and close commit the active editor. Save warns about empty required
   fields and allows saving an incomplete draft. Ctrl+S now works because the
   conflicting Notes sidebar shortcut was removed. Save/Undo/Redo shortcuts
-  first commit the active form edit.
+  first commit the active form edit, as do toolbar/menu Undo and Redo actions.
 - Edits use `PDFDocumentModifier`, the existing appearance API,
   `onDocumentModified` and `PDFUndoRedoManager`. No separate history or sidecar.
 - If `/NeedAppearances` is true, supported text/choice appearances are refreshed
   through `updateAnnotationAppearanceStreams`. The flag is cleared only when
   every widget has a usable normal appearance and each requested regeneration
   produced a new stream. Failed/unsupported regeneration preserves the flag.
+  Successful refreshes are remembered by stream contents within the document
+  session, so a malformed widget does not regenerate all other fields on every
+  edit. Undo/Redo changes are compared with those contents; document reset clears
+  the refresh cache.
   This fixes Edge discarding generated appearances and showing blank fields.
 
 ## Navigation and signatures

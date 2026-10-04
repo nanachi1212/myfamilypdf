@@ -1829,6 +1829,19 @@ void ViewerContextMenuTest::formWorkflow()
     editor.findChild<QAction*>("actionRedo")->trigger();
     QCOMPARE(workflowValue(manager, "name"), "Form value");
     QCOMPARE(appearance(), savedAppearance);
+    // Menu/toolbar actions must commit pending input before selecting history.
+    enter("name", "pending");
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QCOMPARE(workflowValue(manager, "name"), "Form value");
+    QCOMPARE(appearance(), savedAppearance);
+    editor.findChild<QAction*>("actionRedo")->trigger();
+    QCOMPARE(workflowValue(manager, "name"), "pending");
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    enter("name", "new branch");
+    editor.findChild<QAction*>("actionRedo")->trigger();
+    QCOMPARE(workflowValue(manager, "name"), "new branch");
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QCOMPARE(workflowValue(manager, "name"), "Form value");
     enter("name", "123456789012345"); manager->setFocusToEditor(nullptr);
     QCOMPARE(workflowValue(manager, "name").size(), 12);
     enter("multiline", "line1\nline2"); manager->setFocusToEditor(nullptr);
@@ -1942,6 +1955,18 @@ void ViewerContextMenuTest::signaturePresentation()
     result.addSignatureDigestFailureError();
     controller->setDocument(pdf::PDFModifiedDocument(controller->getDocument(), nullptr), {result}, true);
     QVERIFY(tree->topLevelItem(0)->text(0).contains("Invalid / Untrusted"));
+    for (const auto flag : {
+        pdf::PDFSignatureVerificationResult::Error_Signature_Invalid,
+        pdf::PDFSignatureVerificationResult::Error_Signature_SourceCertificateMissing,
+        pdf::PDFSignatureVerificationResult::Error_Signature_NoSignaturesFound,
+        pdf::PDFSignatureVerificationResult::Error_Signature_DataOther,
+        pdf::PDFSignatureVerificationResult::Error_Signature_DataCoveredBySignatureMissing})
+    {
+        pdf::PDFSignatureVerificationResult failed(pdf::PDFSignature::Type::Sig, signature, "signature");
+        failed.setFlag(flag, true);
+        controller->setDocument(pdf::PDFModifiedDocument(controller->getDocument(), nullptr), {failed}, true);
+        QVERIFY(tree->topLevelItem(0)->text(0).contains("Invalid / Unknown"));
+    }
     pdf::PDFSignatureVerificationResult unknown(pdf::PDFSignature::Type::Invalid, signature, "signature");
     unknown.addNoHandlerError("unsupported");
     controller->setDocument(pdf::PDFModifiedDocument(controller->getDocument(), nullptr), {unknown}, true);
@@ -2094,6 +2119,28 @@ void ViewerContextMenuTest::formAppearanceFallback()
     QCOMPARE(workflowValue(manager, "name"), "filled");
     // A stale AP left behind by a failed generator must not clear the request.
     QVERIFY(pdf::PDFForm::parse(controller->getDocument(), controller->getDocument()->getCatalog()->getFormObject()).isAppearanceUpdateNeeded());
+    auto normalAppearance = [&](const QString& name) {
+        const auto* doc = controller->getDocument();
+        const auto reference = workflowField(manager, name)->getWidgets().front().getWidget();
+        const auto* dictionary = doc->getDictionaryFromObject(doc->getObjectByReference(reference));
+        const auto* ap = doc->getDictionaryFromObject(dictionary->get("AP"));
+        return ap ? ap->get("N") : pdf::PDFObject();
+    };
+    const auto unchangedAppearance = normalAppearance("multiline");
+    QVERIFY(unchangedAppearance.isReference());
+    for (const QString& value : {QString("next"), QString("last")})
+    {
+        manager->setFocusToEditor(manager->getEditor(workflowField(manager, "name")));
+        QKeyEvent input(QEvent::KeyPress, 0, Qt::NoModifier, value);
+        manager->keyPressEvent(controller->getPdfWidget()->getDrawWidget()->getWidget(), &input);
+        manager->setFocusToEditor(nullptr);
+        QCOMPARE(workflowValue(manager, "name"), value);
+        // No new streams/resources for unrelated widgets on each failed retry.
+        QCOMPARE(normalAppearance("multiline"), unchangedAppearance);
+        editor.findChild<QAction*>("actionUndo")->trigger();
+        editor.findChild<QAction*>("actionRedo")->trigger();
+        QCOMPARE(normalAppearance("multiline"), unchangedAppearance);
+    }
     controller->performSave();
     controller->closeDocument();
 }

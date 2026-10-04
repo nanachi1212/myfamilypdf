@@ -654,6 +654,7 @@ void PDFFormManager::setDocument(const PDFModifiedDocument& document)
 
         if (document.hasReset())
         {
+            m_refreshedAppearances.clear();
             if (m_document)
             {
                 m_form = PDFForm::parse(m_document, m_document->getCatalog()->getFormObject());
@@ -811,7 +812,11 @@ void PDFFormManager::setFormFieldValue(PDFFormField::SetValueParameters paramete
                 const auto* previousAppearances = previousDictionary ? storage->getDictionaryFromObject(previousDictionary->get("AP")) : nullptr;
                 const PDFObject previousNormal = previousAppearances ? previousAppearances->get("N") : PDFObject();
                 const auto type = widget.getParent()->getFieldType();
-                const bool regenerate = type == PDFFormField::FieldType::Text || type == PDFFormField::FieldType::Choice;
+                const bool valueWidget = type == PDFFormField::FieldType::Text || type == PDFFormField::FieldType::Choice;
+                const auto cached = m_refreshedAppearances.find(widget.getWidget());
+                const bool alreadyRefreshed = cached != m_refreshedAppearances.end()
+                    && cached->second == storage->getObject(previousNormal);
+                const bool regenerate = valueWidget && !alreadyRefreshed;
                 if (regenerate)
                     builder->updateAnnotationAppearanceStreams(widget.getWidget());
                 const auto* dictionary = storage->getDictionaryFromObject(storage->getObjectByReference(widget.getWidget()));
@@ -828,6 +833,8 @@ void PDFFormManager::setFormFieldValue(PDFFormField::SetValueParameters paramete
                 // evidence that a requested appearance refresh was completed.
                 const bool refreshed = !regenerate || (appearances && appearances->get("N") != previousNormal);
                 complete = complete && available && refreshed;
+                if (valueWidget && available && refreshed)
+                    m_refreshedAppearances[widget.getWidget()] = normal;
             }
             if (complete)
             {

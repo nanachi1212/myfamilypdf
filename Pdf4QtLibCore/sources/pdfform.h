@@ -32,6 +32,7 @@
 #include <QTextLayout>
 
 #include <optional>
+#include <map>
 
 namespace pdf
 {
@@ -620,6 +621,9 @@ private:
     const PDFDocument* m_document;
     FormAppearanceFlags m_flags;
     PDFForm m_form;
+    // Successful refreshes while NeedAppearances remains set due to another
+    // widget. Match stream contents, not object numbers reused by Undo/Redo.
+    std::map<PDFObjectReference, PDFObject> m_refreshedAppearances;
     bool m_isCommitDisabled;
 
     PDFXFAEngine m_xfaEngine;

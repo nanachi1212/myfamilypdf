@@ -767,8 +767,14 @@ void PDFProgramController::initialize(Features features,
         m_undoRedoManager = new PDFUndoRedoManager(this);
         connect(m_undoRedoManager, &PDFUndoRedoManager::undoRedoStateChanged, this, &PDFProgramController::updateUndoRedoActions);
         connect(m_undoRedoManager, &PDFUndoRedoManager::documentChangeRequest, this, &PDFProgramController::onDocumentUndoRedo);
-        connect(m_actionManager->getAction(PDFActionManager::Undo), &QAction::triggered, m_undoRedoManager, &PDFUndoRedoManager::doUndo);
-        connect(m_actionManager->getAction(PDFActionManager::Redo), &QAction::triggered, m_undoRedoManager, &PDFUndoRedoManager::doRedo);
+        connect(m_actionManager->getAction(PDFActionManager::Undo), &QAction::triggered, this, [this]() {
+            if (m_formManager) m_formManager->setFocusToEditor(nullptr);
+            m_undoRedoManager->doUndo();
+        });
+        connect(m_actionManager->getAction(PDFActionManager::Redo), &QAction::triggered, this, [this]() {
+            if (m_formManager) m_formManager->setFocusToEditor(nullptr);
+            m_undoRedoManager->doRedo();
+        });
         updateUndoRedoSettings();
     }
 
