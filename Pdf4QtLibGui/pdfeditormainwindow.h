@@ -93,6 +93,7 @@ public:
     virtual void setDocument(const pdf::PDFModifiedDocument& document) override;
     virtual void adjustToolbar(QToolBar* toolbar) override final;
     virtual pdf::PDFTextSelection getSelectedText() const override;
+    virtual std::vector<pdf::PDFInteger> getSelectedPages() const override;
 
 protected:
     virtual void dragEnterEvent(QDragEnterEvent* event) override;

@@ -78,6 +78,9 @@ public:
     virtual void setDocument(const pdf::PDFModifiedDocument& document) = 0;
     virtual void adjustToolbar(QToolBar* toolbar) = 0;
     virtual pdf::PDFTextSelection getSelectedText() const = 0;
+
+    /// Returns pages selected in the page thumbnails (zero based, sorted, unique).
+    virtual std::vector<pdf::PDFInteger> getSelectedPages() const { return std::vector<pdf::PDFInteger>(); }
 };
 
 class PDF4QTLIBGUILIBSHARED_EXPORT PDFActionManager : public QObject
@@ -121,6 +124,7 @@ public:
         About,
         SendByMail,
         RenderToImages,
+        ExportPageImages,
         Optimize,
         OptimizeImages,
         Sanitize,
@@ -329,6 +333,10 @@ public:
     void createSelectionMarkup(pdf::AnnotationType type);
 
     void performPrint();
+    void printPages(const std::vector<pdf::PDFInteger>& pageIndices);
+    void exportPagesAsImages();
+    void exportPagesAsImages(const std::vector<pdf::PDFInteger>& pageIndices);
+    void exportSelectionAsImage();
     void performSave();
     void performSaveAs();
     void launchOcrPlugin();
@@ -369,6 +377,9 @@ private:
         std::vector<pdf::PDFSignatureVerificationResult> signatures;
         PDFSafeSaveService::Baseline safeSaveBaseline;
     };
+
+    void runPrintWorkflow(const std::vector<pdf::PDFInteger>& selectedPages, bool preferSelectedPages);
+    void runExportImagesWorkflow(const std::vector<pdf::PDFInteger>& selectedPages, bool preferSelectedPages);
 
     void initializeToolManager();
     void initializeAnnotationManager();
@@ -472,6 +483,7 @@ private:
 
     PDFActionManager* m_actionManager;
     QMainWindow* m_mainWindow;
+    bool m_isOutputWorkflowActive = false;   ///< Print/export is running with raw pointers into the document
     IMainWindow* m_mainWindowInterface;
     pdf::PDFWidget* m_pdfWidget;
     PDFViewerSettings* m_settings;

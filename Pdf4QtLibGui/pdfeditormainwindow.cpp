@@ -170,6 +170,7 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     m_actionManager->setAction(PDFActionManager::RotateRight, ui->actionRotateRight);
     m_actionManager->setAction(PDFActionManager::RotateLeft, ui->actionRotateLeft);
     m_actionManager->setAction(PDFActionManager::Print, ui->actionPrint);
+    m_actionManager->setAction(PDFActionManager::ExportPageImages, ui->actionExportPageImages);
     m_actionManager->setAction(PDFActionManager::Undo, ui->actionUndo);
     m_actionManager->setAction(PDFActionManager::Redo, ui->actionRedo);
     m_actionManager->setAction(PDFActionManager::Save, ui->actionSave);
@@ -356,6 +357,10 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     connect(m_sidebarWidget, &PDFSidebarWidget::documentModified, m_programController, &PDFProgramController::onDocumentModified);
     connect(m_sidebarWidget, &PDFSidebarWidget::extractPagesRequested, m_programController,
             [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->extractPages(pages); });
+    connect(m_sidebarWidget, &PDFSidebarWidget::printPagesRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->printPages(pages); });
+    connect(m_sidebarWidget, &PDFSidebarWidget::exportPagesAsImagesRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->exportPagesAsImages(pages); });
     connect(m_sidebarWidget, &PDFSidebarWidget::deletePagesRequested, m_programController,
             [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->deletePages(pages); });
     connect(m_sidebarWidget, &PDFSidebarWidget::rotatePagesRequested, m_programController,
@@ -429,6 +434,12 @@ void PDFEditorMainWindow::onPdfContextMenuRequested(const QPoint& pos)
     menu.addAction(ui->actionCopyText);
     menu.addAction(ui->actionSelectTextAll);
     menu.addAction(ui->actionDeselectText);
+
+    // The area of the selected text is exported; it is offered only while text is selected.
+    pdf::PDFToolManager* toolManager = m_programController->getToolManager();
+    QAction* exportSelectionAction = menu.addAction(tr("Export Selection as Image..."), this, [this]() { m_programController->exportSelectionAsImage(); });
+    exportSelectionAction->setObjectName(QStringLiteral("actionExportSelectionImage"));
+    exportSelectionAction->setEnabled(ui->actionExportPageImages->isEnabled() && toolManager && !toolManager->getSelectedText().isEmpty());
     menu.addSeparator();
     const bool canMark = ui->actionCopyText->isEnabled() && ui->actionCreateTextHighlight->isEnabled();
     const std::pair<pdf::AnnotationType, QString> markups[] = {
@@ -775,6 +786,11 @@ pdf::PDFTextSelection PDFEditorMainWindow::getSelectedText() const
     }
 
     return m_advancedFindWidget->getSelectedText();
+}
+
+std::vector<pdf::PDFInteger> PDFEditorMainWindow::getSelectedPages() const
+{
+    return m_sidebarWidget ? m_sidebarWidget->getSelectedThumbnailPages() : std::vector<pdf::PDFInteger>();
 }
 
 void PDFEditorMainWindow::closeEvent(QCloseEvent* event)

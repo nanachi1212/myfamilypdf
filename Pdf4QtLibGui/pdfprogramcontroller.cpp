@@ -37,6 +37,9 @@
 #include "pdfviewersettings.h"
 #include "pdfundoredomanager.h"
 #include "pdfrendertoimagesdialog.h"
+#include "pdfprintdialog.h"
+#include "pdfexportimagesdialog.h"
+#include "pdfpageoutput.h"
 #include "pdfoptimizedocumentdialog.h"
 #include "pdfoptimizeimagesdialog.h"
 #include "pdfsanitizedocumentdialog.h"
@@ -59,10 +62,13 @@
 #include <cstdio>
 #include <algorithm>
 #include <cmath>
+#include <map>
+#include <memory>
 
 #include <QMenu>
 #include <QPrinter>
-#include <QPrintDialog>
+#include <QProgressDialog>
+#include <QScopeGuard>
 #include <QMessageBox>
 #include <QProcess>
 #include <QDesktopServices>
@@ -583,6 +589,10 @@ void PDFProgramController::initialize(Features features,
     {
         connect(action, &QAction::triggered, this, &PDFProgramController::onActionRenderToImagesTriggered);
     }
+    if (QAction* action = m_actionManager->getAction(PDFActionManager::ExportPageImages))
+    {
+        connect(action, &QAction::triggered, this, [this]() { exportPagesAsImages(); });
+    }
     if (QAction* action = m_actionManager->getAction(PDFActionManager::Optimize))
     {
         connect(action, &QAction::triggered, this, &PDFProgramController::onActionOptimizeTriggered);
@@ -819,6 +829,27 @@ void PDFProgramController::finishInitialization()
 
 void PDFProgramController::performPrint()
 {
+    runPrintWorkflow(m_mainWindowInterface->getSelectedPages(), false);
+}
+
+void PDFProgramController::printPages(const std::vector<pdf::PDFInteger>& pageIndices)
+{
+    runPrintWorkflow(pageIndices, true);
+}
+
+void PDFProgramController::runPrintWorkflow(const std::vector<pdf::PDFInteger>& selectedPages, bool preferSelectedPages)
+{
+    if (!m_pdfDocument)
+    {
+        return;
+    }
+
+    // Printing and exporting keep pointers into the current document (also in their worker threads),
+    // so automatic reload must not replace it while the workflow is open.
+    const pdf::PDFDocumentPointer documentKeepAlive = m_pdfDocument;
+    m_isOutputWorkflowActive = true;
+    const auto outputWorkflowGuard = qScopeGuard([this]() { m_isOutputWorkflowActive = false; });
+
     // Are we allowed to print in high resolution? If yes, then print in high resolution,
     // otherwise print in low resolution. If this action is triggered, then print operation
     // should be allowed (at least print in low resolution).
@@ -830,95 +861,181 @@ void PDFProgramController::performPrint()
         printerMode = QPrinter::ScreenResolution;
     }
 
-    // Run print dialog
-    QPrinter printer(printerMode);
-    QPrintDialog printDialog(&printer, m_mainWindow);
-    printDialog.setOptions(QPrintDialog::PrintPageRange | QPrintDialog::PrintShowPageSize | QPrintDialog::PrintCollateCopies | QPrintDialog::PrintSelection);
-    printDialog.setOption(QPrintDialog::PrintCurrentPage, m_pdfWidget->getDrawWidget()->getCurrentPages().size() == 1);
-    printDialog.setMinMax(1, int(m_pdfDocument->getCatalog()->getPageCount()));
-    if (printDialog.exec() == QPrintDialog::Accepted)
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount());
+    PDFPrintDialog::PageSelectionInfo pageInfo;
+    pageInfo.pageCount = pageCount;
+    // The current page is the first visible page (continuous layouts show several).
+    pageInfo.currentPages = m_pdfWidget->getDrawWidget()->getCurrentPages();
+    if (pageInfo.currentPages.size() > 1)
     {
-        std::vector<pdf::PDFInteger> pageIndices;
-        switch (printDialog.printRange())
-        {
-            case QAbstractPrintDialog::AllPages:
-            {
-                pageIndices.resize(m_pdfDocument->getCatalog()->getPageCount(), 0);
-                std::iota(pageIndices.begin(), pageIndices.end(), 0);
-                break;
-            }
-
-            case QAbstractPrintDialog::Selection:
-            case QAbstractPrintDialog::CurrentPage:
-            {
-                pageIndices = m_pdfWidget->getDrawWidget()->getCurrentPages();
-                break;
-            }
-
-            case QAbstractPrintDialog::PageRange:
-            {
-                const pdf::PDFInteger fromPage = printDialog.fromPage();
-                const pdf::PDFInteger toPage = printDialog.toPage();
-                const pdf::PDFInteger pageCount = toPage - fromPage + 1;
-                if (pageCount > 0)
-                {
-                    pageIndices.resize(pageCount, 0);
-                    std::iota(pageIndices.begin(), pageIndices.end(), fromPage - 1);
-                }
-                break;
-            }
-
-            default:
-                Q_ASSERT(false);
-                break;
-        }
-
-        if (pageIndices.empty())
-        {
-            // Nothing to be printed
-            return;
-        }
-
-        pdf::ProgressStartupInfo info;
-        info.showDialog = true;
-        info.text = tr("Printing document");
-        m_progress->start(pageIndices.size(), qMove(info));
-        printer.setFullPage(true);
-        QPainter painter(&printer);
-
-        const pdf::PDFCatalog* catalog = m_pdfDocument->getCatalog();
-        pdf::PDFDrawWidgetProxy* proxy = m_pdfWidget->getDrawWidgetProxy();
-        pdf::PDFOptionalContentActivity optionalContentActivity(m_pdfDocument.data(), pdf::OCUsage::Print, nullptr);
-        pdf::PDFCMSPointer cms = proxy->getCMSManager()->getCurrentCMS();
-        pdf::PDFRenderer renderer(m_pdfDocument.get(), proxy->getFontCache(), cms.data(), &optionalContentActivity, proxy->getFeatures(), proxy->getMeshQualitySettings());
-
-        const pdf::PDFInteger lastPage = pageIndices.back();
-        for (const pdf::PDFInteger pageIndex : pageIndices)
-        {
-            const pdf::PDFPage* page = catalog->getPage(pageIndex);
-            Q_ASSERT(page);
-
-            QRectF mediaBox = page->getRotatedMediaBox();
-            QRectF paperRect = printer.pageLayout().fullRectPixels(printer.resolution());
-            QSizeF scaledSize = mediaBox.size().scaled(paperRect.size(), Qt::KeepAspectRatio);
-            mediaBox.setSize(scaledSize);
-            mediaBox.moveCenter(paperRect.center());
-
-            renderer.render(&painter, mediaBox, pageIndex);
-            m_progress->step();
-
-            if (pageIndex != lastPage)
-            {
-                if (!printer.newPage())
-                {
-                    break;
-                }
-            }
-        }
-
-        painter.end();
-        m_progress->finish();
+        pageInfo.currentPages.resize(1);
     }
+    for (const pdf::PDFInteger pageIndex : selectedPages)
+    {
+        if (pageIndex >= 0 && pageIndex < pageCount)
+        {
+            pageInfo.selectedPages.push_back(pageIndex);
+        }
+    }
+    pageInfo.preferSelectedPages = preferSelectedPages;
+
+    // The dialog only enumerates printers and renders a single preview page,
+    // so opening it does not depend on the size of the document.
+    const PDFPageOutputContext outputContext = PDFPageOutputContext::fromProxy(m_pdfDocument.data(), m_pdfWidget->getDrawWidgetProxy());
+    PDFPrintDialog printDialog(outputContext, pageInfo, QFileInfo(getOriginalFileName()).fileName(), printerMode, m_mainWindow);
+    if (printDialog.exec() != QDialog::Accepted)
+    {
+        return;
+    }
+
+    const PDFPrintOptions options = printDialog.getOptions();
+    std::unique_ptr<QPrinter> printer = printDialog.takePrinter();
+    if (!printer || options.pageIndices.empty())
+    {
+        return;
+    }
+
+    QProgressDialog progressDialog(tr("Printing document"), tr("Cancel"), 0, int(options.pageIndices.size()), m_mainWindow);
+    progressDialog.setWindowModality(Qt::WindowModal);
+    progressDialog.setMinimumDuration(0);
+    progressDialog.setAutoClose(false);
+    progressDialog.setAutoReset(false);
+    progressDialog.setValue(0);
+
+    auto onProgress = [&progressDialog](int done, int total)
+    {
+        progressDialog.setMaximum(total);
+        progressDialog.setValue(done);
+        QCoreApplication::processEvents();
+        return !progressDialog.wasCanceled();
+    };
+    const PDFPrintResult result = PDFPageOutput::print(printer.get(), outputContext, options, onProgress);
+    progressDialog.close();
+
+    if (result.cancelled)
+    {
+        m_mainWindowInterface->setStatusBarMessage(tr("Printing was cancelled."), 5000);
+        return;
+    }
+
+    if (!result.completed)
+    {
+        QMessageBox::warning(m_mainWindow, tr("Print"), result.errorMessage.isEmpty() ? tr("Printing failed.") : result.errorMessage);
+        return;
+    }
+
+    if (!result.renderWarnings.isEmpty())
+    {
+        QMessageBox::warning(m_mainWindow, tr("Print"), tr("The document was printed, but some content could not be rendered:\n%1").arg(result.renderWarnings.join(QLatin1Char('\n'))));
+        return;
+    }
+
+    m_mainWindowInterface->setStatusBarMessage(tr("%1 page(s) were sent to the printer.").arg(result.pagesPrinted), 5000);
+}
+
+void PDFProgramController::exportPagesAsImages()
+{
+    runExportImagesWorkflow(m_mainWindowInterface->getSelectedPages(), false);
+}
+
+void PDFProgramController::exportPagesAsImages(const std::vector<pdf::PDFInteger>& pageIndices)
+{
+    runExportImagesWorkflow(pageIndices, true);
+}
+
+void PDFProgramController::runExportImagesWorkflow(const std::vector<pdf::PDFInteger>& selectedPages, bool preferSelectedPages)
+{
+    if (!m_pdfDocument)
+    {
+        return;
+    }
+
+    // Printing and exporting keep pointers into the current document (also in their worker threads),
+    // so automatic reload must not replace it while the workflow is open.
+    const pdf::PDFDocumentPointer documentKeepAlive = m_pdfDocument;
+    m_isOutputWorkflowActive = true;
+    const auto outputWorkflowGuard = qScopeGuard([this]() { m_isOutputWorkflowActive = false; });
+
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount());
+    PDFExportImagesDialog::Request request;
+    request.outputContext = PDFPageOutputContext::fromProxy(m_pdfDocument.data(), m_pdfWidget->getDrawWidgetProxy());
+    request.documentFileName = getOriginalFileName();
+    request.pageCount = pageCount;
+    // The current page is the first visible page (continuous layouts show several).
+    request.currentPages = m_pdfWidget->getDrawWidget()->getCurrentPages();
+    if (request.currentPages.size() > 1)
+    {
+        request.currentPages.resize(1);
+    }
+    for (const pdf::PDFInteger pageIndex : selectedPages)
+    {
+        if (pageIndex >= 0 && pageIndex < pageCount)
+        {
+            request.selectedPages.push_back(pageIndex);
+        }
+    }
+    request.preferSelectedPages = preferSelectedPages;
+
+    PDFExportImagesDialog dialog(request, m_mainWindow);
+    dialog.exec();
+}
+
+void PDFProgramController::exportSelectionAsImage()
+{
+    if (!m_pdfDocument || !m_toolManager)
+    {
+        return;
+    }
+
+    // Printing and exporting keep pointers into the current document (also in their worker threads),
+    // so automatic reload must not replace it while the workflow is open.
+    const pdf::PDFDocumentPointer documentKeepAlive = m_pdfDocument;
+    m_isOutputWorkflowActive = true;
+    const auto outputWorkflowGuard = qScopeGuard([this]() { m_isOutputWorkflowActive = false; });
+
+    const pdf::PDFTextSelection selection = m_toolManager->getSelectedText();
+    if (selection.isEmpty())
+    {
+        m_mainWindowInterface->setStatusBarMessage(tr("Select some text first, then export the selection as an image."), 5000);
+        return;
+    }
+
+    // The area of the selection on each page is the bounding box of the selected text,
+    // the same geometry the text markup tools use.
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount());
+    std::map<pdf::PDFInteger, QRectF> regions;
+    for (auto it = selection.begin(); it != selection.end(); )
+    {
+        const auto end = selection.nextPageRange(it);
+        const pdf::PDFInteger pageIndex = it->start.pageIndex;
+        if (pageIndex >= 0 && pageIndex < pageCount)
+        {
+            auto layoutGetter = m_pdfWidget->getDrawWidgetProxy()->getTextLayoutCompiler()->getTextLayoutLazy(pageIndex);
+            QPolygonF quads;
+            pdf::PDFTextSelectionPainter painter(&selection);
+            const QPainterPath path = painter.prepareGeometry(pageIndex, layoutGetter, QTransform(), &quads);
+            if (!path.isEmpty() && !quads.isEmpty())
+            {
+                regions[pageIndex] = quads.boundingRect().adjusted(-2.0, -2.0, 2.0, 2.0);
+            }
+        }
+        it = end;
+    }
+
+    if (regions.empty())
+    {
+        m_mainWindowInterface->setStatusBarMessage(tr("The selection has no visible area to export."), 5000);
+        return;
+    }
+
+    PDFExportImagesDialog::Request request;
+    request.outputContext = PDFPageOutputContext::fromProxy(m_pdfDocument.data(), m_pdfWidget->getDrawWidgetProxy());
+    request.documentFileName = getOriginalFileName();
+    request.pageCount = pageCount;
+    request.selectionRegions = qMove(regions);
+
+    PDFExportImagesDialog dialog(request, m_mainWindow);
+    dialog.exec();
 }
 
 void PDFProgramController::onActionTriggered(const pdf::PDFAction* action)
@@ -2408,6 +2525,7 @@ void PDFProgramController::updateActionsAvailability()
     m_actionManager->setEnabled(PDFActionManager::Find, hasValidDocument);
     m_actionManager->setEnabled(PDFActionManager::Print, hasValidDocument && canPrint);
     m_actionManager->setEnabled(PDFActionManager::RenderToImages, hasValidDocument && canPrint);
+    m_actionManager->setEnabled(PDFActionManager::ExportPageImages, hasValidDocument && canPrint);
     m_actionManager->setEnabled(PDFActionManager::Optimize, hasValidDocument);
     m_actionManager->setEnabled(PDFActionManager::OptimizeImages, hasValidDocument);
     m_actionManager->setEnabled(PDFActionManager::Sanitize, hasValidDocument);
@@ -2451,7 +2569,8 @@ void PDFProgramController::onFileChanged(const QString& fileName)
 {
     QAction* autoRefreshDocumentAction = m_actionManager->getAction(PDFActionManager::AutomaticDocumentRefresh);
 
-    if (!autoRefreshDocumentAction || // We do not have action
+    if (m_isOutputWorkflowActive || // Print or export is using the current document
+        !autoRefreshDocumentAction || // We do not have action
         !autoRefreshDocumentAction->isChecked() || // Auto refresh is not enabled
         m_fileInfo.originalFileName != fileName) // File is different
     {

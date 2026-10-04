@@ -1084,6 +1084,11 @@ void PDFSidebarWidget::onThumbnailClicked(const QModelIndex& index)
 std::vector<pdf::PDFInteger> PDFSidebarWidget::getSelectedThumbnailPages() const
 {
     std::vector<pdf::PDFInteger> result;
+    if (!ui->thumbnailsListView->selectionModel())
+    {
+        return result;
+    }
+
     const QModelIndexList selectedIndexes = ui->thumbnailsListView->selectionModel()->selectedIndexes();
     result.reserve(selectedIndexes.size());
     for (const QModelIndex& index : selectedIndexes)
@@ -1148,6 +1153,20 @@ void PDFSidebarWidget::onThumbnailContextMenuRequested(const QPoint& pos)
     connect(extractAction, &QAction::triggered, this, [this, selectedPages]()
     {
         Q_EMIT extractPagesRequested(selectedPages);
+    });
+
+    QAction* printAction = menu.addAction(tr("Print Selected Pages..."));
+    printAction->setObjectName(QStringLiteral("thumbnailPrintPagesAction"));
+    connect(printAction, &QAction::triggered, this, [this, selectedPages]()
+    {
+        Q_EMIT printPagesRequested(selectedPages);
+    });
+
+    QAction* exportImagesAction = menu.addAction(tr("Export Selected Pages as Images..."));
+    exportImagesAction->setObjectName(QStringLiteral("thumbnailExportImagesAction"));
+    connect(exportImagesAction, &QAction::triggered, this, [this, selectedPages]()
+    {
+        Q_EMIT exportPagesAsImagesRequested(selectedPages);
     });
 
     if (m_editableDocument)

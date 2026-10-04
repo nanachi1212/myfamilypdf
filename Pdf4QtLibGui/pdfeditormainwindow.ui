@@ -36,6 +36,7 @@
     <addaction name="separator"/>
     <addaction name="actionSend_by_E_Mail"/>
     <addaction name="actionPrint"/>
+    <addaction name="actionExportPageImages"/>
     <addaction name="actionRender_to_Images"/>
     <addaction name="separator"/>
     <addaction name="actionProperties"/>
@@ -692,6 +693,11 @@
    </property>
    <property name="text">
     <string>&amp;Print...</string>
+   </property>
+  </action>
+  <action name="actionExportPageImages">
+   <property name="text">
+    <string>Export Page(s) as &amp;Images...</string>
    </property>
   </action>
   <action name="actionRender_to_Images">
