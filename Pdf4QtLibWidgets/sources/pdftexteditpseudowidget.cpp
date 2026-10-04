@@ -400,6 +400,8 @@ void PDFTextEditPseudowidget::setText(const QString& text)
 {
     clearSelection();
     m_editText = text;
+    if (isMultiline())
+        m_editText.replace("\r\n", "\n").replace(QChar('\r'), QChar('\n')).replace(QChar('\n'), QChar(0x2028));
     setCursorPosition(getPositionEnd(), false);
     updateTextLayout();
 }
@@ -559,8 +561,11 @@ void PDFTextEditPseudowidget::performInsertText(const QString& text)
 
     // Insert text at the cursor
     performRemoveSelectedText();
-    m_editText.insert(m_positionCursor, text);
-    setCursorPosition(m_positionCursor + text.length(), false);
+    QString insertedText = text;
+    if (isMultiline())
+        insertedText.replace("\r\n", "\n").replace(QChar('\r'), QChar('\n')).replace(QChar('\n'), QChar(0x2028));
+    m_editText.insert(m_positionCursor, insertedText);
+    setCursorPosition(m_positionCursor + insertedText.length(), false);
     updateTextLayout();
 }
 

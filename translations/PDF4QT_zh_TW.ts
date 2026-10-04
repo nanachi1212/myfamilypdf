@@ -14490,6 +14490,16 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>The optional FamilyPDF OCR plugin is not installed.</source><translation>尚未安裝選用的 FamilyPDF OCR 外掛。</translation></message>
     <message><source>Save searchable OCR PDF</source><translation>儲存可搜尋的 OCR PDF</translation></message>
     <message><source>Could not start the FamilyPDF OCR plugin.</source><translation>無法啟動 FamilyPDF OCR 外掛。</translation></message>
+    <message>
+        <source>Required form fields</source>
+        <translation>必填表單欄位</translation>
+    </message>
+    <message>
+        <source>Required fields are empty: %1
+Save the incomplete form anyway?</source>
+        <translation>尚未填寫的必填欄位：%1
+仍要儲存未完成的表單嗎？</translation>
+    </message>
 </context>
 <context>
     <name>pdfviewer::PDFRecentFileManager</name>
@@ -14644,11 +14654,10 @@ Page %2: %3</source>
         <translation>時間戳 - %1</translation>
     </message>
     <message>
-        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="561"/>
         <source>Unknown</source>
         <translation>未知</translation>
     </message>
-    <message>
+<message>
         <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="579"/>
         <source>Certificate is valid.</source>
         <translation>證書有效。</translation>
@@ -15014,6 +15023,54 @@ Do you want to perform this action?</source>
     <message>
         <source>Strikeout</source>
         <translation>刪除線</translation>
+    </message>
+    <message>
+        <source>Valid</source>
+        <translation>有效</translation>
+    </message>
+    <message>
+        <source>Invalid</source>
+        <translation>無效</translation>
+    </message>
+    <message>
+        <source>Trusted</source>
+        <translation>受信任</translation>
+    </message>
+    <message>
+        <source>Untrusted</source>
+        <translation>未受信任</translation>
+    </message>
+    <message>
+        <source>Cryptographic signature: %1</source>
+        <translation>密碼學簽章：%1</translation>
+    </message>
+    <message>
+        <source>Certificate trust: %1</source>
+        <translation>憑證信任：%1</translation>
+    </message>
+    <message>
+        <source>Field: %1</source>
+        <translation>欄位：%1</translation>
+    </message>
+    <message>
+        <source>Page: %1</source>
+        <translation>頁碼：%1</translation>
+    </message>
+    <message>
+        <source>The signature does not cover all document bytes. Later changes may be present.</source>
+        <translation>簽章未涵蓋文件的所有位元組，可能包含簽署後的變更。</translation>
+    </message>
+    <message>
+        <source>Document changes after signing: unknown.</source>
+        <translation>簽署後的文件變更：未知。</translation>
+    </message>
+    <message>
+        <source>Signing date/time (reported by signer): %1</source>
+        <translation>簽署日期／時間（簽署者提供）：%1</translation>
+    </message>
+    <message>
+        <source>Timestamp: %1</source>
+        <translation>時間戳記：%1</translation>
     </message>
 </context>
 <context>

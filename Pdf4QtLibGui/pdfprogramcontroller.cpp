@@ -767,8 +767,14 @@ void PDFProgramController::initialize(Features features,
         m_undoRedoManager = new PDFUndoRedoManager(this);
         connect(m_undoRedoManager, &PDFUndoRedoManager::undoRedoStateChanged, this, &PDFProgramController::updateUndoRedoActions);
         connect(m_undoRedoManager, &PDFUndoRedoManager::documentChangeRequest, this, &PDFProgramController::onDocumentUndoRedo);
-        connect(m_actionManager->getAction(PDFActionManager::Undo), &QAction::triggered, m_undoRedoManager, &PDFUndoRedoManager::doUndo);
-        connect(m_actionManager->getAction(PDFActionManager::Redo), &QAction::triggered, m_undoRedoManager, &PDFUndoRedoManager::doRedo);
+        connect(m_actionManager->getAction(PDFActionManager::Undo), &QAction::triggered, this, [this]() {
+            if (m_formManager) m_formManager->setFocusToEditor(nullptr);
+            m_undoRedoManager->doUndo();
+        });
+        connect(m_actionManager->getAction(PDFActionManager::Redo), &QAction::triggered, this, [this]() {
+            if (m_formManager) m_formManager->setFocusToEditor(nullptr);
+            m_undoRedoManager->doRedo();
+        });
         updateUndoRedoSettings();
     }
 
@@ -1299,6 +1305,16 @@ void PDFProgramController::performSave()
 
 void PDFProgramController::saveDocument(const QString& fileName)
 {
+    if (m_formManager)
+    {
+        m_formManager->setFocusToEditor(nullptr);
+        const QStringList missing = m_formManager->getMissingRequiredFields();
+        if (!missing.isEmpty() && QMessageBox::warning(m_mainWindow, tr("Required form fields"),
+                tr("Required fields are empty: %1\nSave the incomplete form anyway?").arg(missing.join(", ")),
+                QMessageBox::Save | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Save)
+            return;
+    }
+
     updateFileWatcher(true);
 
     const QString previousSourcePath = m_fileInfo.absoluteFilePath;
@@ -1689,6 +1705,9 @@ bool PDFProgramController::canClose() const
 
 bool PDFProgramController::askForSaveDocumentBeforeClose()
 {
+    if (m_formManager)
+        m_formManager->setFocusToEditor(nullptr);
+
     if (!m_pdfDocument)
     {
         // Nothing to be done
@@ -2794,6 +2813,9 @@ void PDFProgramController::onDocumentUndoRedo(pdf::PDFModifiedDocument document)
 
 void PDFProgramController::setDocument(pdf::PDFModifiedDocument document, std::vector<pdf::PDFSignatureVerificationResult> signatureVerificationResult, bool isCurrentSaved)
 {
+    // Results describe the exact bytes opened. Edits and Undo/Redo must not
+    // retain a previously verified status for a different document revision.
+    m_signatures = signatureVerificationResult;
     if (document.hasReset())
     {
         if (m_optionalContentActivity)

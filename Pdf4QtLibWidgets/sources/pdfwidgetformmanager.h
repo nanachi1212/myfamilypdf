@@ -109,6 +109,8 @@ public:
     /// \param next Focus next (true) or previous (false) widget
     bool focusNextPrevFormField(bool next);
 
+    QStringList getMissingRequiredFields() const;
+
     /// Sets focus to the editor. Is is allowed to pass nullptr to this
     /// function, it means that no editor is focused.
     /// \param editor Editor to be focused

@@ -315,7 +315,7 @@
             </size>
            </property>
            <property name="shortcut">
-            <string>Ctrl+S</string>
+            <string/>
            </property>
            <property name="toolButtonStyle">
             <enum>Qt::ToolButtonStyle::ToolButtonTextUnderIcon</enum>
