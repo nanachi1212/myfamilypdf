@@ -35,7 +35,7 @@
 
 ## Git 狀態
 
-- 分支 `feature/print-export-v7`（從 `a0ed1692` 的 main 建立）。PR／CI 結果待更新。
+- 分支 `feature/print-export-v7`（從 `a0ed1692` 的 main 建立）已 commit 並 push。**blocker**：本機 `gh` 未登入（`gh auth status` 顯示未登入），無法建立 PR／查 CI／merge；需使用者執行 `gh auth login` 後，從該分支建立 PR（base `main`），等 CI 全綠再 squash merge、同步 main、刪除分支，最後把本文件更新為 v7 完成狀態。PR 建立連結：https://github.com/nanachi1212/myfamilypdf/pull/new/feature/print-export-v7
 
 ## 限制與接手注意事項
 
