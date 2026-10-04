@@ -168,6 +168,7 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     m_actionManager->setAction(PDFActionManager::RotateRight, ui->actionRotateRight);
     m_actionManager->setAction(PDFActionManager::RotateLeft, ui->actionRotateLeft);
     m_actionManager->setAction(PDFActionManager::Print, ui->actionPrint);
+    m_actionManager->setAction(PDFActionManager::ExportPageImages, ui->actionExportPageImages);
     m_actionManager->setAction(PDFActionManager::GoToDocumentStart, ui->actionGoToDocumentStart);
     m_actionManager->setAction(PDFActionManager::GoToDocumentEnd, ui->actionGoToDocumentEnd);
     m_actionManager->setAction(PDFActionManager::GoToNextPage, ui->actionGoToNextPage);
@@ -293,6 +294,10 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     connect(m_sidebarWidget, &PDFSidebarWidget::documentModified, m_programController, &PDFProgramController::onDocumentModified);
     connect(m_sidebarWidget, &PDFSidebarWidget::extractPagesRequested, m_programController,
             [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->extractPages(pages); });
+    connect(m_sidebarWidget, &PDFSidebarWidget::printPagesRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->printPages(pages); });
+    connect(m_sidebarWidget, &PDFSidebarWidget::exportPagesAsImagesRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->exportPagesAsImages(pages); });
 
     ui->menuView->addSeparator();
     ui->menuView->addAction(m_sidebarDockWidget->toggleViewAction());
@@ -638,6 +643,11 @@ pdf::PDFTextSelection PDFViewerMainWindow::getSelectedText() const
     return pdf::PDFTextSelection();
 }
 
+std::vector<pdf::PDFInteger> PDFViewerMainWindow::getSelectedPages() const
+{
+    return m_sidebarWidget ? m_sidebarWidget->getSelectedThumbnailPages() : std::vector<pdf::PDFInteger>();
+}
+
 void PDFViewerMainWindow::closeEvent(QCloseEvent* event)
 {
     if (!m_programController->canClose())
@@ -710,6 +720,12 @@ void PDFViewerMainWindow::onPdfContextMenuRequested(const QPoint& pos)
     contextMenu.addAction(ui->actionCopyText);
     contextMenu.addAction(ui->actionSelectTextAll);
     contextMenu.addAction(ui->actionDeselectText);
+
+    // The area of the selected text is exported; it is offered only while text is selected.
+    pdf::PDFToolManager* toolManager = m_programController->getToolManager();
+    QAction* exportSelectionAction = contextMenu.addAction(tr("Export Selection as Image..."), this, [this]() { m_programController->exportSelectionAsImage(); });
+    exportSelectionAction->setObjectName(QStringLiteral("actionExportSelectionImage"));
+    exportSelectionAction->setEnabled(ui->actionExportPageImages->isEnabled() && toolManager && !toolManager->getSelectedText().isEmpty());
     contextMenu.addSeparator();
 
     // Tools are modes, not operations on the current selection. They are

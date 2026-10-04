@@ -2275,6 +2275,7 @@
         <source>Clear Recent File &amp;History</source>
         <translation type="unfinished"></translation>
     </message>
+    <message><source>Export Page(s) as &amp;Images...</source><translation>将页面导出为图片(&amp;I)...</translation></message>
 </context>
 <context>
     <name>PDFEncryptionSettingsDialog</name>
@@ -5787,6 +5788,7 @@
         <source>Clear Recent File &amp;History</source>
         <translation type="unfinished"></translation>
     </message>
+    <message><source>Export Page(s) as &amp;Images...</source><translation>将页面导出为图片(&amp;I)...</translation></message>
 </context>
 <context>
     <name>PDFViewerSettingsDialog</name>
@@ -14142,6 +14144,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <source>Annotations</source>
         <translation>批注</translation>
     </message>
+    <message><source>Export Selection as Image...</source><translation>将选中范围导出为图片...</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFEncryptionSettingsDialog</name>
@@ -14481,6 +14484,16 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>document</source><translation>文档</translation></message>
     <message><source>Save Extracted Pages</source><translation>保存提取的页面</translation></message>
     <message><source>Saved %1 pages to %2.</source><translation>已将 %1 页保存到 %2。</translation></message>
+    <message><source>Cancel</source><translation>取消</translation></message>
+    <message><source>Print</source><translation>打印</translation></message>
+    <message><source>Printing failed.</source><translation>打印失败。</translation></message>
+    <message><source>The document was printed, but some content could not be rendered:
+%1</source><translation>文档已打印，但部分内容无法绘制：
+%1</translation></message>
+    <message><source>Printing was cancelled.</source><translation>已取消打印。</translation></message>
+    <message><source>%1 page(s) were sent to the printer.</source><translation>已将 %1 页发送到打印机。</translation></message>
+    <message><source>Select some text first, then export the selection as an image.</source><translation>请先选中文字，再将选中范围导出为图片。</translation></message>
+    <message><source>The selection has no visible area to export.</source><translation>选中范围没有可导出的可见区域。</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFRecentFileManager</name>
@@ -15005,6 +15018,8 @@ Do you want to perform this action?</source>
         <source>Strikeout</source>
         <translation>删除线</translation>
     </message>
+    <message><source>Print Selected Pages...</source><translation>打印选中的页面...</translation></message>
+    <message><source>Export Selected Pages as Images...</source><translation>将选中的页面导出为图片...</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFViewerMainWindow</name>
@@ -15029,6 +15044,7 @@ Do you want to perform this action?</source>
         <translation> / %1</translation>
     </message>
     <message><source>Extract Pages...</source><translation>提取页面(另存新文档)...</translation></message>
+    <message><source>Export Selection as Image...</source><translation>将选中范围导出为图片...</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFViewerSettingsDialog</name>
@@ -15443,5 +15459,108 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>将使用最�
     <message><source>The selected pages have no searchable text layer. Run FamilyPDF OCR, then export again.</source><translation>所选页面没有可搜索文字层。请先运行 FamilyPDF OCR，再重新导出。</translation></message>
     <message><source>Office export failed with exit code %1.</source><translation>Office 导出失败，退出代码为 %1。</translation></message>
     <message><source>Office export timed out and was stopped. Try fewer pages.</source><translation>Office 导出超时并已停止。请尝试减少导出页数。</translation></message>
+</context>
+<context>
+    <name>pdfviewer::PDFPrintDialog</name>
+    <message><source>Print</source><translation>打印</translation></message>
+    <message><source>Printer</source><translation>打印机</translation></message>
+    <message><source>Automatic (follow each page)</source><translation>自动（按每页方向）</translation></message>
+    <message><source>Portrait</source><translation>纵向</translation></message>
+    <message><source>Landscape</source><translation>横向</translation></message>
+    <message><source>Color</source><translation>彩色</translation></message>
+    <message><source>Grayscale</source><translation>灰度</translation></message>
+    <message><source>One-sided</source><translation>单面</translation></message>
+    <message><source>Two-sided, flip on long edge</source><translation>双面，长边翻转</translation></message>
+    <message><source>Two-sided, flip on short edge</source><translation>双面，短边翻转</translation></message>
+    <message><source>Collate</source><translation>逐份打印</translation></message>
+    <message><source>&amp;Name:</source><translation>名称(&amp;N)：</translation></message>
+    <message><source>Pa&amp;per:</source><translation>纸张(&amp;P)：</translation></message>
+    <message><source>&amp;Orientation:</source><translation>方向(&amp;O)：</translation></message>
+    <message><source>Co&amp;lor:</source><translation>色彩(&amp;L)：</translation></message>
+    <message><source>&amp;Duplex:</source><translation>双面打印(&amp;D)：</translation></message>
+    <message><source>&amp;Copies:</source><translation>份数(&amp;C)：</translation></message>
+    <message><source>Pages</source><translation>页面</translation></message>
+    <message><source>All pages (%1)</source><translation>全部页面（%1）</translation></message>
+    <message><source>Pages:</source><translation>页面：</translation></message>
+    <message><source>e.g. 1-3,8,10-12</source><translation>例如 1-3,8,10-12</translation></message>
+    <message><source>Current pages (%1)</source><translation>当前页面（%1）</translation></message>
+    <message><source>Current page (%1)</source><translation>当前页面（%1）</translation></message>
+    <message><source>Pages selected in thumbnails (%1)</source><translation>缩略图中选中的页面（%1）</translation></message>
+    <message><source>Page scaling</source><translation>页面缩放</translation></message>
+    <message><source>Fit to printable area</source><translation>适合可打印区域</translation></message>
+    <message><source>Actual size (100%)</source><translation>实际大小 (100%)</translation></message>
+    <message><source>Preview</source><translation>预览</translation></message>
+    <message><source>Previous page</source><translation>上一页</translation></message>
+    <message><source>Next page</source><translation>下一页</translation></message>
+    <message><source>&amp;Print</source><translation>打印(&amp;P)</translation></message>
+    <message><source>none</source><translation>无</translation></message>
+    <message><source>Enter the pages to print, for example 1-3,8,10-12.</source><translation>请输入要打印的页面，例如 1-3,8,10-12。</translation></message>
+    <message><source>The selected printer does not support two-sided printing.</source><translation>所选打印机不支持双面打印。</translation></message>
+    <message><source>No printer is installed. Install a printer (for example Microsoft Print to PDF) to print.</source><translation>尚未安装打印机。请安装打印机（例如 Microsoft Print to PDF）后再打印。</translation></message>
+    <message><source>%1 page(s) will be printed.</source><translation>将打印 %1 页。</translation></message>
+    <message><source>Sheet %1 of %2</source><translation>第 %1 张，共 %2 张</translation></message>
+    <message><source>There are no pages to print.</source><translation>没有可打印的页面。</translation></message>
+    <message><source>No printer is available.</source><translation>没有可用的打印机。</translation></message>
+</context>
+<context>
+    <name>pdfviewer::PDFExportImagesDialog</name>
+    <message><source>Export Selection as Image</source><translation>导出选中范围为图片</translation></message>
+    <message><source>Export Pages as Images</source><translation>导出页面为图片</translation></message>
+    <message><source>Pages</source><translation>页面</translation></message>
+    <message><source>Current page</source><translation>当前页面</translation></message>
+    <message><source>All pages (%1)</source><translation>全部页面（%1）</translation></message>
+    <message><source>Pages selected in thumbnails (%1)</source><translation>缩略图中选中的页面（%1）</translation></message>
+    <message><source>Pages:</source><translation>页面：</translation></message>
+    <message><source>e.g. 1-3,8,10-12</source><translation>例如 1-3,8,10-12</translation></message>
+    <message><source>The selected area of %1 page(s) is exported, one image per page.</source><translation>将导出 %1 页中的选中区域，每页一张图片。</translation></message>
+    <message><source>Image</source><translation>图片</translation></message>
+    <message><source>PNG (lossless, best for text and drawings)</source><translation>PNG（无损，适合文字与图形）</translation></message>
+    <message><source>JPEG (smaller files, best for photos and scans)</source><translation>JPEG（文件较小，适合照片与扫描）</translation></message>
+    <message><source> DPI</source><translation> DPI</translation></message>
+    <message><source>&amp;Format:</source><translation>格式(&amp;F)：</translation></message>
+    <message><source>&amp;Resolution:</source><translation>分辨率(&amp;R)：</translation></message>
+    <message><source>JPEG &amp;quality:</source><translation>JPEG 质量(&amp;Q)：</translation></message>
+    <message><source>Output</source><translation>输出</translation></message>
+    <message><source>&amp;Browse...</source><translation>浏览(&amp;B)...</translation></message>
+    <message><source>Fol&amp;der:</source><translation>文件夹(&amp;D)：</translation></message>
+    <message><source>&amp;Export</source><translation>导出(&amp;E)</translation></message>
+    <message><source>&amp;Cancel</source><translation>取消(&amp;C)</translation></message>
+    <message><source>&amp;Close</source><translation>关闭(&amp;C)</translation></message>
+    <message><source>Exporting...</source><translation>导出中...</translation></message>
+    <message><source>Exporting... %1 of %2</source><translation>导出中... %1／%2</translation></message>
+    <message><source>Cancelling...</source><translation>正在取消...</translation></message>
+    <message><source>Enter the pages to export, for example 1-3,8,10-12.</source><translation>请输入要导出的页面，例如 1-3,8,10-12。</translation></message>
+    <message><source>There are no pages to export.</source><translation>没有可导出的页面。</translation></message>
+    <message><source>Choose the folder for the images.</source><translation>请选择图片的保存文件夹。</translation></message>
+    <message><source>The folder '%1' does not exist.</source><translation>文件夹“%1”不存在。</translation></message>
+    <message><source>File: %1</source><translation>文件：%1</translation></message>
+    <message><source>%1 files, from %2 to %3</source><translation>共 %1 个文件，从 %2 到 %3</translation></message>
+    <message><source>Too large: %1 x %2 pixels. Use a lower resolution.</source><translation>图片过大：%1 x %2 像素。请降低分辨率。</translation></message>
+    <message><source>Page images up to %1 x %2 pixels</source><translation>页面图片最大 %1 x %2 像素</translation></message>
+    <message><source>Select output folder</source><translation>选择输出文件夹</translation></message>
+    <message><source>%1 of the %2 files already exist in the folder. Replace them?</source><translation>文件夹中已有 %1 个（共 %2 个）同名文件。要替换它们吗？</translation></message>
+    <message><source>%1 image(s) were saved to %2.</source><translation>已将 %1 张图片保存到 %2。</translation></message>
+    <message><source>%1 image(s) were saved to:
+%2</source><translation>已将 %1 张图片保存到：
+%2</translation></message>
+    <message><source>The export was cancelled. %1 of %2 image(s) were saved; the others were not created.</source><translation>导出已取消。已保存 %1 张（共 %2 张）图片，其余未创建。</translation></message>
+    <message><source>Only %1 of %2 image(s) could be saved.</source><translation>只能保存 %1 张（共 %2 张）图片。</translation></message>
+    <message><source>Page %1: %2</source><translation>第 %1 页：%2</translation></message>
+    <message><source>... and %1 more.</source><translation>…还有 %1 项。</translation></message>
+</context>
+<context>
+    <name>pdfviewer::PDFPageOutput</name>
+    <message><source>There are no pages to print.</source><translation>没有可打印的页面。</translation></message>
+    <message><source>Printing could not be started. The printer is not available, or no output file was chosen.</source><translation>无法开始打印。打印机不可用，或未选择输出文件。</translation></message>
+    <message><source>Page %1: %2</source><translation>第 %1 页：%2</translation></message>
+    <message><source>The printer did not accept page %1.</source><translation>打印机未接受第 %1 页。</translation></message>
+</context>
+<context>
+    <name>pdfviewer::PDFPageImageExporter</name>
+    <message><source>Page %1 does not exist.</source><translation>第 %1 页不存在。</translation></message>
+    <message><source>The image of page %1 would be too large (%2 x %3 pixels). Use a lower resolution.</source><translation>第 %1 页的图片过大（%2 x %3 像素）。请降低分辨率。</translation></message>
+    <message><source>Not enough memory to render page %1 at %2 x %3 pixels.</source><translation>内存不足，无法以 %2 x %3 像素绘制第 %1 页。</translation></message>
+    <message><source>The selection on page %1 is outside of the page.</source><translation>第 %1 页的选中范围在页面之外。</translation></message>
+    <message><source>Cannot write '%1': %2</source><translation>无法写入“%1”：%2</translation></message>
 </context>
 </TS>

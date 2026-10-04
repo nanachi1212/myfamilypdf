@@ -44,6 +44,19 @@
 #include "pdfdocumentwriter.h"
 #include "pdfwidgetformmanager.h"
 #include "pdfsidebarwidget.h"
+#include "pdfprintdialog.h"
+#include "pdfexportimagesdialog.h"
+#include "pdfpageoutput.h"
+#include "pdfcms.h"
+#include "pdffont.h"
+#include "pdfconstants.h"
+#include <QRadioButton>
+#include <QScopeGuard>
+#include <QSpinBox>
+#include <QComboBox>
+#include <QPrinter>
+#include <QPrinterInfo>
+#include <QThreadPool>
 #include <QTreeWidget>
 #include "pdfdocumentbuilder.h"
 #include "pdfannotation.h"
@@ -174,6 +187,12 @@ private slots:
     void formValidationAndMalformed();
     void formAppearanceFallback();
     void annotationListLargeDocument();
+    void printAndExportEntriesAreAvailable();
+    void printDialogOptionsAndCancel();
+    void exportImagesDialogWorkflow();
+    void exportSelectionAsImageWorkflow();
+    void filledFormPrintsAndExports();
+    void printExportLargeDocumentBenchmark();
 
 private:
     QAction* action(const char* name) const { return m_window->findChild<QAction*>(QLatin1String(name)); }
@@ -197,6 +216,9 @@ void ViewerContextMenuTest::initTestCase()
     QCoreApplication::setOrganizationName("FamilyPDFTests");
     QCoreApplication::setApplicationName("ViewerContextMenu");
     pdf::PDFSettings::setSettingsPath(m_temp.filePath("settings"));
+    // Export dialog preferences must not leak into the registry of the machine.
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_temp.filePath("qsettings"));
     pdf::PDFWidgetUtils::setDarkTheme(true, false);
     m_pdfPath = m_temp.filePath("three-pages.pdf");
 
@@ -1004,7 +1026,9 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
             "thumbnailExtractPagesAction",
             "thumbnailDeletePagesAction",
             "thumbnailRotatePagesRightAction",
-            "thumbnailRotatePagesLeftAction"
+            "thumbnailRotatePagesLeftAction",
+            "thumbnailPrintPagesAction",
+            "thumbnailExportImagesAction"
         };
         for (const QString& objectName : requiredActions)
         {
@@ -2163,6 +2187,568 @@ void ViewerContextMenuTest::formAppearanceFallback()
     }
     controller->performSave();
     controller->closeDocument();
+}
+
+namespace {
+
+qint64 countDarkPixels(const QImage& image)
+{
+    qint64 count = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+            if (image.pixelColor(x, y).lightness() < 140)
+                ++count;
+    return count;
+}
+
+/// Rendering resources for a document which is read from a file (printed output).
+struct RenderedFile
+{
+    bool open(const QString& path)
+    {
+        pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+        document = std::make_unique<pdf::PDFDocument>(reader.readFromFile(path));
+        if (reader.getReadingResult() != pdf::PDFDocumentReader::Result::OK)
+            return false;
+        optionalContent = std::make_unique<pdf::PDFOptionalContentActivity>(document.get(), pdf::OCUsage::Export, nullptr);
+        cms = std::make_unique<pdf::PDFCMSManager>(nullptr);
+        cms->setDocument(document.get());
+        fonts = std::make_unique<pdf::PDFFontCache>(pdf::DEFAULT_FONT_CACHE_LIMIT, pdf::DEFAULT_REALIZED_FONT_CACHE_LIMIT);
+        fonts->setDocument(pdf::PDFModifiedDocument(document.get(), optionalContent.get()));
+        return true;
+    }
+
+    QImage render(int pageIndex, int dpi)
+    {
+        pdfviewer::PDFPageOutputContext context;
+        context.document = document.get();
+        context.fontCache = fonts.get();
+        context.cmsManager = cms.get();
+        pdfviewer::PDFPageImageExporter exporter(context, pdf::OCUsage::Export, 1);
+        return exporter.renderPage(pageIndex, pdfviewer::PDFPageImageExporter::getImageSize(document->getCatalog()->getPage(pageIndex), dpi));
+    }
+
+    std::unique_ptr<pdf::PDFDocument> document;
+    std::unique_ptr<pdf::PDFOptionalContentActivity> optionalContent;
+    std::unique_ptr<pdf::PDFCMSManager> cms;
+    std::unique_ptr<pdf::PDFFontCache> fonts;
+};
+
+}
+
+void ViewerContextMenuTest::printAndExportEntriesAreAvailable()
+{
+    for (const bool editorWindow : { false, true })
+    {
+        std::unique_ptr<QMainWindow> window;
+        pdfviewer::PDFProgramController* controller = nullptr;
+        if (editorWindow)
+        {
+            auto* editor = new pdfviewer::PDFEditorMainWindow;
+            window.reset(editor);
+            controller = editor->getProgramController();
+        }
+        else
+        {
+            auto* viewer = new pdfviewer::PDFViewerMainWindow;
+            window.reset(viewer);
+            controller = viewer->getProgramController();
+        }
+        window->resize(1100, 900);
+        window->show();
+
+        auto* exportAction = window->findChild<QAction*>("actionExportPageImages");
+        auto* printAction = window->findChild<QAction*>("actionPrint");
+        auto* fileMenu = window->findChild<QMenu*>("menuFile");
+        QVERIFY(exportAction && printAction && fileMenu);
+        QVERIFY(!exportAction->isEnabled());
+
+        controller->openDocument(m_pdfPath);
+        QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+        QTRY_VERIFY(exportAction->isEnabled());
+        QVERIFY(printAction->isEnabled());
+
+        // The export entry is listed right after Print in the File menu.
+        const QList<QAction*> actions = fileMenu->actions();
+        const int printIndex = actions.indexOf(printAction);
+        QVERIFY(printIndex >= 0);
+        QCOMPARE(actions.value(printIndex + 1), exportAction);
+        QVERIFY(exportAction->text().contains("Images"));
+
+        controller->closeDocument();
+        QTRY_VERIFY(!exportAction->isEnabled());
+        QVERIFY(!printAction->isEnabled());
+    }
+}
+
+void ViewerContextMenuTest::printDialogOptionsAndCancel()
+{
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+
+    const bool hasPrinter = !QPrinterInfo::availablePrinterNames().isEmpty();
+    bool inspected = false;
+    QElapsedTimer sinceOpen;
+    QTimer timer;
+    connect(&timer, &QTimer::timeout, &editor, [&]()
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFPrintDialog*>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        if (!sinceOpen.isValid())
+            sinceOpen.start();
+
+        auto* preview = dialog->findChild<QLabel*>("printPreviewLabel");
+        QVERIFY(preview);
+        // The first page of the preview appears without rendering the document.
+        if (hasPrinter && preview->pixmap(Qt::ReturnByValue).isNull() && sinceOpen.elapsed() < 20000)
+            return;
+        timer.stop();
+        if (hasPrinter)
+            qInfo() << "PERF print dialog first preview page ms:" << sinceOpen.elapsed();
+        saveImage(dialog->grab(), "print-dialog.png");
+
+        auto* range = dialog->findChild<QLineEdit*>("printRangeEdit");
+        auto* all = dialog->findChild<QRadioButton*>("printAllPagesRadio");
+        auto* fit = dialog->findChild<QRadioButton*>("printFitRadio");
+        auto* actual = dialog->findChild<QRadioButton*>("printActualSizeRadio");
+        auto* orientation = dialog->findChild<QComboBox*>("printOrientationCombo");
+        auto* duplex = dialog->findChild<QComboBox*>("printDuplexCombo");
+        auto* copies = dialog->findChild<QSpinBox*>("printCopiesSpin");
+        QVERIFY(range && all && fit && actual && orientation && duplex && copies);
+
+        // Defaults: all pages, fit to the printable area, orientation follows the pages.
+        QVERIFY(all->isChecked());
+        QCOMPARE(dialog->getSelectedPages(), (std::vector<pdf::PDFInteger>{ 0, 1, 2 }));
+        QCOMPARE(dialog->getOptions().scaling, pdfviewer::PDFPrintScaling::FitToPrintableArea);
+        QCOMPARE(dialog->getOptions().orientation, pdfviewer::PDFPrintOrientation::Auto);
+        QCOMPARE(copies->value(), 1);
+
+        range->setText("2-3");
+        QCOMPARE(dialog->getSelectedPages(), (std::vector<pdf::PDFInteger>{ 1, 2 }));
+        range->setText("3,1,2,2");
+        QCOMPARE(dialog->getSelectedPages(), (std::vector<pdf::PDFInteger>{ 0, 1, 2 }));
+        QString error;
+        range->setText("0");
+        QVERIFY(dialog->getSelectedPages(&error).empty());
+        QVERIFY(!error.isEmpty());
+        error.clear();
+        range->setText("2-9");
+        QVERIFY(dialog->getSelectedPages(&error).empty());
+        QVERIFY(!error.isEmpty());
+        range->setText("1,3");
+        QCOMPARE(dialog->getSelectedPages(), (std::vector<pdf::PDFInteger>{ 0, 2 }));
+
+        actual->setChecked(true);
+        QCOMPARE(dialog->getOptions().scaling, pdfviewer::PDFPrintScaling::ActualSize);
+        orientation->setCurrentIndex(orientation->findData(int(pdfviewer::PDFPrintOrientation::Landscape)));
+        QCOMPARE(dialog->getOptions().orientation, pdfviewer::PDFPrintOrientation::Landscape);
+
+        // Two-sided printing is only offered when the printer reports it.
+        if (hasPrinter)
+        {
+            const QPrinterInfo info = QPrinterInfo::printerInfo(dialog->findChild<QComboBox*>("printPrinterCombo")->currentText());
+            const auto modes = info.supportedDuplexModes();
+            QCOMPARE(duplex->isEnabled(), modes.contains(QPrinter::DuplexLongSide) || modes.contains(QPrinter::DuplexShortSide));
+            QVERIFY(dialog->findChild<QPushButton*>("printButton")->isEnabled());
+        }
+        inspected = true;
+        dialog->reject();
+    });
+    timer.start(10);
+    editor.findChild<QAction*>("actionPrint")->trigger();
+    timer.stop();
+    QVERIFY(inspected);
+
+    // Cancel leaves nothing running in the background.
+    QVERIFY(QThreadPool::globalInstance()->waitForDone(5000));
+
+    // "Print selected pages" from the thumbnails starts with those pages.
+    inspected = false;
+    QTimer selectedTimer;
+    connect(&selectedTimer, &QTimer::timeout, &editor, [&]()
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFPrintDialog*>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        selectedTimer.stop();
+        auto* selected = dialog->findChild<QRadioButton*>("printSelectedPagesRadio");
+        QVERIFY(selected && selected->isEnabled() && selected->isChecked());
+        QCOMPARE(dialog->getSelectedPages(), (std::vector<pdf::PDFInteger>{ 1, 2 }));
+        inspected = true;
+        dialog->reject();
+    });
+    selectedTimer.start(10);
+    controller->printPages({ 1, 2 });
+    selectedTimer.stop();
+    QVERIFY(inspected);
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::exportImagesDialogWorkflow()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+
+    QDir outputDirectory(m_temp.filePath("ui-export"));
+    QVERIFY(outputDirectory.mkpath("."));
+
+    // Runs the export dialog: the first function adjusts it, then the Export button is pressed.
+    // Message boxes are answered by the second function (return true to press the default answer).
+    auto runDialog = [&](const std::function<void(pdfviewer::PDFExportImagesDialog*)>& configure, QMessageBox::StandardButton answer, int expectedMessages)
+    {
+        int stage = 0;
+        int messages = 0;
+        QTimer timer;
+        connect(&timer, &QTimer::timeout, &editor, [&]()
+        {
+            QWidget* modal = QApplication::activeModalWidget();
+            if (auto* message = qobject_cast<QMessageBox*>(modal))
+            {
+                ++messages;
+                if (auto* button = message->button(answer))
+                    button->click();
+                else
+                    message->accept();
+                return;
+            }
+            if (auto* dialog = qobject_cast<pdfviewer::PDFExportImagesDialog*>(modal); dialog && stage == 0)
+            {
+                stage = 1;
+                saveImage(dialog->grab(), "export-images-dialog.png");
+                configure(dialog);
+                auto* button = dialog->findChild<QPushButton*>("exportButton");
+                QVERIFY(button && button->isEnabled());
+                // Clicked from the event loop: the overwrite question is a nested loop which this timer must not block.
+                QMetaObject::invokeMethod(button, &QPushButton::click, Qt::QueuedConnection);
+                return;
+            }
+            if (auto* dialog = qobject_cast<pdfviewer::PDFExportImagesDialog*>(modal); dialog && stage == 1 && messages > 0)
+            {
+                // The export was not started (answered "No"): close the dialog.
+                stage = 2;
+                dialog->reject();
+            }
+        });
+        timer.start(10);
+        editor.findChild<QAction*>("actionExportPageImages")->trigger();
+        timer.stop();
+        QCOMPARE(messages, expectedMessages);
+    };
+
+    // 1. Current page as JPEG
+    runDialog([&](pdfviewer::PDFExportImagesDialog* dialog)
+    {
+        QVERIFY(dialog->findChild<QRadioButton*>("exportCurrentPageRadio")->isChecked());
+        dialog->findChild<QLineEdit*>("exportDirectoryEdit")->setText(outputDirectory.absolutePath());
+        dialog->findChild<QSpinBox*>("exportDpiSpin")->setValue(72);
+        auto* format = dialog->findChild<QComboBox*>("exportFormatCombo");
+        format->setCurrentIndex(format->findData(int(pdfviewer::PDFImageFormat::Jpeg)));
+        QVERIFY(dialog->findChild<QSpinBox*>("exportQualitySpin")->isEnabled());
+        dialog->findChild<QSpinBox*>("exportQualitySpin")->setValue(60);
+        QVERIFY(dialog->findChild<QLabel*>("exportFilesLabel")->text().contains("three-pages_p1.jpg"));
+    }, QMessageBox::Ok, 1);
+    QCOMPARE(outputDirectory.entryList(QDir::Files, QDir::Name), (QStringList{ "three-pages_p1.jpg" }));
+    QCOMPARE(QImage(outputDirectory.filePath("three-pages_p1.jpg")).size(), QSize(420, 595));
+
+    // 2. All pages as PNG at 144 dpi
+    runDialog([&](pdfviewer::PDFExportImagesDialog* dialog)
+    {
+        dialog->findChild<QLineEdit*>("exportDirectoryEdit")->setText(outputDirectory.absolutePath());
+        dialog->findChild<QRadioButton*>("exportAllPagesRadio")->setChecked(true);
+        dialog->findChild<QSpinBox*>("exportDpiSpin")->setValue(144);
+        auto* format = dialog->findChild<QComboBox*>("exportFormatCombo");
+        format->setCurrentIndex(format->findData(int(pdfviewer::PDFImageFormat::Png)));
+        QVERIFY(!dialog->findChild<QSpinBox*>("exportQualitySpin")->isEnabled());
+    }, QMessageBox::Ok, 1);
+    QCOMPARE(outputDirectory.entryList(QDir::Files, QDir::Name), (QStringList{ "three-pages_p1.jpg", "three-pages_p1.png", "three-pages_p2.png", "three-pages_p3.png" }));
+    for (const QString& name : { "three-pages_p1.png", "three-pages_p2.png", "three-pages_p3.png" })
+    {
+        const QImage image(outputDirectory.filePath(name));
+        QCOMPARE(image.size(), QSize(840, 1190));
+        QVERIFY(countDarkPixels(image) > 50);   // the page text
+    }
+
+    // 3. Existing files are never replaced without asking. Answering "No" keeps them untouched.
+    const QDateTime before = QFileInfo(outputDirectory.filePath("three-pages_p2.png")).lastModified();
+    runDialog([&](pdfviewer::PDFExportImagesDialog* dialog)
+    {
+        dialog->findChild<QLineEdit*>("exportDirectoryEdit")->setText(outputDirectory.absolutePath());
+        dialog->findChild<QRadioButton*>("exportRangeRadio")->setChecked(true);
+        dialog->findChild<QLineEdit*>("exportRangeEdit")->setText("2-3");
+        dialog->findChild<QSpinBox*>("exportDpiSpin")->setValue(144);
+    }, QMessageBox::No, 1);
+    QCOMPARE(QFileInfo(outputDirectory.filePath("three-pages_p2.png")).lastModified(), before);
+    // 4. Page range selection and an invalid range keep Export disabled.
+    bool checked = false;
+    QTimer timer;
+    connect(&timer, &QTimer::timeout, &editor, [&]()
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFExportImagesDialog*>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        timer.stop();
+        auto* range = dialog->findChild<QLineEdit*>("exportRangeEdit");
+        range->setText("1-3,8");
+        QVERIFY(!dialog->findChild<QPushButton*>("exportButton")->isEnabled());
+        QVERIFY(dialog->getSelectedPages().empty());
+        range->setText("1,3");
+        QVERIFY(dialog->findChild<QPushButton*>("exportButton")->isEnabled());
+        QCOMPARE(dialog->getSelectedPages(), (std::vector<pdf::PDFInteger>{ 0, 2 }));
+        checked = true;
+        dialog->reject();
+    });
+    timer.start(10);
+    controller->exportPagesAsImages();
+    timer.stop();
+    QVERIFY(checked);
+    QVERIFY(QThreadPool::globalInstance()->waitForDone(5000));
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::exportSelectionAsImageWorkflow()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    const QString path = m_temp.filePath("selection-source.pdf");
+    QVERIFY(writePdfFixture(path, 3, 2));
+    // A failed check must not leave the document open while the window is destroyed.
+    const auto closeGuard = qScopeGuard([controller]() { controller->closeDocument(); });
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    auto* widget = controller->getPdfWidget();
+    auto* drawProxy = widget->getDrawWidgetProxy();
+    editor.findChild<QAction*>("actionSelectText")->trigger();
+    QTRY_VERIFY_WITH_TIMEOUT(drawProxy->getTextLayoutCompiler()->isTextLayoutReady(), 15000);
+
+    // The context menu offers the export only while text is selected.
+    auto exportSelectionEnabled = [&]()
+    {
+        std::optional<bool> enabled;
+        QTimer menuTimer;
+        connect(&menuTimer, &QTimer::timeout, &editor, [&]()
+        {
+            if (auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget()))
+            {
+                menuTimer.stop();
+                auto* action = menu->findChild<QAction*>("actionExportSelectionImage");
+                enabled = action && action->isEnabled();
+                menu->close();
+            }
+        });
+        menuTimer.start(10);
+        Q_EMIT widget->customContextMenuRequested(QPoint(100, 100));
+        menuTimer.stop();
+        return enabled;
+    };
+    QCOMPARE(exportSelectionEnabled(), std::optional<bool>(false));
+    editor.findChild<QAction*>("actionSelectTextAll")->trigger();
+    QVERIFY(!controller->getToolManager()->getSelectedText().isEmpty());
+    QCOMPARE(exportSelectionEnabled(), std::optional<bool>(true));
+
+    QDir outputDirectory(m_temp.filePath("ui-selection-export"));
+    QVERIFY(outputDirectory.mkpath("."));
+    int stage = 0;
+    QTimer timer;
+    connect(&timer, &QTimer::timeout, &editor, [&]()
+    {
+        QWidget* modal = QApplication::activeModalWidget();
+        if (auto* message = qobject_cast<QMessageBox*>(modal))
+        {
+            ++stage;
+            message->accept();
+        }
+        else if (auto* dialog = qobject_cast<pdfviewer::PDFExportImagesDialog*>(modal); dialog && stage == 0)
+        {
+            stage = -1;
+            QCOMPARE(dialog->windowTitle(), QString("Export Selection as Image"));
+            auto* format = dialog->findChild<QComboBox*>("exportFormatCombo");
+            format->setCurrentIndex(format->findData(int(pdfviewer::PDFImageFormat::Png)));
+            // One region per page of the document; there are no page options.
+            QCOMPARE(dialog->getSelectedPages(), (std::vector<pdf::PDFInteger>{ 0, 1, 2 }));
+            dialog->findChild<QLineEdit*>("exportDirectoryEdit")->setText(outputDirectory.absolutePath());
+            dialog->findChild<QSpinBox*>("exportDpiSpin")->setValue(144);
+            dialog->findChild<QPushButton*>("exportButton")->click();
+        }
+    });
+    timer.start(10);
+    controller->exportSelectionAsImage();
+    timer.stop();
+    QCOMPARE(stage, 0);     // -1 + the message box
+
+    QCOMPARE(outputDirectory.entryList(QDir::Files, QDir::Name), (QStringList{ "selection-source_p1_selection.png", "selection-source_p2_selection.png", "selection-source_p3_selection.png" }));
+    for (const QFileInfo& file : outputDirectory.entryInfoList(QDir::Files))
+    {
+        const QImage image(file.absoluteFilePath());
+        // The text block of the page (two lines of 16 point text) at 144 dpi, not the whole page.
+        QVERIFY2(image.width() > 150 && image.width() < 840 && image.height() > 40 && image.height() < 400, qPrintable(QString("%1x%2").arg(image.width()).arg(image.height())));
+        QVERIFY(countDarkPixels(image) > 100);
+    }
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::filledFormPrintsAndExports()
+{
+    const QString path = m_temp.filePath("print-form.pdf");
+    QVERIFY(writeWorkflowForm(path));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    auto* widget = controller->getPdfWidget();
+    auto* manager = widget->getFormManager();
+    auto* draw = widget->getDrawWidget()->getWidget();
+    QVERIFY(manager);
+
+    auto* field = workflowField(manager, "name");
+    manager->setFocusToEditor(manager->getEditor(field));
+    QKeyEvent event(QEvent::KeyPress, 0, Qt::NoModifier, QString("Form value"));
+    manager->keyPressEvent(draw, &event);
+    manager->setFocusToEditor(nullptr);
+    QCOMPARE(workflowValue(manager, "name"), "Form value");
+
+    const pdf::PDFDocument* document = controller->getDocument();
+    const pdf::PDFPage* page = document->getCatalog()->getPage(0);
+    const auto context = pdfviewer::PDFPageOutputContext::fromProxy(document, widget->getDrawWidgetProxy());
+
+    // Image export draws the filled field, like the screen does.
+    pdfviewer::PDFPageImageExporter exporter(context, pdf::OCUsage::Export, 1);
+    const QSize size = pdfviewer::PDFPageImageExporter::getImageSize(page, 144);
+    QString error;
+    const QImage image = exporter.renderPage(0, size, &error);
+    QVERIFY2(!image.isNull(), qPrintable(error));
+    const QRect fieldRect = pdf::PDFRenderer::createPagePointToDevicePointMatrix(page, QRect(QPoint(0, 0), size)).mapRect(QRectF(40, 450, 220, 40)).toAlignedRect();
+    const qint64 exportedPixels = countDarkPixels(image.copy(fieldRect.adjusted(6, 6, -6, -6)));
+    qInfo() << "form value pixels in exported image:" << exportedPixels;
+    QVERIFY(exportedPixels > 40);
+
+    // The same field of an empty form (second page has no value) stays blank.
+    const QRect emptyRect = pdf::PDFRenderer::createPagePointToDevicePointMatrix(page, QRect(QPoint(0, 0), size)).mapRect(QRectF(40, 390, 220, 40)).toAlignedRect();
+    QVERIFY(countDarkPixels(image.copy(emptyRect.adjusted(40, 6, -6, -6))) < exportedPixels);
+
+    // Printing keeps the field: print to PDF output and render the printed sheet again.
+    const QString printedPath = m_temp.filePath("print-form-printed.pdf");
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(printedPath);
+    pdfviewer::PDFPrintOptions options;
+    options.pageIndices = { 0 };
+    options.scaling = pdfviewer::PDFPrintScaling::ActualSize;
+    const pdfviewer::PDFPrintResult result = pdfviewer::PDFPageOutput::print(&printer, context, options);
+    QVERIFY2(result.completed, qPrintable(result.errorMessage));
+    QVERIFY2(result.renderWarnings.isEmpty(), qPrintable(result.renderWarnings.join("; ")));
+
+    RenderedFile printed;
+    QVERIFY(printed.open(printedPath));
+    QCOMPARE(printed.document->getCatalog()->getPageCount(), size_t(1));
+    const QImage sheet = printed.render(0, 144);
+    // The 420 x 595 point page is centered on the A4 sheet at actual size.
+    const QSizeF sheetPoints = printed.document->getCatalog()->getPage(0)->getRotatedMediaBox().size();
+    const QPointF origin((sheetPoints.width() - 420.0) / 2.0 * 2.0, (sheetPoints.height() - 595.0) / 2.0 * 2.0);
+    const QRect printedField = fieldRect.translated(origin.toPoint());
+    const qint64 printedPixels = countDarkPixels(sheet.copy(printedField.adjusted(6, 6, -6, -6)));
+    qInfo() << "form value pixels in printed sheet:" << printedPixels;
+    QVERIFY(printedPixels > 40);
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::printExportLargeDocumentBenchmark()
+{
+    const QString path = m_temp.filePath("print-export-1200.pdf");
+    QVERIFY(writePdfFixture(path, 1200, 20));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    const auto closeGuard = qScopeGuard([controller]() { controller->closeDocument(); });
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 30000);
+    const auto context = pdfviewer::PDFPageOutputContext::fromProxy(controller->getDocument(), controller->getPdfWidget()->getDrawWidgetProxy());
+
+    QDir directory(m_temp.filePath("large-export"));
+    QVERIFY(directory.mkpath("."));
+    auto exportPages = [&](const std::vector<pdf::PDFInteger>& pages, int dpi)
+    {
+        pdfviewer::PDFPageImageExporter exporter(context, pdf::OCUsage::Export, 4);
+        std::vector<pdfviewer::PDFImageExportTarget> targets;
+        for (const pdf::PDFInteger page : pages)
+        {
+            pdfviewer::PDFImageExportTarget target;
+            target.pageIndex = page;
+            target.fileName = directory.absoluteFilePath(pdfviewer::PDFPageImageExporter::getFileName("big", page, 1200, pdfviewer::PDFImageFormat::Png, false));
+            targets.push_back(target);
+        }
+        QElapsedTimer timer;
+        timer.start();
+        const auto result = exporter.exportTargets(targets, pdfviewer::PDFImageFormat::Png, dpi, 90);
+        const qint64 elapsed = timer.elapsed();
+        return std::make_pair(result.isComplete(), elapsed);
+    };
+
+    // Only page 600 of 1200: the pages before it are not touched.
+    auto single = exportPages({ 599 }, 150);
+    QVERIFY(single.first);
+    qInfo() << "PERF 1 page PNG (#600 of 1200, 150 dpi) ms:" << single.second;
+    QCOMPARE(directory.entryList(QDir::Files).size(), 1);
+    QVERIFY(countDarkPixels(QImage(directory.filePath("big_p0600.png"))) > 100);
+    QVERIFY2(single.second < 8000, "one page of a large document must not wait for the others");
+
+    std::vector<pdf::PDFInteger> tenPages;
+    for (int i = 0; i < 10; ++i)
+        tenPages.push_back(600 + i);
+    auto batch = exportPages(tenPages, 150);
+    QVERIFY(batch.first);
+    qInfo() << "PERF 10 pages PNG (#601-610 of 1200, 150 dpi) ms:" << batch.second;
+    QCOMPARE(directory.entryList(QDir::Files).size(), 11);
+
+    // Print one page of the large document.
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(m_temp.filePath("big-printed.pdf"));
+    pdfviewer::PDFPrintOptions options;
+    options.pageIndices = { 599 };
+    QElapsedTimer timer;
+    timer.start();
+    const auto printResult = pdfviewer::PDFPageOutput::print(&printer, context, options);
+    qInfo() << "PERF print 1 page (#600 of 1200) ms:" << timer.elapsed();
+    QVERIFY2(printResult.completed, qPrintable(printResult.errorMessage));
+
+    // Opening the print dialog (with its first preview page) on the large document.
+    bool opened = false;
+    QElapsedTimer dialogTimer;
+    QTimer dialogPoll;
+    connect(&dialogPoll, &QTimer::timeout, &editor, [&]()
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFPrintDialog*>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        auto* preview = dialog->findChild<QLabel*>("printPreviewLabel");
+        if (!preview || (!QPrinterInfo::availablePrinterNames().isEmpty() && preview->pixmap(Qt::ReturnByValue).isNull() && dialogTimer.elapsed() < 20000))
+            return;
+        dialogPoll.stop();
+        qInfo() << "PERF print dialog on 1200 pages, first preview ms:" << dialogTimer.elapsed();
+        opened = true;
+        dialog->reject();
+    });
+    dialogTimer.start();
+    dialogPoll.start(10);
+    controller->performPrint();
+    dialogPoll.stop();
+    QVERIFY(opened);
 }
 
 QTEST_MAIN(ViewerContextMenuTest)

@@ -107,10 +107,15 @@ public:
     /// Sets current pages (for example, selects the correct thumbnail)
     void setCurrentPages(const std::vector<pdf::PDFInteger>& currentPages);
 
+    /// Returns pages selected in the thumbnails (zero based, sorted, unique)
+    std::vector<pdf::PDFInteger> getSelectedThumbnailPages() const;
+
 signals:
     void actionTriggered(const pdf::PDFAction* action);
     void documentModified(pdf::PDFModifiedDocument document);
     void extractPagesRequested(std::vector<pdf::PDFInteger> pageIndices);
+    void printPagesRequested(std::vector<pdf::PDFInteger> pageIndices);
+    void exportPagesAsImagesRequested(std::vector<pdf::PDFInteger> pageIndices);
     void deletePagesRequested(std::vector<pdf::PDFInteger> pageIndices);
     void rotatePagesRequested(std::vector<pdf::PDFInteger> pageIndices, int quarterTurns);
 
@@ -149,7 +154,6 @@ private:
 
     bool saveAttachmentToFile(const pdf::PDFFileSpecification* fileSpecification, const QString& fileName);
     void openAttachment(const pdf::PDFFileSpecification* fileSpecification);
-    std::vector<pdf::PDFInteger> getSelectedThumbnailPages() const;
     void selectThumbnailPages(const std::vector<pdf::PDFInteger>& pageIndices);
 
     Ui::PDFSidebarWidget* ui;
