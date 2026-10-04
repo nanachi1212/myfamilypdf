@@ -2130,11 +2130,31 @@ void ViewerContextMenuTest::formAppearanceFallback()
     QVERIFY(unchangedAppearance.isReference());
     for (const QString& value : {QString("next"), QString("last")})
     {
+        // Compare allocation against the existing single-field setter on an
+        // independent form model: the global refresh must add no second AP.
+        pdf::PDFWidgetFormManager baseline(controller->getPdfWidget()->getDrawWidgetProxy(), nullptr);
+        baseline.setAnnotationManager(manager->getAnnotationManager());
+        baseline.setAppearanceFlags(manager->getAppearanceFlags());
+        baseline.setDocument(pdf::PDFModifiedDocument(controller->getDocument(), nullptr, pdf::PDFModifiedDocument::Reset));
+        auto* baselineField = baseline.getFormFieldForWidget(workflowField(manager, "name")->getWidgets().front().getWidget());
+        QVERIFY(baselineField);
+        pdf::PDFDocumentModifier baselineModifier(controller->getDocument());
+        baselineModifier.getBuilder()->setFormManager(&baseline);
+        pdf::PDFFormField::SetValueParameters parameters;
+        parameters.formManager = &baseline;
+        parameters.modifier = &baselineModifier;
+        parameters.invokingFormField = baselineField;
+        parameters.invokingWidget = baselineField->getWidgets().front().getWidget();
+        parameters.scope = pdf::PDFFormField::SetValueParameters::Scope::User;
+        parameters.value = pdf::PDFObjectFactory::createTextString(value);
+        QVERIFY(baselineField->setValue(parameters));
+        const auto expectedObjectCount = baselineModifier.getBuilder()->getStorage()->getObjects().size();
         manager->setFocusToEditor(manager->getEditor(workflowField(manager, "name")));
         QKeyEvent input(QEvent::KeyPress, 0, Qt::NoModifier, value);
         manager->keyPressEvent(controller->getPdfWidget()->getDrawWidget()->getWidget(), &input);
         manager->setFocusToEditor(nullptr);
         QCOMPARE(workflowValue(manager, "name"), value);
+        QCOMPARE(controller->getDocument()->getStorage().getObjects().size(), expectedObjectCount);
         // No new streams/resources for unrelated widgets on each failed retry.
         QCOMPARE(normalAppearance("multiline"), unchangedAppearance);
         editor.findChild<QAction*>("actionUndo")->trigger();

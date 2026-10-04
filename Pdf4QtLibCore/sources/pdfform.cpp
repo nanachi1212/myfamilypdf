@@ -811,12 +811,17 @@ void PDFFormManager::setFormFieldValue(PDFFormField::SetValueParameters paramete
                 const auto* previousDictionary = storage->getDictionaryFromObject(storage->getObjectByReference(widget.getWidget()));
                 const auto* previousAppearances = previousDictionary ? storage->getDictionaryFromObject(previousDictionary->get("AP")) : nullptr;
                 const PDFObject previousNormal = previousAppearances ? previousAppearances->get("N") : PDFObject();
+                const auto* originalDictionary = m_document->getDictionaryFromObject(m_document->getObjectByReference(widget.getWidget()));
+                const auto* originalAppearances = originalDictionary ? m_document->getDictionaryFromObject(originalDictionary->get("AP")) : nullptr;
+                // The field setter has already regenerated changed values in
+                // this transaction. Reuse that stream rather than orphaning it.
+                const bool updatedBySetter = previousNormal != (originalAppearances ? originalAppearances->get("N") : PDFObject());
                 const auto type = widget.getParent()->getFieldType();
                 const bool valueWidget = type == PDFFormField::FieldType::Text || type == PDFFormField::FieldType::Choice;
                 const auto cached = m_refreshedAppearances.find(widget.getWidget());
                 const bool alreadyRefreshed = cached != m_refreshedAppearances.end()
                     && cached->second == storage->getObject(previousNormal);
-                const bool regenerate = valueWidget && !alreadyRefreshed;
+                const bool regenerate = valueWidget && !alreadyRefreshed && !updatedBySetter;
                 if (regenerate)
                     builder->updateAnnotationAppearanceStreams(widget.getWidget());
                 const auto* dictionary = storage->getDictionaryFromObject(storage->getObjectByReference(widget.getWidget()));
