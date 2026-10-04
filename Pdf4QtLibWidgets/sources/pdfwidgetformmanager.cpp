@@ -277,22 +277,8 @@ PDFFormFieldSignatureEditor::PDFFormFieldSignatureEditor(PDFWidgetFormManager* f
 
 bool PDFFormFieldSignatureEditor::isEditorDrawEnabled() const
 {
-    PDFDrawWidgetProxy* proxy = m_formManager->getProxy();
-
-    if (proxy)
-    {
-        const std::vector<PDFSignatureVerificationResult>& signatureVerificationResult = proxy->getSignatureVerificationResult();
-        QString qualifiedName = m_formWidget.getParent()->getName(PDFFormField::NameType::FullyQualified);
-
-        for (const PDFSignatureVerificationResult& result : signatureVerificationResult)
-        {
-            if (result.getSignatureFieldQualifiedName() == qualifiedName)
-            {
-                return true;
-            }
-        }
-    }
-
+    // Preserve the signed widget appearance. Verification and trust are shown
+    // separately in the signature sidebar, without overwriting the signature.
     return false;
 }
 
@@ -324,7 +310,7 @@ void PDFFormFieldSignatureEditor::draw(AnnotationDrawParameters& parameters, boo
 
     if (verificationResult)
     {
-        if (verificationResult->isValid())
+        if (verificationResult->isSignatureValid())
         {
             isValid = true;
             text = tr("Signature Valid");
@@ -539,6 +525,14 @@ void PDFWidgetFormManager::setAnnotationManager(PDFWidgetAnnotationManager* anno
 
 void PDFWidgetFormManager::shortcutOverrideEvent(QWidget* widget, QKeyEvent* event)
 {
+    if (event == QKeySequence::Save || event == QKeySequence::SaveAs
+        || event == QKeySequence::Undo || event == QKeySequence::Redo)
+    {
+        setFocusToEditor(nullptr);
+        event->ignore();
+        return;
+    }
+
     if (m_focusedEditor)
     {
         m_focusedEditor->shortcutOverrideEvent(widget, event);
@@ -820,52 +814,85 @@ QString PDFWidgetFormManager::getTooltip() const
 
 bool PDFWidgetFormManager::focusNextPrevFormField(bool next)
 {
-    if (m_widgetEditors.empty())
-    {
+    std::vector<PDFFormFieldWidgetEditor*> candidates;
+    if (!getDocument())
         return false;
-    }
-
-    std::vector<PDFFormFieldWidgetEditor*>::const_iterator newFocusIterator = m_widgetEditors.cend();
-
-    if (!m_focusedEditor)
+    auto* catalog = getDocument()->getCatalog();
+    for (size_t pageIndex = 0; pageIndex < catalog->getPageCount(); ++pageIndex)
     {
-        // We are setting a new focus
-        if (next)
+        const auto* page = catalog->getPage(pageIndex);
+        std::vector<PDFFormFieldWidgetEditor*> pageEditors;
+        for (const auto& annotation : page->getAnnotations())
         {
-            newFocusIterator = m_widgetEditors.cbegin();
+            for (auto* editor : m_widgetEditors)
+            {
+                const auto* field = editor->getFormField();
+                if (editor->getWidgetAnnotation() != annotation || field->getFlags().testFlag(PDFFormField::ReadOnly)
+                    || field->getFieldType() == PDFFormField::FieldType::Signature)
+                    continue;
+                const auto* dictionary = getDocument()->getDictionaryFromObject(getDocument()->getObjectByReference(annotation));
+                PDFDocumentDataLoaderDecorator loader(getDocument());
+                const auto flags = loader.readIntegerFromDictionary(dictionary, "F", 0);
+                if (!(flags & (1 | 2 | 32)) && !getWidgetRectangle(*editor->getFormWidget()).isEmpty())
+                    pageEditors.push_back(editor);
+            }
         }
-        else
+        const auto order = page->getTabOrder();
+        if (order == PageTabOrder::Row || order == PageTabOrder::Column)
         {
-            newFocusIterator = std::prev(m_widgetEditors.cend());
+            std::stable_sort(pageEditors.begin(), pageEditors.end(), [this, order](const auto* left, const auto* right)
+            {
+                const QRectF a = getWidgetRectangle(*left->getFormWidget());
+                const QRectF b = getWidgetRectangle(*right->getFormWidget());
+                if (order == PageTabOrder::Column)
+                    return a.left() != b.left() ? a.left() < b.left() : a.bottom() > b.bottom();
+                return a.bottom() != b.bottom() ? a.bottom() > b.bottom() : a.left() < b.left();
+            });
         }
+        candidates.insert(candidates.end(), pageEditors.begin(), pageEditors.end());
     }
+    if (candidates.empty())
+        return false;
+    auto it = std::find(candidates.begin(), candidates.end(), m_focusedEditor);
+    if (it == candidates.end())
+        it = next ? candidates.begin() : std::prev(candidates.end());
+    else if (next)
+        it = std::next(it) == candidates.end() ? candidates.begin() : std::next(it);
     else
+        it = it == candidates.begin() ? std::prev(candidates.end()) : std::prev(it);
+    setFocusToEditor(*it);
+    catalog = getDocument()->getCatalog();
+    const auto reference = (*it)->getWidgetAnnotation();
+    for (size_t pageIndex = 0; pageIndex < catalog->getPageCount(); ++pageIndex)
     {
-        std::vector<PDFFormFieldWidgetEditor*>::const_iterator it = std::find(m_widgetEditors.cbegin(), m_widgetEditors.cend(), m_focusedEditor);
-        Q_ASSERT(it != m_widgetEditors.cend());
-
-        if (next)
+        const auto& annotations = catalog->getPage(pageIndex)->getAnnotations();
+        if (std::find(annotations.begin(), annotations.end(), reference) != annotations.end())
         {
-            newFocusIterator = std::next(it);
-        }
-        else if (it != m_widgetEditors.cbegin())
-        {
-            newFocusIterator = std::prev(it);
+            m_proxy->goToPageAndEnsureVisible(pageIndex, getWidgetRectangle(*(*it)->getFormWidget()));
+            break;
         }
     }
+    return true;
+}
 
-    if (newFocusIterator != m_widgetEditors.cend())
+QStringList PDFWidgetFormManager::getMissingRequiredFields() const
+{
+    QStringList names;
+    if (!getDocument())
+        return names;
+    PDFDocumentDataLoaderDecorator loader(getDocument());
+    apply([&](const PDFFormField* field)
     {
-        setFocusToEditor(*newFocusIterator);
-        return true;
-    }
-    else
-    {
-        // Jakub Melka: We must remove focus out of editor, because
-        setFocusToEditor(nullptr);
-    }
-
-    return false;
+        if (!field->getFlags().testFlag(PDFFormField::Required) || field->getWidgets().empty())
+            return;
+        const PDFObject value = getDocument()->getObject(field->getValue());
+        const bool empty = value.isNull() || (value.isString() && loader.readTextString(value, QString()).isEmpty())
+            || (value.isName() && value.getString() == "Off") || (value.isArray() && value.getArray()->getCount() == 0);
+        if (empty)
+            names.append(field->getName(PDFFormField::FullyQualified));
+    });
+    names.removeDuplicates();
+    return names;
 }
 
 void PDFWidgetFormManager::clearEditors()
@@ -904,8 +931,7 @@ void PDFWidgetFormManager::updateFormWidgetEditors()
                     }
 
                     default:
-                        Q_ASSERT(false);
-                        break;
+                                break;
                 }
 
                 break;
@@ -932,8 +958,7 @@ void PDFWidgetFormManager::updateFormWidgetEditors()
                 else
                 {
                     // Uknown field choice
-                    Q_ASSERT(false);
-                }
+                    }
 
                 break;
             }
@@ -945,7 +970,6 @@ void PDFWidgetFormManager::updateFormWidgetEditors()
             }
 
             default:
-                Q_ASSERT(false);
                 break;
         }
     }
@@ -1489,7 +1513,7 @@ void PDFFormFieldComboBoxEditor::reloadValue()
     Q_ASSERT(parentField);
 
     PDFDocumentDataLoaderDecorator loader(m_formManager->getDocument());
-    m_textEdit.setText(loader.readTextString(m_formWidget.getParent()->getValue(), QString()));
+    initializeTextEdit(&m_textEdit);
 
     m_listBoxVisible = false;
 }
@@ -1561,7 +1585,10 @@ void PDFFormFieldComboBoxEditor::initializeTextEdit(PDFTextEditPseudowidget* tex
 
     // Initialize text edit
     textEdit->setAppearance(PDFAnnotationDefaultAppearance::parse(defaultAppearance), alignment, m_formManager->getWidgetRectangle(m_formWidget), 0);
-    textEdit->setText(loader.readTextString(parentField->getValue(), QString()));
+    QString value = loader.readTextString(parentField->getValue(), QString());
+    for (const auto& option : parentField->getOptions())
+        if (option.exportString == value) { value = option.userString; break; }
+    textEdit->setText(value);
 }
 
 void PDFFormFieldComboBoxEditor::initializeListBox(PDFListBoxPseudowidget* listBox) const
@@ -1583,7 +1610,11 @@ void PDFFormFieldComboBoxEditor::setFocusImpl(bool focused)
     else if (!m_formManager->isCommitDisabled())
     {
         // If text has been changed, then commit it
-        PDFObject object = PDFObjectFactory::createTextString(m_textEdit.getText());
+        QString value = m_textEdit.getText();
+        const auto* field = static_cast<const PDFFormFieldChoice*>(m_formWidget.getParent());
+        for (const auto& option : field->getOptions())
+            if (option.userString == value) { value = option.exportString; break; }
+        PDFObject object = PDFObjectFactory::createTextString(value);
 
         if (object != m_formWidget.getParent()->getValue())
         {
@@ -1641,7 +1672,7 @@ void PDFFormFieldTextBoxEditor::setFocusImpl(bool focused)
     else if (!m_textEdit.isPassword() && !m_formManager->isCommitDisabled()) // Passwords are not saved in the document
     {
         // If text has been changed, then commit it
-        PDFObject object = PDFObjectFactory::createTextString(m_textEdit.getText());
+        PDFObject object = PDFObjectFactory::createTextString(QString(m_textEdit.getText()).replace(QChar(0x2028), QChar('\n')));
 
         if (object != m_formWidget.getParent()->getValue())
         {
@@ -2271,7 +2302,7 @@ std::set<int> PDFFormFieldListBoxEditor::getSelectedItems(PDFObject value, PDFOb
             for (size_t i = 0; i < options.size(); ++i)
             {
                 const PDFFormFieldChoice::Option& option = options[i];
-                if (option.userString == optionString)
+                if (option.exportString == optionString)
                 {
                     result.insert(int(i));
                 }
@@ -2310,11 +2341,12 @@ void PDFFormFieldListBoxEditor::commit()
         Q_ASSERT(parentField);
 
         const PDFFormFieldChoice::Options& options = parentField->getOptions();
-        std::set<QString> values;
+        std::vector<QString> values;
 
         for (const int index : selection)
         {
-            values.insert(options[index].userString);
+            if (index >= 0 && size_t(index) < options.size())
+                values.push_back(options[index].exportString);
         }
 
         if (values.size() == 1)

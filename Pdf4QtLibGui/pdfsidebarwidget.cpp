@@ -34,6 +34,7 @@
 #include "pdfitemmodels.h"
 #include "pdfexception.h"
 #include "pdfsignaturehandler.h"
+#include "pdfform.h"
 #include "pdfdrawspacecontroller.h"
 #include "pdfdocumentbuilder.h"
 #include "pdfwidgetutils.h"
@@ -217,6 +218,13 @@ PDFSidebarWidget::PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
 
     ui->signatureTreeWidget->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->signatureTreeWidget, &QTreeWidget::customContextMenuRequested, this, &PDFSidebarWidget::onSignatureCustomContextMenuRequested);
+    connect(ui->signatureTreeWidget, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem* item)
+    {
+        while (item->parent()) item = item->parent();
+        const int page = item->data(0, Qt::UserRole + 1).toInt();
+        if (page > 0)
+            m_proxy->goToPageAndEnsureVisible(page - 1, item->data(0, Qt::UserRole + 2).toRectF());
+    });
 
     if (pdf::PDFWidgetUtils::isDarkTheme())
     {
@@ -245,6 +253,25 @@ void PDFSidebarWidget::setDocument(const pdf::PDFModifiedDocument& document, con
     m_document = document;
     m_optionalContentActivity = document.getOptionalContentActivity();
     m_signatures = signatures;
+    if (m_document)
+    {
+        const auto form = pdf::PDFForm::parse(m_document, m_document->getCatalog()->getFormObject());
+        form.apply([this](const pdf::PDFFormField* field)
+        {
+            if (field->getFieldType() != pdf::PDFFormField::FieldType::Signature)
+                return;
+            if (m_document->getObject(field->getValue()).isNull())
+            {
+                m_signatures.erase(std::remove_if(m_signatures.begin(), m_signatures.end(), [field](const auto& result)
+                { return result.getSignatureFieldReference() == field->getSelfReference(); }), m_signatures.end());
+                return;
+            }
+            const auto it = std::find_if(m_signatures.begin(), m_signatures.end(), [field](const auto& result)
+            { return result.getSignatureFieldReference() == field->getSelfReference(); });
+            if (it == m_signatures.end())
+                m_signatures.emplace_back(pdf::PDFSignature::Type::Sig, field->getSelfReference(), field->getName(pdf::PDFFormField::FullyQualified));
+        });
+    }
 
     // Update outline
     m_outlineTreeModel->setDocument(document);
@@ -321,7 +348,7 @@ void PDFSidebarWidget::setDocument(const pdf::PDFModifiedDocument& document, con
     // Update GUI
     updateGUI(preferred);
     updateButtons();
-    updateSignatures(signatures);
+    updateSignatures(m_signatures);
 
     if (document.hasReset() || document.hasFlag(pdf::PDFModifiedDocument::Annotation))
     {
@@ -588,7 +615,8 @@ void PDFSidebarWidget::updateSignatures(const std::vector<pdf::PDFSignatureVerif
                 break;
 
             case pdf::PDFSignature::Type::Invalid:
-                continue;
+                templateString = tr("Signature - %1");
+                break;
 
             default:
                 Q_ASSERT(false);
@@ -598,29 +626,43 @@ void PDFSidebarWidget::updateSignatures(const std::vector<pdf::PDFSignatureVerif
         QString text = templateString.arg(certificateInfo ? certificateInfo->getName(pdf::PDFCertificateInfo::CommonName) : tr("Unknown"));
         QTreeWidgetItem* rootItem = new QTreeWidgetItem(QStringList(text));
 
-        if (signature.hasError())
-        {
-            rootItem->setIcon(0, errorIcon);
-        }
-        else if (signature.hasWarning())
-        {
-            rootItem->setIcon(0, warningIcon);
-        }
-        else
-        {
-            rootItem->setIcon(0, okIcon);
-        }
+        const bool verified = signature.isSignatureValid();
+        const bool invalid = signature.hasFlag(pdf::PDFSignatureVerificationResult::Error_Signature_DigestFailure)
+            || signature.hasFlag(pdf::PDFSignatureVerificationResult::Error_Signature_Invalid);
+        const QString validity = verified ? tr("Valid") : invalid ? tr("Invalid") : tr("Unknown");
+        const QString trust = signature.isCertificateValid() ? tr("Trusted")
+            : signature.hasCertificateError() ? tr("Untrusted") : tr("Unknown");
+        rootItem->setText(0, text + QStringLiteral(" — ") + validity + QStringLiteral(" / ") + trust);
+        rootItem->setIcon(0, invalid ? errorIcon : verified && signature.isCertificateValid() ? okIcon : warningIcon);
+        new QTreeWidgetItem(rootItem, QStringList(tr("Cryptographic signature: %1").arg(validity)));
+        new QTreeWidgetItem(rootItem, QStringList(tr("Certificate trust: %1").arg(trust)));
+        new QTreeWidgetItem(rootItem, QStringList(tr("Field: %1").arg(signature.getSignatureFieldQualifiedName())));
+        if (signature.hasFlag(pdf::PDFSignatureVerificationResult::Warning_Signature_NotCoveredBytes))
+            new QTreeWidgetItem(rootItem, QStringList(tr("The signature does not cover all document bytes. Later changes may be present.")));
+        else if (!verified)
+            new QTreeWidgetItem(rootItem, QStringList(tr("Document changes after signing: unknown.")));
 
-        if (signature.isCertificateValid())
+        if (m_document)
         {
-            QTreeWidgetItem* certificateItem = new QTreeWidgetItem(rootItem, QStringList(tr("Certificate is valid.")));
-            certificateItem->setIcon(0, okIcon);
-        }
-
-        if (signature.isSignatureValid())
-        {
-            QTreeWidgetItem* signatureItem = new QTreeWidgetItem(rootItem, QStringList(tr("Signature is valid.")));
-            signatureItem->setIcon(0, okIcon);
+            const auto form = pdf::PDFForm::parse(m_document, m_document->getCatalog()->getFormObject());
+            form.apply([&](const pdf::PDFFormField* field)
+            {
+                if (field->getSelfReference() != signature.getSignatureFieldReference()) return;
+                for (const auto& widget : field->getWidgets())
+                {
+                    for (size_t page = 0; page < m_document->getCatalog()->getPageCount(); ++page)
+                    {
+                        const auto& annotations = m_document->getCatalog()->getPage(page)->getAnnotations();
+                        if (std::find(annotations.begin(), annotations.end(), widget.getWidget()) == annotations.end()) continue;
+                        const auto annotation = pdf::PDFAnnotation::parse(&m_document->getStorage(), widget.getWidget());
+                        if (!annotation) continue;
+                        rootItem->setData(0, Qt::UserRole + 1, int(page + 1));
+                        rootItem->setData(0, Qt::UserRole + 2, annotation->getRectangle());
+                        new QTreeWidgetItem(rootItem, QStringList(tr("Page: %1").arg(page + 1)));
+                        return;
+                    }
+                }
+            });
         }
 
         for (const QString& error : signature.getErrors())
@@ -645,14 +687,14 @@ void PDFSidebarWidget::updateSignatures(const std::vector<pdf::PDFSignatureVerif
         QDateTime signingDate = signature.getSignatureDate();
         if (signingDate.isValid())
         {
-            QTreeWidgetItem* item = new QTreeWidgetItem(rootItem, QStringList(QString("Signing date/time: %2").arg(QLocale::system().toString(signingDate, QLocale::ShortFormat))));
+            QTreeWidgetItem* item = new QTreeWidgetItem(rootItem, QStringList(tr("Signing date/time (reported by signer): %1").arg(QLocale::system().toString(signingDate, QLocale::ShortFormat))));
             item->setIcon(0, infoIcon);
         }
 
         QDateTime timestampDate = signature.getTimestampDate();
         if (timestampDate.isValid())
         {
-            QTreeWidgetItem* item = new QTreeWidgetItem(rootItem, QStringList(QString("Timestamp: %2").arg(QLocale::system().toString(timestampDate, QLocale::ShortFormat))));
+            QTreeWidgetItem* item = new QTreeWidgetItem(rootItem, QStringList(tr("Timestamp: %1").arg(QLocale::system().toString(timestampDate, QLocale::ShortFormat))));
             item->setIcon(0, infoIcon);
         }
 

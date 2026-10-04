@@ -795,6 +795,63 @@ void PDFFormManager::setFormFieldValue(PDFFormField::SetValueParameters paramete
             modify(updateDependentField);
         }
 
+        const auto* formDictionary = m_document->getDictionaryFromObject(m_document->getCatalog()->getFormObject());
+        PDFDocumentDataLoaderDecorator loader(m_document);
+        if (m_form.isAcroForm() && loader.readBooleanFromDictionary(formDictionary, "NeedAppearances", false))
+        {
+            auto* builder = modifier.getBuilder();
+            const auto widgets = getWidgets();
+            bool complete = !widgets.empty();
+            for (const auto& widget : widgets)
+            {
+                // NeedAppearances can also mean existing text appearances are
+                // stale. Regenerate supported value widgets before clearing it.
+                const auto* storage = builder->getStorage();
+                const auto* previousDictionary = storage->getDictionaryFromObject(storage->getObjectByReference(widget.getWidget()));
+                const auto* previousAppearances = previousDictionary ? storage->getDictionaryFromObject(previousDictionary->get("AP")) : nullptr;
+                const PDFObject previousNormal = previousAppearances ? previousAppearances->get("N") : PDFObject();
+                const auto type = widget.getParent()->getFieldType();
+                const bool regenerate = type == PDFFormField::FieldType::Text || type == PDFFormField::FieldType::Choice;
+                if (regenerate)
+                    builder->updateAnnotationAppearanceStreams(widget.getWidget());
+                const auto* dictionary = storage->getDictionaryFromObject(storage->getObjectByReference(widget.getWidget()));
+                const auto* appearances = dictionary ? storage->getDictionaryFromObject(dictionary->get("AP")) : nullptr;
+                const PDFObject normal = appearances ? storage->getObject(appearances->get("N")) : PDFObject();
+                bool available = normal.isStream();
+                if (normal.isDictionary())
+                {
+                    const auto* states = normal.getDictionary();
+                    const PDFObject state = dictionary ? storage->getObject(dictionary->get("AS")) : PDFObject();
+                    available = state.isName() && storage->getObject(states->get(state.getString())).isStream();
+                }
+                // A failed generator can leave an old AP in place. That is not
+                // evidence that a requested appearance refresh was completed.
+                const bool refreshed = !regenerate || (appearances && appearances->get("N") != previousNormal);
+                complete = complete && available && refreshed;
+            }
+            if (complete)
+            {
+                // Use generated standard AP streams in other readers. Keeping
+                // this true makes some readers discard them and rebuild from DA.
+                PDFObjectFactory factory;
+                factory.beginDictionary();
+                factory.beginDictionaryItem("NeedAppearances");
+                factory << false;
+                factory.endDictionaryItem();
+                factory.endDictionary();
+                const PDFObject formObject = m_document->getCatalog()->getFormObject();
+                if (formObject.isReference())
+                    builder->mergeTo(formObject.getReference(), factory.takeObject());
+                else
+                {
+                    const auto reference = builder->addObject(formObject);
+                    builder->mergeTo(reference, factory.takeObject());
+                    builder->setCatalogAcroForm(reference);
+                }
+                modifier.markAnnotationsChanged();
+            }
+        }
+
         if (modifier.finalize())
         {
             Q_EMIT documentModified(PDFModifiedDocument(modifier.getDocument(), nullptr, modifier.getFlags()));

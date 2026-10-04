@@ -41,6 +41,10 @@
 #include <QTabBar>
 #include "pdfwidgettool.h"
 #include "pdfdocumentreader.h"
+#include "pdfdocumentwriter.h"
+#include "pdfwidgetformmanager.h"
+#include "pdfsidebarwidget.h"
+#include <QTreeWidget>
 #include "pdfdocumentbuilder.h"
 #include "pdfannotation.h"
 #include "pdfwidgetannotation.h"
@@ -163,6 +167,12 @@ private slots:
     void annotationMarkupWorkflow_data();
     void annotationMarkupWorkflow();
     void annotationNoteWorkflow();
+    void formWorkflow();
+    void formNavigation();
+    void signaturePresentation();
+    void signatureVerificationWorkflow();
+    void formValidationAndMalformed();
+    void formAppearanceFallback();
     void annotationListLargeDocument();
 
 private:
@@ -1714,6 +1724,377 @@ void ViewerContextMenuTest::annotationListLargeDocument()
     editor.findChild<QLineEdit*>("notesSearchLineEdit")->setText("Comment 495");
     QCOMPARE(tree->model()->rowCount(), 1);
     qInfo() << "Annotation filter ms:" << timer.elapsed();
+    controller->closeDocument();
+}
+
+namespace {
+bool writeWorkflowForm(const QString& path)
+{
+    if (!writePdfFixture(path, 2)) return false;
+    pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+    auto original = reader.readFromFile(path);
+    pdf::PDFDocumentBuilder builder(&original);
+    const auto first = original.getCatalog()->getPage(0)->getPageReference();
+    const auto second = original.getCatalog()->getPage(1)->getPageReference();
+    auto text = [&](QString name, QString value, pdf::PDFFormField::FieldFlags flags, int y, bool page2 = false) {
+        auto field = builder.createFormFieldText(name, value, flags, 12);
+        builder.createFormFieldWidget(field, page2 ? second : first, QRectF(40, y, 220, 40), "/Helv 12 Tf 0 g");
+        builder.appendAcroFormField(field);
+    };
+    text("name", "", pdf::PDFFormField::Required, 450);
+    text("readonly", "locked", pdf::PDFFormField::ReadOnly, 390);
+    text("multiline", "", pdf::PDFFormField::Multiline, 320);
+    text("password", "", pdf::PDFFormField::Password, 260);
+    auto check = builder.createFormFieldCheckBox("agree", false, pdf::PDFFormField::None);
+    builder.createFormFieldWidget(check, first, QRectF(40, 210, 22, 22), QByteArray());
+    builder.appendAcroFormField(check);
+    auto radio = builder.createFormFieldRadioGroup("radio", "a", pdf::PDFFormField::None);
+    builder.createFormFieldRadioWidget(radio, first, QRectF(40, 170, 22, 22), "a", true);
+    builder.createFormFieldRadioWidget(radio, first, QRectF(90, 170, 22, 22), "b", false);
+    builder.appendAcroFormField(radio);
+    auto combo = builder.createFormFieldChoice("combo", {{"one", "First"}, {"two", "Second"}}, {0}, pdf::PDFFormField::FieldFlags{pdf::PDFFormField::Combo, pdf::PDFFormField::Edit});
+    builder.createFormFieldWidget(combo, first, QRectF(40, 110, 220, 30), "/Helv 12 Tf 0 g");
+    builder.appendAcroFormField(combo);
+    auto list = builder.createFormFieldChoice("list", {{"one", "First"}, {"two", "Second"}}, {0}, pdf::PDFFormField::None);
+    builder.createFormFieldWidget(list, second, QRectF(40, 350, 220, 80), "/Helv 12 Tf 0 g");
+    builder.appendAcroFormField(list);
+    text("second", "", pdf::PDFFormField::None, 450, true);
+    auto document = builder.build();
+    pdf::PDFDocumentWriter writer(nullptr);
+    return bool(writer.write(path, &document, true));
+}
+pdf::PDFFormField* workflowField(pdf::PDFWidgetFormManager* manager, const QString& name)
+{
+    pdf::PDFFormField* found = nullptr;
+    manager->modify([&](pdf::PDFFormField* field) {
+        if (field->getName(pdf::PDFFormField::FullyQualified) == name && !field->getWidgets().empty()) found = field;
+    });
+    return found;
+}
+QString workflowValue(pdf::PDFWidgetFormManager* manager, const QString& name)
+{
+    const auto* field = workflowField(manager, name);
+    if (!field) return QString();
+    const auto object = manager->getDocument()->getObject(field->getValue());
+    if (object.isName()) return QString::fromLatin1(object.getString());
+    return pdf::PDFDocumentDataLoaderDecorator(manager->getDocument()).readTextString(object, QString());
+}
+}
+
+void ViewerContextMenuTest::formWorkflow()
+{
+    const QString path = m_temp.filePath("forms.pdf");
+    QVERIFY(writeWorkflowForm(path));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900); editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    auto* widget = controller->getPdfWidget();
+    auto* manager = widget->getFormManager();
+    auto* draw = widget->getDrawWidget()->getWidget();
+    QVERIFY(manager);
+    QCOMPARE(manager->getMissingRequiredFields(), QStringList{"name"});
+    const auto originalContents = controller->getDocument()->getCatalog()->getPage(0)->getContents();
+    auto enter = [&](const QString& name, const QString& value) {
+        auto* field = workflowField(manager, name);
+        manager->setFocusToEditor(manager->getEditor(field));
+        QKeyEvent event(QEvent::KeyPress, 0, Qt::NoModifier, value);
+        manager->keyPressEvent(draw, &event);
+    };
+    enter("readonly", "changed"); manager->setFocusToEditor(nullptr);
+    QCOMPARE(workflowValue(manager, "readonly"), "locked");
+    enter("name", "Form value");
+    // Exercise the actual shortcut while the form owns keyboard focus.
+    draw->setFocus();
+    QTest::keyClick(draw, Qt::Key_S, Qt::ControlModifier);
+    QCOMPARE(workflowValue(manager, "name"), "Form value");
+    QVERIFY(!editor.windowTitle().contains('*'));
+    // Save while still typing must flush the active editor, including its appearance.
+    controller->performSave();
+    QCOMPARE(workflowValue(manager, "name"), "Form value");
+    QVERIFY(manager->getMissingRequiredFields().isEmpty());
+    auto appearance = [&]() {
+        const auto reference = workflowField(manager, "name")->getWidgets().front().getWidget();
+        const auto* doc = controller->getDocument();
+        const auto* dict = doc->getDictionaryFromObject(doc->getObjectByReference(reference));
+        const auto* ap = doc->getDictionaryFromObject(dict->get("AP"));
+        return ap ? doc->getObject(ap->get("N")) : pdf::PDFObject();
+    };
+    QVERIFY(appearance().isStream());
+    QVERIFY(!pdf::PDFForm::parse(controller->getDocument(), controller->getDocument()->getCatalog()->getFormObject()).isAppearanceUpdateNeeded());
+    const auto savedAppearance = appearance();
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QCOMPARE(workflowValue(manager, "name"), "");
+    editor.findChild<QAction*>("actionRedo")->trigger();
+    QCOMPARE(workflowValue(manager, "name"), "Form value");
+    QCOMPARE(appearance(), savedAppearance);
+    enter("name", "123456789012345"); manager->setFocusToEditor(nullptr);
+    QCOMPARE(workflowValue(manager, "name").size(), 12);
+    enter("multiline", "line1\nline2"); manager->setFocusToEditor(nullptr);
+    QCOMPARE(workflowValue(manager, "multiline"), "line1\nline2");
+    for (const QString name : {QString("agree"), QString("radio")})
+    {
+        auto* field = workflowField(manager, name);
+        auto* input = manager->getEditor(field);
+        manager->setFocusToEditor(input);
+        QKeyEvent event(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+        input->keyPressEvent(draw, &event);
+        manager->setFocusToEditor(nullptr);
+        const auto changed = workflowValue(manager, name);
+        QCOMPARE(changed, name == "agree" ? "Yes" : "b");
+        editor.findChild<QAction*>("actionUndo")->trigger();
+        QVERIFY(workflowValue(manager, name) != changed);
+        editor.findChild<QAction*>("actionRedo")->trigger();
+        QCOMPARE(workflowValue(manager, name), changed);
+    }
+    enter("combo", "Second"); manager->setFocusToEditor(nullptr);
+    QCOMPARE(workflowValue(manager, "combo"), "two");
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QCOMPARE(workflowValue(manager, "combo"), "one");
+    editor.findChild<QAction*>("actionRedo")->trigger();
+    QCOMPARE(workflowValue(manager, "combo"), "two");
+    manager->setFocusToEditor(manager->getEditor(workflowField(manager, "list")));
+    QKeyEvent down(QEvent::KeyPress, Qt::Key_End, Qt::NoModifier);
+    manager->keyPressEvent(draw, &down); manager->setFocusToEditor(nullptr);
+    QCOMPARE(workflowValue(manager, "list"), "two");
+    QCOMPARE(controller->getDocument()->getCatalog()->getPage(0)->getContents(), originalContents);
+    controller->performSave();
+    const QString copyPath = m_temp.filePath("forms-save-as.pdf");
+    QVERIFY(annotationSaveAs(controller, &editor, copyPath));
+    controller->closeDocument();
+    controller->openDocument(copyPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QCOMPARE(workflowValue(manager, "name"), "123456789012");
+    QCOMPARE(workflowValue(manager, "multiline"), "line1\nline2");
+    QCOMPARE(workflowValue(manager, "agree"), "Yes");
+    QCOMPARE(workflowValue(manager, "radio"), "b");
+    QCOMPARE(workflowValue(manager, "combo"), "two");
+    QCOMPARE(workflowValue(manager, "list"), "two");
+    QVERIFY(appearance().isStream());
+    QTRY_COMPARE(widget->getPageRenderingErrorCount(), 0);
+    const QString artifact = qEnvironmentVariable("FAMILYPDF_V6_FIXTURE");
+    if (!artifact.isEmpty()) QVERIFY(QFile::copy(copyPath, artifact));
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::formNavigation()
+{
+    const QString path = m_temp.filePath("navigation.pdf");
+    QVERIFY(writeWorkflowForm(path));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900); editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    auto* widget = controller->getPdfWidget();
+    auto* manager = widget->getFormManager();
+    auto* proxy = widget->getDrawWidgetProxy();
+    const auto zoom = proxy->getZoom();
+    QVERIFY(manager->focusNextPrevFormField(true));
+    QVERIFY(manager->isFocused(workflowField(manager, "name")->getWidgets().front().getWidget()));
+    QTest::keyClick(widget, Qt::Key_Tab);
+    QVERIFY(manager->isFocused(workflowField(manager, "multiline")->getWidgets().front().getWidget()));
+    QTest::keyClick(widget, Qt::Key_Backtab, Qt::ShiftModifier);
+    QVERIFY(manager->isFocused(workflowField(manager, "name")->getWidgets().front().getWidget()));
+    QTest::keyClick(widget, Qt::Key_Backtab, Qt::ShiftModifier);
+    const auto* last = workflowField(manager, "second");
+    QVERIFY(manager->isFocused(last->getWidgets().front().getWidget()));
+    QCOMPARE(proxy->getZoom(), zoom);
+    QTRY_VERIFY([&] { const auto pages = widget->getDrawWidget()->getCurrentPages(); return std::find(pages.begin(), pages.end(), 1) != pages.end(); }());
+    manager->setFocusToEditor(nullptr);
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::signaturePresentation()
+{
+    const QString path = m_temp.filePath("signature.pdf");
+    QVERIFY(writePdfFixture(path, 2));
+    pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+    auto document = reader.readFromFile(path);
+    pdf::PDFDocumentBuilder builder(&document);
+    auto signature = builder.createFormFieldSignature("signature", {}, {});
+    builder.createFormFieldWidget(signature, document.getCatalog()->getPage(1)->getPageReference(), QRectF(40, 400, 200, 50), QByteArray());
+    builder.appendAcroFormField(signature);
+    builder.setFormFieldValue(signature, pdf::PDFObjectFactory::createTextString("malformed"));
+    document = builder.build();
+    pdf::PDFDocumentWriter writer(nullptr);
+    QVERIFY(writer.write(path, &document, true));
+    pdfviewer::PDFViewerMainWindow viewer;
+    viewer.show();
+    auto* controller = viewer.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QVERIFY(!controller->getPdfWidget()->getFormManager());
+    auto* tree = viewer.findChild<QTreeWidget*>("signatureTreeWidget");
+    QVERIFY(tree);
+    pdf::PDFSignatureVerificationResult result(pdf::PDFSignature::Type::Sig, signature, "signature");
+    result.setFlag(pdf::PDFSignatureVerificationResult::Signature_OK, true);
+    result.addCertificateSelfSignedError();
+    controller->setDocument(pdf::PDFModifiedDocument(controller->getDocument(), nullptr), {result}, true);
+    QCOMPARE(tree->topLevelItemCount(), 1);
+    auto* row = tree->topLevelItem(0);
+    QVERIFY(row->text(0).contains("Valid / Untrusted"));
+    QVERIFY(!row->text(0).contains("Invalid"));
+    Q_EMIT tree->itemClicked(row, 0);
+    QTRY_VERIFY([&] { const auto pages = controller->getPdfWidget()->getDrawWidget()->getCurrentPages(); return std::find(pages.begin(), pages.end(), 1) != pages.end(); }());
+    result.setFlag(pdf::PDFSignatureVerificationResult::Signature_OK, false);
+    result.addSignatureDigestFailureError();
+    controller->setDocument(pdf::PDFModifiedDocument(controller->getDocument(), nullptr), {result}, true);
+    QVERIFY(tree->topLevelItem(0)->text(0).contains("Invalid / Untrusted"));
+    pdf::PDFSignatureVerificationResult unknown(pdf::PDFSignature::Type::Invalid, signature, "signature");
+    unknown.addNoHandlerError("unsupported");
+    controller->setDocument(pdf::PDFModifiedDocument(controller->getDocument(), nullptr), {unknown}, true);
+    QVERIFY(tree->topLevelItem(0)->text(0).contains("Unknown / Unknown"));
+    controller->closeDocument();
+    QCOMPARE(tree->topLevelItemCount(), 0);
+}
+
+void ViewerContextMenuTest::signatureVerificationWorkflow()
+{
+    const QString path = QFINDTESTDATA("fixtures/pyhanko-signed.pdf");
+    QVERIFY(!path.isEmpty());
+    pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+    auto document = reader.readFromFile(path);
+    QVERIFY(reader.getReadingResult() == pdf::PDFDocumentReader::Result::OK);
+    auto form = pdf::PDFForm::parse(&document, document.getCatalog()->getFormObject());
+    pdf::PDFCertificateStore store;
+    pdf::PDFSignatureHandler::Parameters parameters;
+    parameters.store = &store;
+    parameters.useSystemCertificateStore = false;
+    parameters.ignoreExpirationDate = true; // Fixture certificates are historical.
+    const QByteArray original = reader.getSource();
+    auto results = pdf::PDFSignatureHandler::verifySignatures(form, original, parameters);
+    QCOMPARE(results.size(), size_t(2));
+    for (const auto& result : results)
+    {
+        QVERIFY(result.isSignatureValid());
+        QVERIFY(!result.isCertificateValid());
+    }
+    QByteArray tampered = original;
+    // Alter a comment byte covered by both signatures, preserving PDF structure.
+    const int comment = tampered.indexOf('%', 1);
+    QVERIFY(comment > 0);
+    tampered[comment + 1] = 'X';
+    auto invalid = pdf::PDFSignatureHandler::verifySignatures(form, tampered, parameters);
+    QCOMPARE(invalid.size(), results.size());
+    for (const auto& result : invalid)
+        QVERIFY(!result.isSignatureValid());
+
+    pdfviewer::PDFViewerMainWindow viewer;
+    viewer.show();
+    auto* controller = viewer.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    auto* tree = viewer.findChild<QTreeWidget*>("signatureTreeWidget");
+    QCOMPARE(tree->topLevelItemCount(), 2);
+    QVERIFY(tree->topLevelItem(0)->text(0).contains("Valid / Untrusted"));
+    controller->closeDocument();
+
+    // Malformed /V remains a readable document with a visible unknown/invalid result.
+    pdf::PDFDocumentBuilder builder(&document);
+    form.apply([&](const pdf::PDFFormField* field) {
+        if (field->getFieldType() == pdf::PDFFormField::FieldType::Signature)
+            builder.setFormFieldValue(field->getSelfReference(), pdf::PDFObjectFactory::createTextString("malformed"));
+    });
+    document = builder.build();
+    form = pdf::PDFForm::parse(&document, document.getCatalog()->getFormObject());
+    results = pdf::PDFSignatureHandler::verifySignatures(form, original, parameters);
+    QCOMPARE(results.size(), size_t(2));
+    for (const auto& result : results) QVERIFY(!result.isSignatureValid());
+    const QString malformed = m_temp.filePath("malformed-signature.pdf");
+    pdf::PDFDocumentWriter writer(nullptr);
+    QVERIFY(writer.write(malformed, &document, true));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.show();
+    auto* edit = editor.getProgramController();
+    edit->openDocument(malformed);
+    QTRY_VERIFY_WITH_TIMEOUT(edit->getDocument(), 15000);
+    QCOMPARE(editor.findChild<QTreeWidget*>("signatureTreeWidget")->topLevelItemCount(), 2);
+    edit->closeDocument();
+}
+
+void ViewerContextMenuTest::formValidationAndMalformed()
+{
+    const QString path = m_temp.filePath("form-validation.pdf");
+    QVERIFY(writeWorkflowForm(path));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    auto* manager = controller->getPdfWidget()->getFormManager();
+    bool prompted = false;
+    QTimer timer;
+    connect(&timer, &QTimer::timeout, &editor, [&] {
+        if (auto* box = qobject_cast<QMessageBox*>(QApplication::activeModalWidget()))
+        {
+            timer.stop(); prompted = true;
+            QVERIFY(box->text().contains("name"));
+            box->button(QMessageBox::Save)->click();
+        }
+    });
+    timer.start(10);
+    controller->performSave();
+    QVERIFY(prompted);
+    // Passwords use the existing masked editor and are deliberately not persisted.
+    auto* field = workflowField(manager, "password");
+    QVERIFY(field->getFlags().testFlag(pdf::PDFFormField::Password));
+    manager->setFocusToEditor(manager->getEditor(field));
+    auto* draw = controller->getPdfWidget()->getDrawWidget()->getWidget();
+    QKeyEvent text(QEvent::KeyPress, 0, Qt::NoModifier, QString(6, QChar('x')));
+    manager->keyPressEvent(draw, &text); manager->setFocusToEditor(nullptr);
+    QVERIFY(workflowField(manager, "password")->getValue().isNull()
+        || workflowValue(manager, "password").isEmpty());
+    // Unsupported field type with a widget should be ignored, not asserted.
+    pdf::PDFDocumentBuilder builder(controller->getDocument());
+    const auto unknown = workflowField(manager, "readonly")->getSelfReference();
+    pdf::PDFObjectFactory factory;
+    factory.beginDictionary(); factory.beginDictionaryItem("FT"); factory << pdf::WrapName("Unsupported"); factory.endDictionaryItem(); factory.endDictionary();
+    builder.mergeTo(unknown, factory.takeObject());
+    auto malformed = builder.build();
+    controller->closeDocument();
+    pdf::PDFDocumentWriter writer(nullptr);
+    const QString malformedPath = m_temp.filePath("malformed-form.pdf");
+    QVERIFY(writer.write(malformedPath, &malformed, true));
+    controller->openDocument(malformedPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QVERIFY(manager->focusNextPrevFormField(true));
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::formAppearanceFallback()
+{
+    const QString path = m_temp.filePath("appearance-fallback.pdf");
+    QVERIFY(writeWorkflowForm(path));
+    pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+    auto document = reader.readFromFile(path);
+    const auto form = pdf::PDFForm::parse(&document, document.getCatalog()->getFormObject());
+    pdf::PDFDocumentBuilder builder(&document);
+    form.apply([&](const pdf::PDFFormField* field) {
+        if (field->getName(pdf::PDFFormField::FullyQualified) != "second") return;
+        pdf::PDFObjectFactory factory;
+        factory.beginDictionary(); factory.beginDictionaryItem("Rect"); factory << QRectF(); factory.endDictionaryItem(); factory.endDictionary();
+        builder.mergeTo(field->getSelfReference(), factory.takeObject());
+    });
+    document = builder.build();
+    pdf::PDFDocumentWriter writer(nullptr);
+    QVERIFY(writer.write(path, &document, true));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    auto* manager = controller->getPdfWidget()->getFormManager();
+    auto* field = workflowField(manager, "name");
+    manager->setFocusToEditor(manager->getEditor(field));
+    QKeyEvent text(QEvent::KeyPress, 0, Qt::NoModifier, "filled");
+    manager->keyPressEvent(controller->getPdfWidget()->getDrawWidget()->getWidget(), &text);
+    manager->setFocusToEditor(nullptr);
+    QCOMPARE(workflowValue(manager, "name"), "filled");
+    // A stale AP left behind by a failed generator must not clear the request.
+    QVERIFY(pdf::PDFForm::parse(controller->getDocument(), controller->getDocument()->getCatalog()->getFormObject()).isAppearanceUpdateNeeded());
+    controller->performSave();
     controller->closeDocument();
 }
 
