@@ -13,7 +13,7 @@
 ## 目前狀態與下一步
 
 - 專案：`F:\Projects\Codex project\myfamilypdf`，Windows x64 PDF 閱讀／編輯工具。
-- 「列印與圖片匯出工作流 v7」實作與本機驗證完成，分支 `feature/print-export-v7`；PR／CI／merge 狀態見下方「Git 狀態」，merge 後再更新。沒有已知 blocker；下一步依使用者新需求開始，不必重做 v6／v7。
+- 「列印與圖片匯出工作流 v7」已完成並 merge（PR #15，squash，merge commit `60be9699b42d01a42b7860e153ccd77868b191b1`）；CodeQL、FamilyPDF validation、CI 全部 PASS 後才合併。沒有進行中的功能任務或已知 blocker；下一步依使用者新需求開始，不必重做 v6／v7。
 - `.ai-memory.toml` 是使用者原有 untracked 檔案，保留，不修改、不提交。
 - 先前整理的 `HANDOFF.md`／`AGENTS.md`／`CLAUDE.md`（v6 後的交接文件重寫）原本未提交，已隨 v7 PR 一起提交。
 
@@ -35,7 +35,7 @@
 
 ## Git 狀態
 
-- 分支 `feature/print-export-v7`（從 `a0ed1692` 的 main 建立）已 commit 並 push。**blocker**：本機 `gh` 未登入（`gh auth status` 顯示未登入），無法建立 PR／查 CI／merge；需使用者執行 `gh auth login` 後，從該分支建立 PR（base `main`），等 CI 全綠再 squash merge、同步 main、刪除分支，最後把本文件更新為 v7 完成狀態。PR 建立連結：https://github.com/nanachi1212/myfamilypdf/pull/new/feature/print-export-v7
+- PR #15 已 squash merge 為 `60be9699`，本機 `main` 已同步，feature branch 已刪除（本機與遠端）。本機 `gh` 仍未登入，無法自行建立 PR 或查 CI；merge 由使用者在 GitHub 完成。
 
 ## 限制與接手注意事項
 
