@@ -13,7 +13,7 @@
 ## 目前狀態與下一步
 
 - 專案：`F:\Projects\Codex project\myfamilypdf`，Windows x64 PDF 閱讀／編輯工具。
-- 「縮圖拖曳重排頁面 v8」已實作並通過本機驗證，在 branch `feature/thumbnail-page-reorder-v8`（一個 commit）。本機 `gh` 未登入，沒有建立 PR、沒有查 CI；下一步：由有登入的人／ChatGPT 對該 branch 開 PR，等 CodeQL、FamilyPDF validation、CI 全綠後 squash merge，再同步 `main`、刪 branch。Merge PDFs 尚未開始，留到下一階段。
+- 「縮圖拖曳重排頁面 v8」已實作並通過本機驗證，PR #17（branch `feature/thumbnail-page-reorder-v8`）。首次 CI 的 `build_ubuntu` 失敗：`ui_pdfsidebarwidget.h`（uic 產生）引用的 `pdfthumbnailslistview.h` 找不到，已修（見下）。本機 `gh` 未登入，看不到 job log，CI 狀態用公開 API 查；等 PR #17 所有 checks 綠燈後 squash merge，再同步 `main`、刪 branch。Merge PDFs 尚未開始。
 - 先前「列印與圖片匯出 v7」已 merge（PR #15，squash，merge commit `60be9699b42d01a42b7860e153ccd77868b191b1`），不必重做 v6／v7。
 - `.ai-memory.toml` 是使用者原有 untracked 檔案，保留，不修改、不提交。
 
@@ -29,6 +29,7 @@
 - `UnitTestsViewer`（offscreen）新增 `pageReorderOrderMath`（18 列）、`pageReorderInsertionGeometry`、`thumbnailReorderWorkflow`（單頁前／後、連續多頁前／後、Ctrl 不連續、Shift 範圍、第一頁前、最後一頁後與空白處、自身區域 no-op、invalid／duplicate／missing 被拒、Undo／Redo、選取與目前頁面）、`reorderPreservesContentAfterSave`（含註解、旋轉頁、AcroForm 欄位、文字層：重排 → Save As → 重開後逐項確認）、`reorderFlattensNestedPageTree`、`viewerThumbnailsAreReadOnly`：全 PASS。
 - 真實 Windows 平台滑鼠拖曳 `nativeThumbnailDragSmoke`（`FAMILYPDF_NATIVE_DRAG_SMOKE=1`、`QT_QPA_PLATFORM=windows`，會移動實體游標、需視窗在最上層）：單頁、多選、Undo、Redo PASS。跑的時候別動滑鼠；偶爾因人為移動或視窗被遮住而 drag 沒落到 view，測試會重試。
 - 回歸 smoke PASS：`thumbnailSelectionAndPageManagement`（選取、刪除、旋轉、提取）、`printAndExportEntriesAreAvailable`、`printDialogOptionsAndCancel`、`exportImagesDialogWorkflow`、`exportSelectionAsImageWorkflow`、`filledFormPrintsAndExports`、`menuActionsOperateOnTheDocument`、`UnitTestsBookmarks`、`UnitTestsDocumentEdit`。未重跑本機完整 CTest 與 `dist/FamilyPDF`（依規定交給 CI）。
+- Ubuntu CI 根因：`Pdf4QtLibGui` 只對使用者宣告 `INTERFACE` include 目錄，自己的 target 沒有自己的原始碼目錄；MSVC 找 `#include "..."` 時會連同「正在被 include 的每個檔案」所在目錄一起找，所以 Windows 找得到，GCC 只找 include 檔自己的目錄（autogen/include）與 `-I`，找不到。修法：`Pdf4QtLibGui/CMakeLists.txt` 的 `target_include_directories(... INTERFACE ...)` 改 `PUBLIC`。之後 `.ui` 若再引用自訂 widget 標頭，靠這行即可。驗證：用 target 的實際編譯指令、把只含 `ui_pdfsidebarwidget.h` 的 TU 放在原始碼目錄外（等同 GCC 的搜尋規則），修前 `C1083` 找不到 header、修後通過。
 - 本機 build：新增檔案需要重新 configure；`VCPKG_MANIFEST_INSTALL=OFF` 已固定所以 vcpkg 沒被動到，重新產生後把 `rules.ninja` 第 17 行的 `msvc_deps_prefix` 還原成 `注意: 包含檔案:`（`ninja -t deps` 確認新 obj 有 #deps）。
 
 ## v7 已交付內容
@@ -49,7 +50,7 @@
 
 ## Git 狀態
 
-- v8：branch `feature/thumbnail-page-reorder-v8`，已 push，未開 PR（`gh` 未登入）。
+- v8：branch `feature/thumbnail-page-reorder-v8`，PR #17（`gh` 未登入，用公開 API 查 CI）。
 - v7：PR #15 已 squash merge 為 `60be9699`，本機 `main` 已同步，feature branch 已刪除（本機與遠端）。本機 `gh` 仍未登入，無法自行建立 PR 或查 CI；merge 由使用者在 GitHub 完成。
 
 ## 限制與接手注意事項
