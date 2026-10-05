@@ -51,6 +51,10 @@ add_library(Pdf4QtLibGui SHARED
     pdfsendmail.h
     pdfsidebarwidget.cpp
     pdfsidebarwidget.h
+    pdfpagereorder.cpp
+    pdfpagereorder.h
+    pdfthumbnailslistview.cpp
+    pdfthumbnailslistview.h
     pdftexttospeech.cpp
     pdftexttospeech.h
     pdfundoredomanager.cpp

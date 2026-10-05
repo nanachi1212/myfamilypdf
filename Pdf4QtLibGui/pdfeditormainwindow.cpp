@@ -365,6 +365,8 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
             [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->deletePages(pages); });
     connect(m_sidebarWidget, &PDFSidebarWidget::rotatePagesRequested, m_programController,
             [this](const std::vector<pdf::PDFInteger>& pages, int quarterTurns) { m_programController->rotatePages(pages, quarterTurns); });
+    connect(m_sidebarWidget, &PDFSidebarWidget::reorderPagesRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& newPageOrder) { m_programController->reorderPages(newPageOrder); });
 
     m_advancedFindWidget = new PDFAdvancedFindWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), this);
     m_advancedFindDockWidget = new QDockWidget(tr("Advanced find"), this);

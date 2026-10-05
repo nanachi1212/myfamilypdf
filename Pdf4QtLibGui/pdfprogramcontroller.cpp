@@ -40,6 +40,7 @@
 #include "pdfprintdialog.h"
 #include "pdfexportimagesdialog.h"
 #include "pdfpageoutput.h"
+#include "pdfpagereorder.h"
 #include "pdfoptimizedocumentdialog.h"
 #include "pdfoptimizeimagesdialog.h"
 #include "pdfsanitizedocumentdialog.h"
@@ -3633,6 +3634,75 @@ void PDFProgramController::deletePages(const std::vector<pdf::PDFInteger>& pageI
                                                       pdf::PDFInteger(0),
                                                       pdf::PDFInteger(remainingPages.size() - 1));
     m_pdfWidget->getDrawWidgetProxy()->goToPage(newCurrentPage);
+}
+
+bool PDFProgramController::reorderPages(const std::vector<pdf::PDFInteger>& newPageOrder)
+{
+    if (!m_pdfDocument)
+    {
+        return false;
+    }
+
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount());
+    if (!PDFPageReorder::isPermutation(newPageOrder, pageCount))
+    {
+        qWarning() << "Page reorder rejected: the new order is not a permutation of" << pageCount << "pages.";
+        return false;
+    }
+    if (PDFPageReorder::isIdentity(newPageOrder))
+    {
+        return false;
+    }
+
+    const std::vector<pdf::PDFInteger> currentPages = m_pdfWidget->getDrawWidget()->getCurrentPages();
+    const pdf::PDFInteger oldCurrentPage = currentPages.empty() ? 0 : currentPages.front();
+
+    pdf::PDFDocumentModifier modifier(m_pdfDocument.data());
+    pdf::PDFDocumentBuilder* builder = modifier.getBuilder();
+    std::vector<pdf::PDFObjectReference> pages = builder->getPages();
+    if (pdf::PDFInteger(pages.size()) != pageCount)
+    {
+        // Nested page tree. Flattening copies the inherited attributes into the pages.
+        builder->flattenPageTree();
+        pages = builder->getPages();
+    }
+
+    // The page tree must list exactly the pages the user sees, in the same order.
+    bool pageTreeMatches = pdf::PDFInteger(pages.size()) == pageCount;
+    for (pdf::PDFInteger pageIndex = 0; pageTreeMatches && pageIndex < pageCount; ++pageIndex)
+    {
+        pageTreeMatches = pages[size_t(pageIndex)] == m_pdfDocument->getCatalog()->getPage(size_t(pageIndex))->getPageReference();
+    }
+    if (!pageTreeMatches)
+    {
+        qWarning() << "Page reorder rejected: the page tree does not match the page list.";
+        return false;
+    }
+
+    std::vector<pdf::PDFObjectReference> reorderedPages;
+    reorderedPages.reserve(pages.size());
+    for (const pdf::PDFInteger oldIndex : newPageOrder)
+    {
+        reorderedPages.push_back(pages[size_t(oldIndex)]);
+    }
+    builder->setPages(reorderedPages);
+    modifier.markReset();
+    if (!modifier.finalize())
+    {
+        return false;
+    }
+
+    pdf::PDFModifiedDocument::ModificationFlags flags = modifier.getFlags();
+    flags.setFlag(pdf::PDFModifiedDocument::PreserveUndoRedo);
+    onDocumentModified(pdf::PDFModifiedDocument(modifier.getDocument(), m_optionalContentActivity, flags));
+
+    // Keep showing the page that was being read, wherever it went.
+    const auto newCurrentPosition = std::find(newPageOrder.cbegin(), newPageOrder.cend(), oldCurrentPage);
+    if (newCurrentPosition != newPageOrder.cend())
+    {
+        m_pdfWidget->getDrawWidgetProxy()->goToPage(pdf::PDFInteger(newCurrentPosition - newPageOrder.cbegin()));
+    }
+    return true;
 }
 
 void PDFProgramController::rotatePages(const std::vector<pdf::PDFInteger>& pageIndices, int quarterTurns)

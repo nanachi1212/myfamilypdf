@@ -1,6 +1,6 @@
 # FamilyPDF AI 交接文件
 
-更新日期：2026-10-04（Asia/Taipei）。本文件是 Claude、Codex 與其他 AI 的共同交接入口。
+更新日期：2026-10-05（Asia/Taipei）。本文件是 Claude、Codex 與其他 AI 的共同交接入口。
 
 ## 接手與更新規則
 
@@ -13,9 +13,23 @@
 ## 目前狀態與下一步
 
 - 專案：`F:\Projects\Codex project\myfamilypdf`，Windows x64 PDF 閱讀／編輯工具。
-- 「列印與圖片匯出工作流 v7」已完成並 merge（PR #15，squash，merge commit `60be9699b42d01a42b7860e153ccd77868b191b1`）；CodeQL、FamilyPDF validation、CI 全部 PASS 後才合併。沒有進行中的功能任務或已知 blocker；下一步依使用者新需求開始，不必重做 v6／v7。
+- 「縮圖拖曳重排頁面 v8」已實作並通過本機驗證，在 branch `feature/thumbnail-page-reorder-v8`（一個 commit）。本機 `gh` 未登入，沒有建立 PR、沒有查 CI；下一步：由有登入的人／ChatGPT 對該 branch 開 PR，等 CodeQL、FamilyPDF validation、CI 全綠後 squash merge，再同步 `main`、刪 branch。Merge PDFs 尚未開始，留到下一階段。
+- 先前「列印與圖片匯出 v7」已 merge（PR #15，squash，merge commit `60be9699b42d01a42b7860e153ccd77868b191b1`），不必重做 v6／v7。
 - `.ai-memory.toml` 是使用者原有 untracked 檔案，保留，不修改、不提交。
-- 先前整理的 `HANDOFF.md`／`AGENTS.md`／`CLAUDE.md`（v6 後的交接文件重寫）原本未提交，已隨 v7 PR 一起提交。
+
+## v8 已交付內容（縮圖拖曳重排）
+
+- Editor 左側縮圖可拖曳一頁或 Ctrl／Shift 多選後一起拖曳重排；Viewer 縮圖維持唯讀（不能拖、不接受 drop）。被拖頁面保持彼此相對順序；drop 在自己原區域不產生變更也不建立 Undo。重排後被移動的頁面維持選取、正在看的頁面維持不變，側邊欄停留在縮圖頁（連 Undo／Redo 後也是）。
+- 流程：`PDFThumbnailsListView` 算出 drop 位置 → `PDFSidebarWidget` 算 `newPageOrder`（`PDFPageReorder`）並送 `reorderPagesRequested` → `PDFProgramController::reorderPages` 驗證完整 permutation → `PDFDocumentModifier`／`builder->getPages()`／`setPages()` → `markReset` → `onDocumentModified(Reset | PreserveUndoRedo)`，沿用既有 `PDFUndoRedoManager`。只重排 page tree 的 page reference，不複製頁面物件、不改 writer；巢狀 page tree 會先用既有 `flattenPageTree()`（把繼承的 MediaBox／CropBox／Resources／Rotate 寫進頁面）。
+- IconMode 的標準 model drag/drop 在探測中沒有給出可用的插入行（見 `docs/page-reorder-v8.md`），所以由 `PDFThumbnailsListView` 依 `visualRect()` 計算插入點（左／上半＝前、右／下半＝後、空白處＝文件最後），不寫死像素。view 只在自己的 drag 進行中接受 drop，檔案拖到側邊欄仍交給主視窗開檔。
+- 新檔：`Pdf4QtLibGui/pdfpagereorder.*`、`pdfthumbnailslistview.*`、`docs/page-reorder-v8.md`。改動：`pdfsidebarwidget.*`（含 `.ui` 把縮圖 view 升級成自訂 widget；`setDocument` 對「保留 undo 的編輯」改為停留在目前側邊欄頁）、`pdfprogramcontroller.*`、`pdfeditormainwindow.cpp`、`pdfitemmodels.*`（縮圖 model 加 `ItemIsDragEnabled`）。沒有新增 tr() 字串、沒有新增或升級 dependency。
+
+## v8 驗證證據（本機 Release）
+
+- `UnitTestsViewer`（offscreen）新增 `pageReorderOrderMath`（18 列）、`pageReorderInsertionGeometry`、`thumbnailReorderWorkflow`（單頁前／後、連續多頁前／後、Ctrl 不連續、Shift 範圍、第一頁前、最後一頁後與空白處、自身區域 no-op、invalid／duplicate／missing 被拒、Undo／Redo、選取與目前頁面）、`reorderPreservesContentAfterSave`（含註解、旋轉頁、AcroForm 欄位、文字層：重排 → Save As → 重開後逐項確認）、`reorderFlattensNestedPageTree`、`viewerThumbnailsAreReadOnly`：全 PASS。
+- 真實 Windows 平台滑鼠拖曳 `nativeThumbnailDragSmoke`（`FAMILYPDF_NATIVE_DRAG_SMOKE=1`、`QT_QPA_PLATFORM=windows`，會移動實體游標、需視窗在最上層）：單頁、多選、Undo、Redo PASS。跑的時候別動滑鼠；偶爾因人為移動或視窗被遮住而 drag 沒落到 view，測試會重試。
+- 回歸 smoke PASS：`thumbnailSelectionAndPageManagement`（選取、刪除、旋轉、提取）、`printAndExportEntriesAreAvailable`、`printDialogOptionsAndCancel`、`exportImagesDialogWorkflow`、`exportSelectionAsImageWorkflow`、`filledFormPrintsAndExports`、`menuActionsOperateOnTheDocument`、`UnitTestsBookmarks`、`UnitTestsDocumentEdit`。未重跑本機完整 CTest 與 `dist/FamilyPDF`（依規定交給 CI）。
+- 本機 build：新增檔案需要重新 configure；`VCPKG_MANIFEST_INSTALL=OFF` 已固定所以 vcpkg 沒被動到，重新產生後把 `rules.ninja` 第 17 行的 `msvc_deps_prefix` 還原成 `注意: 包含檔案:`（`ninja -t deps` 確認新 obj 有 #deps）。
 
 ## v7 已交付內容
 
@@ -27,7 +41,7 @@
 - 繁中／簡中翻譯已補（`translations/PDF4QT_zh_TW.ts`、`PDF4QT_zh_CN.ts`）。說明文件：`docs/print-export-v7.md`。
 - 未修改 renderer／色彩管理／搜尋／OCR／表單與簽章核心；未新增或升級 dependency。
 
-## 驗證與交付證據
+## v7 驗證與交付證據
 
 - 新測試 `UnitTestsPrintExport`（35 項，offscreen 33 通過＋2 項因無 Windows 字型／平台外掛而 SKIP；`QT_QPA_PLATFORM=windows` 下 35/35，含 Microsoft Print to PDF 驅動與中文字型）與 `UnitTestsViewer` 新增 6 項（入口／縮圖選單、列印對話框、匯出對話框、選取匯出、填寫表單列印與匯出、1,200 頁量測）。完整 CTest 10/10 通過。
 - 效能（本機 Release）：1,200 頁文件開列印對話框至預覽第一頁約 280 ms；第 600 頁 1 頁 PNG 29 ms；10 頁 PNG 84 ms；列印第 600 頁 14 ms；A4 PNG 600 DPI 約 680 ms。只輸出少數頁時時間不隨頁數增加，不需優化。
@@ -35,7 +49,8 @@
 
 ## Git 狀態
 
-- PR #15 已 squash merge 為 `60be9699`，本機 `main` 已同步，feature branch 已刪除（本機與遠端）。本機 `gh` 仍未登入，無法自行建立 PR 或查 CI；merge 由使用者在 GitHub 完成。
+- v8：branch `feature/thumbnail-page-reorder-v8`，已 push，未開 PR（`gh` 未登入）。
+- v7：PR #15 已 squash merge 為 `60be9699`，本機 `main` 已同步，feature branch 已刪除（本機與遠端）。本機 `gh` 仍未登入，無法自行建立 PR 或查 CI；merge 由使用者在 GitHub 完成。
 
 ## 限制與接手注意事項
 
@@ -48,6 +63,7 @@
 
 ## 需要深入時再讀
 
+- v8 行為與資料流：`docs/page-reorder-v8.md`；核心 `Pdf4QtLibGui/pdfpagereorder.*`、`pdfthumbnailslistview.*`，控制器 `pdfprogramcontroller.cpp` 的 `reorderPages`；測試見 `tst_viewercontextmenutest.cpp` 的 `pageReorder*`、`thumbnailReorderWorkflow`、`reorderPreservesContentAfterSave`、`reorderFlattensNestedPageTree`、`nativeThumbnailDragSmoke`。
 - v7 行為與限制：`docs/print-export-v7.md`；核心 `Pdf4QtLibGui/pdfpageoutput.*`，對話框 `pdfprintdialog.*`、`pdfexportimagesdialog.*`，流程 `pdfprogramcontroller.cpp` 的 `runPrintWorkflow`／`runExportImagesWorkflow`／`exportSelectionAsImage`。
 - v7 回歸：`UnitTests/tst_printexporttest.cpp`；`tst_viewercontextmenutest.cpp` 的 `printAndExportEntriesAreAvailable`、`printDialogOptionsAndCancel`、`exportImagesDialogWorkflow`、`exportSelectionAsImageWorkflow`、`filledFormPrintsAndExports`、`printExportLargeDocumentBenchmark`。
 - v6 行為與限制：`docs/forms-signatures-v6.md`（表單核心 `pdfform.*`、儲存／UndoRedo `pdfprogramcontroller.cpp`）。

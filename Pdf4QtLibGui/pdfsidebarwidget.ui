@@ -452,7 +452,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QListView" name="thumbnailsListView">
+        <widget class="pdfviewer::PDFThumbnailsListView" name="thumbnailsListView">
          <property name="movement">
           <enum>QListView::Movement::Static</enum>
          </property>
@@ -788,6 +788,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>pdfviewer::PDFThumbnailsListView</class>
+   <extends>QListView</extends>
+   <header>pdfthumbnailslistview.h</header>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="pdf4qtlibgui.qrc"/>
  </resources>

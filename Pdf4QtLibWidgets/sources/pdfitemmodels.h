@@ -312,6 +312,10 @@ public:
     virtual int columnCount(const QModelIndex& parent) const override;
     virtual QVariant data(const QModelIndex& index, int role) const override;
 
+    /// Items are selectable and may be dragged (a view decides whether dragging is enabled).
+    /// The model never accepts drops; page reordering is done on the document, not here.
+    virtual Qt::ItemFlags flags(const QModelIndex& index) const override;
+
     void setThumbnailsSize(int size);
     void setDocument(const PDFModifiedDocument& document);
 

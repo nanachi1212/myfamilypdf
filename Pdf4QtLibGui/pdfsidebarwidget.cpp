@@ -40,6 +40,8 @@
 #include "pdfwidgetutils.h"
 #include "pdfbookmarkui.h"
 #include "pdfwidgetannotation.h"
+#include "pdfpagereorder.h"
+#include "pdfthumbnailslistview.h"
 
 #include <QMenu>
 #include <QAction>
@@ -143,6 +145,8 @@ PDFSidebarWidget::PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
     ui->thumbnailsListView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     ui->thumbnailsListView->setSelectionBehavior(QAbstractItemView::SelectItems);
     ui->thumbnailsListView->setContextMenuPolicy(Qt::CustomContextMenu);
+    ui->thumbnailsListView->setReorderEnabled(m_editableDocument);
+    connect(ui->thumbnailsListView, &PDFThumbnailsListView::pagesDropped, this, &PDFSidebarWidget::onThumbnailPagesDropped);
     connect(ui->thumbnailsSizeSlider, &QSlider::valueChanged, this, &PDFSidebarWidget::onThumbnailsSizeChanged);
     connect(ui->thumbnailsListView, &QListView::clicked, this, &PDFSidebarWidget::onThumbnailClicked);
     connect(ui->thumbnailsListView, &QListView::customContextMenuRequested, this, &PDFSidebarWidget::onThumbnailContextMenuRequested);
@@ -340,7 +344,11 @@ void PDFSidebarWidget::setDocument(const pdf::PDFModifiedDocument& document, con
         }
     }
 
-    if (!document.hasReset() && preferred == Invalid && m_currentPage != Invalid && !isEmpty(m_currentPage))
+    // Staying on the page the user is working in: for edits that keep the document and the undo
+    // history (page reordering, deleting pages ...) and for their Undo / Redo, not only for
+    // changes that leave the document structure alone.
+    const bool keepsContext = !document.hasReset() || document.hasPreserveUndoRedo();
+    if (keepsContext && preferred == Invalid && m_currentPage != Invalid && !isEmpty(m_currentPage))
     {
         preferred = m_currentPage;
     }
@@ -1125,6 +1133,56 @@ void PDFSidebarWidget::selectThumbnailPages(const std::vector<pdf::PDFInteger>& 
         selectionModel->setCurrentIndex(currentIndex, QItemSelectionModel::NoUpdate);
         ui->thumbnailsListView->scrollTo(currentIndex, QListView::EnsureVisible);
     }
+}
+
+void PDFSidebarWidget::onThumbnailPagesDropped(std::vector<pdf::PDFInteger> movedPages, int insertionRow)
+{
+    if (!m_editableDocument || !m_document)
+    {
+        return;
+    }
+
+    const pdf::PDFInteger pageCount = m_thumbnailsModel->rowCount(QModelIndex());
+    const std::vector<pdf::PDFInteger> pages = PDFPageReorder::normalizePages(movedPages, pageCount);
+    if (pages.empty())
+    {
+        return;
+    }
+
+    const std::vector<pdf::PDFInteger> newPageOrder = PDFPageReorder::computeNewPageOrder(pageCount, pages, insertionRow);
+    if (PDFPageReorder::isIdentity(newPageOrder))
+    {
+        return;
+    }
+
+    // The page that is being read keeps being the same page after the move.
+    const std::vector<pdf::PDFInteger> currentPages = m_proxy->getWidget()->getDrawWidget()->getCurrentPages();
+    const std::vector<pdf::PDFInteger> newCurrentRows = PDFPageReorder::mapOldToNew(newPageOrder, currentPages.empty() ? std::vector<pdf::PDFInteger>() : std::vector<pdf::PDFInteger>{ currentPages.front() });
+    const pdf::PDFInteger newCurrentRow = newCurrentRows.empty() ? -1 : newCurrentRows.front();
+    const std::vector<pdf::PDFInteger> movedRows = PDFPageReorder::mapOldToNew(newPageOrder, pages);
+
+    const pdf::PDFDocument* documentBefore = m_document;
+    Q_EMIT reorderPagesRequested(newPageOrder);
+    if (m_document == documentBefore)
+    {
+        // The request was rejected, nothing has changed.
+        return;
+    }
+
+    // The model was reset and the view moved the current item, which cleared
+    // the selection. Restore it after the document update has settled.
+    QTimer::singleShot(0, this, [this, movedRows, newCurrentRow]()
+    {
+        selectThumbnailPages(movedRows);
+        if (newCurrentRow >= 0)
+        {
+            const QModelIndex currentIndex = m_thumbnailsModel->index(int(newCurrentRow), 0, QModelIndex());
+            if (currentIndex.isValid())
+            {
+                ui->thumbnailsListView->selectionModel()->setCurrentIndex(currentIndex, QItemSelectionModel::NoUpdate);
+            }
+        }
+    });
 }
 
 void PDFSidebarWidget::onThumbnailContextMenuRequested(const QPoint& pos)
