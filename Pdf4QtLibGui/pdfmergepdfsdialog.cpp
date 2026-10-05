@@ -22,6 +22,9 @@
 #include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrent>
 
+#include <algorithm>
+#include <climits>
+
 #include "pdfdbgheap.h"
 
 namespace pdfviewer

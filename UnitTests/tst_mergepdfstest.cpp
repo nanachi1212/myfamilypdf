@@ -17,6 +17,7 @@
 #include <QFile>
 #include <QRegularExpression>
 #include <QTemporaryDir>
+#include <QThread>
 #include <QtTest>
 
 #include <atomic>
