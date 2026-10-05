@@ -44,6 +44,8 @@
 #include "pdfdocumentwriter.h"
 #include "pdfwidgetformmanager.h"
 #include "pdfsidebarwidget.h"
+#include "pdfthumbnailslistview.h"
+#include "pdfpagereorder.h"
 #include "pdfprintdialog.h"
 #include "pdfexportimagesdialog.h"
 #include "pdfpageoutput.h"
@@ -65,15 +67,35 @@
 #include <QTreeView>
 #include <QTextBrowser>
 #include <QMimeData>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QtConcurrent/QtConcurrentRun>
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #include <psapi.h>
 #endif
 #include <memory>
+#include <thread>
 
 namespace
 {
+
+template <typename Condition>
+bool waitUntil(Condition&& condition, int timeoutMs)
+{
+    QElapsedTimer timer;
+    timer.start();
+    while (!condition())
+    {
+        if (timer.elapsed() > timeoutMs)
+        {
+            return false;
+        }
+        QTest::qWait(20);
+    }
+    return true;
+}
 
 bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool withText = true, bool unicode = false, bool malformed = false)
 {
@@ -177,6 +199,14 @@ private slots:
     void extractionRejectsInvalidInputAndCancellation();
     void readingPositionRestoresZoomAndClamps();
     void thumbnailSelectionAndPageManagement();
+    void pageReorderOrderMath_data();
+    void pageReorderOrderMath();
+    void pageReorderInsertionGeometry();
+    void thumbnailReorderWorkflow();
+    void reorderPreservesContentAfterSave();
+    void reorderFlattensNestedPageTree();
+    void viewerThumbnailsAreReadOnly();
+    void nativeThumbnailDragSmoke();
     void annotationMarkupWorkflow_data();
     void annotationMarkupWorkflow();
     void annotationNoteWorkflow();
@@ -243,7 +273,9 @@ void ViewerContextMenuTest::init()
         return;
     }
 #endif
-    if (testFunction == "thumbnailSelectionAndPageManagement" || testFunction.startsWith("annotation"))
+    if (testFunction == "thumbnailSelectionAndPageManagement" || testFunction.startsWith("annotation")
+        || testFunction.startsWith("pageReorder") || testFunction == "thumbnailReorderWorkflow"
+        || testFunction == "reorderPreservesContentAfterSave" || testFunction == "reorderFlattensNestedPageTree" || testFunction == "nativeThumbnailDragSmoke")
     {
         return;
     }
@@ -2750,6 +2782,894 @@ void ViewerContextMenuTest::printExportLargeDocumentBenchmark()
     dialogPoll.stop();
     QVERIFY(opened);
 }
+
+namespace
+{
+
+std::vector<pdf::PDFObjectReference> reorderPageReferences(const pdf::PDFDocument* document)
+{
+    std::vector<pdf::PDFObjectReference> references;
+    for (size_t index = 0; index < document->getCatalog()->getPageCount(); ++index)
+    {
+        references.push_back(document->getCatalog()->getPage(index)->getPageReference());
+    }
+    return references;
+}
+
+// Delivers a thumbnail drag as the windowing system would: enter, move, drop.
+void dropThumbnails(pdfviewer::PDFThumbnailsListView* view, const std::vector<pdf::PDFInteger>& pages, const QPoint& position)
+{
+    // A real drag started by the view accepts drops while it runs; Qt delivers drag events to a
+    // widget that does not accept drops nowhere, so the test does the same for the duration of the drop.
+    const bool acceptedDrops = view->acceptDrops();
+    view->setAcceptDrops(true);
+    const auto restore = qScopeGuard([&]() { view->setAcceptDrops(acceptedDrops); });
+    std::unique_ptr<QMimeData> mimeData(pdfviewer::PDFThumbnailsListView::createReorderMimeData(pages));
+    QDragEnterEvent enter(position, Qt::MoveAction, mimeData.get(), Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(view->viewport(), &enter);
+    QDragMoveEvent move(position, Qt::MoveAction, mimeData.get(), Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(view->viewport(), &move);
+    QDropEvent drop(QPointF(position), Qt::MoveAction, mimeData.get(), Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(view->viewport(), &drop);
+    // The view reports the drop with a queued signal.
+    QCoreApplication::processEvents();
+}
+
+// Opens the thumbnails page of the sidebar so that the view has its real size.
+bool showThumbnailsPage(QMainWindow* window)
+{
+    auto* dock = window->findChild<QDockWidget*>("SidebarDockWidget");
+    auto* button = window->findChild<QToolButton*>("thumbnailsButton");
+    auto* view = window->findChild<QListView*>("thumbnailsListView");
+    if (!dock || !button || !view)
+    {
+        return false;
+    }
+    dock->show();
+    button->click();
+    view->show();
+    for (int attempt = 0; attempt < 100 && view->viewport()->height() < 300; ++attempt)
+    {
+        QTest::qWait(20);
+    }
+    return view->viewport()->height() >= 300;
+}
+
+// A point inside the first (before) or last (after) quarter of a thumbnail, on both axes,
+// so the result does not depend on whether the view lays out one or several columns.
+QPoint thumbnailDropPoint(QListView* view, int row, bool after)
+{
+    view->scrollTo(view->model()->index(row, 0));
+    QCoreApplication::processEvents();
+    const QRect rect = view->visualRect(view->model()->index(row, 0));
+    return after ? QPoint(rect.left() + rect.width() * 3 / 4, rect.top() + rect.height() * 3 / 4)
+                 : QPoint(rect.left() + rect.width() / 4, rect.top() + rect.height() / 4);
+}
+
+std::vector<int> selectedThumbnailRows(const QListView* view)
+{
+    std::vector<int> rows;
+    for (const QModelIndex& index : view->selectionModel()->selectedIndexes())
+    {
+        rows.push_back(index.row());
+    }
+    std::sort(rows.begin(), rows.end());
+    return rows;
+}
+
+bool writeReorderFixture(const QString& path)
+{
+    if (!writePdfFixture(path, 4))
+    {
+        return false;
+    }
+
+    pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+    pdf::PDFDocument original = reader.readFromFile(path);
+    if (reader.getReadingResult() != pdf::PDFDocumentReader::Result::OK)
+    {
+        return false;
+    }
+
+    pdf::PDFDocumentBuilder builder(&original);
+    std::vector<pdf::PDFObjectReference> pages;
+    for (size_t index = 0; index < original.getCatalog()->getPageCount(); ++index)
+    {
+        pages.push_back(original.getCatalog()->getPage(index)->getPageReference());
+        // The width identifies the page after the move.
+        builder.setPageMediaBox(pages.back(), QRectF(0, 0, 400 + 10 * qreal(index), 595));
+    }
+
+    builder.setPageRotation(pages[1], pdf::PageRotation::Rotate90);
+    builder.createAnnotationSquare(pages[2], QRectF(40, 300, 120, 60), 2.0, QColor(255, 220, 220), QColor(200, 0, 0), QStringLiteral("tester"), QStringLiteral("subject"), QStringLiteral("note-on-third-page"));
+
+    auto field = builder.createFormFieldText(QStringLiteral("reorder-name"), QStringLiteral("Alice"), pdf::PDFFormField::None, 40);
+    builder.createFormFieldWidget(field, pages[0], QRectF(40, 450, 220, 40), "/Helv 12 Tf 0 g");
+    builder.appendAcroFormField(field);
+
+    pdf::PDFDocument document = builder.build();
+    pdf::PDFDocumentWriter writer(nullptr);
+    return bool(writer.write(path, &document, true));
+}
+
+QString pageText(pdf::PDFAsynchronousTextLayoutCompiler* compiler, pdf::PDFInteger pageIndex)
+{
+    QString text;
+    const pdf::PDFTextLayout& layout = compiler->getTextLayoutStorage()->getTextLayout(pageIndex);
+    for (const pdf::PDFTextFlow& flow : pdf::PDFTextFlow::createTextFlows(layout, pdf::PDFTextFlow::FlowFlags(), pageIndex))
+    {
+        text += flow.getText();
+    }
+    return text;
+}
+
+#ifdef Q_OS_WIN
+#endif
+#ifdef Q_OS_WIN
+#endif
+#ifdef Q_OS_WIN
+// Presses the real left mouse button, drags with the real cursor and releases. The
+// Windows drag-and-drop loop reads the physical mouse state, so Qt test events cannot
+// drive it. The steps are scheduled up front because the drag blocks the caller.
+// Positions are converted to physical pixels relative to the client area of the window,
+// which takes the screen scaling and the screen origin into account.
+bool scheduleNativeDrag(QWidget* widget, const QPoint& from, const QPoint& to)
+{
+    const auto toScreen = [widget](const QPoint& viewportPoint)
+    {
+        const QWidget* top = widget->window();
+        const QPoint inWindow = widget->mapTo(top, viewportPoint);
+        const qreal ratio = top->devicePixelRatioF();
+        POINT point = { qRound(inWindow.x() * ratio), qRound(inWindow.y() * ratio) };
+        ClientToScreen(reinterpret_cast<HWND>(top->winId()), &point);
+        return QPoint(point.x, point.y);
+    };
+    const QPoint start = toScreen(from);
+    const QPoint end = toScreen(to);
+    // The real mouse reaches whatever window is on top at that point.
+    const HWND topWindow = reinterpret_cast<HWND>(widget->window()->winId());
+    for (const QPoint& point : { start, end })
+    {
+        const HWND hit = WindowFromPoint(POINT{ point.x(), point.y() });
+        if (!hit || GetAncestor(hit, GA_ROOT) != topWindow)
+        {
+            qWarning() << "Native drag point" << point << "is not over the test window";
+            return false;
+        }
+    }
+
+    // A worker thread drives the mouse: the GUI thread is blocked inside the drag loop.
+    auto positions = std::make_shared<QStringList>();
+    std::thread([start, end, positions]()
+    {
+        // SetCursorPos does not produce mouse input, so the drag loop would act on a stale position.
+        // SendInput with an absolute position is real mouse movement.
+        const auto place = [positions](const QPoint& point)
+        {
+            const int width = GetSystemMetrics(SM_CXSCREEN);
+            const int height = GetSystemMetrics(SM_CYSCREEN);
+            INPUT input = {};
+            input.type = INPUT_MOUSE;
+            input.mi.dx = LONG((qint64(point.x()) * 65535 + (width - 1) / 2) / (width - 1));
+            input.mi.dy = LONG((qint64(point.y()) * 65535 + (height - 1) / 2) / (height - 1));
+            input.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
+            SendInput(1, &input, sizeof(INPUT));
+            Sleep(15);
+            POINT actual;
+            GetCursorPos(&actual);
+            positions->push_back(QStringLiteral("%1,%2").arg(actual.x).arg(actual.y));
+        };
+        Sleep(100);
+        place(start);
+        Sleep(150);
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+        Sleep(150);
+        const int steps = 12;
+        for (int step = 1; step <= steps; ++step)
+        {
+            place(start + (end - start) * step / steps);
+            Sleep(60);
+        }
+        Sleep(250);
+        place(end);
+        Sleep(300);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        Sleep(200);
+        qInfo() << "NATIVE cursor path" << *positions << "start" << start << "end" << end;
+    }).detach();
+    return true;
+}
+#endif
+
+}
+
+void ViewerContextMenuTest::pageReorderOrderMath_data()
+{
+    QTest::addColumn<int>("pageCount");
+    QTest::addColumn<QList<int>>("moved");
+    QTest::addColumn<int>("insertionRow");
+    QTest::addColumn<QList<int>>("expected");
+
+    // 0-based pages; "after page N" is insertion row N.
+    QTest::newRow("single forward") << 6 << QList<int>{1} << 5 << QList<int>{0, 2, 3, 4, 1, 5};
+    QTest::newRow("single backward") << 6 << QList<int>{4} << 1 << QList<int>{0, 4, 1, 2, 3, 5};
+    QTest::newRow("contiguous forward (1 2 3 4 5 6, move 2 3 behind 5)") << 6 << QList<int>{1, 2} << 5 << QList<int>{0, 3, 4, 1, 2, 5};
+    QTest::newRow("contiguous backward") << 6 << QList<int>{3, 4} << 1 << QList<int>{0, 3, 4, 1, 2, 5};
+    QTest::newRow("ctrl non contiguous") << 6 << QList<int>{1, 3} << 5 << QList<int>{0, 2, 4, 1, 3, 5};
+    QTest::newRow("shift range to front") << 6 << QList<int>{1, 2, 3, 4} << 0 << QList<int>{1, 2, 3, 4, 0, 5};
+    QTest::newRow("shift range to end") << 6 << QList<int>{1, 2, 3, 4} << 6 << QList<int>{0, 5, 1, 2, 3, 4};
+    QTest::newRow("drop before first page") << 6 << QList<int>{3} << 0 << QList<int>{3, 0, 1, 2, 4, 5};
+    QTest::newRow("drop after last page") << 6 << QList<int>{2} << 6 << QList<int>{0, 1, 3, 4, 5, 2};
+    QTest::newRow("selection order does not matter") << 6 << QList<int>{2, 1} << 5 << QList<int>{0, 3, 4, 1, 2, 5};
+    QTest::newRow("duplicates and invalid pages are ignored") << 6 << QList<int>{1, 1, 2, -1, 9} << 5 << QList<int>{0, 3, 4, 1, 2, 5};
+    QTest::newRow("insertion row is clamped") << 3 << QList<int>{0} << 99 << QList<int>{1, 2, 0};
+    // Dropping a selection into its own area changes nothing.
+    QTest::newRow("self: before first moved page") << 6 << QList<int>{2, 3} << 2 << QList<int>{0, 1, 2, 3, 4, 5};
+    QTest::newRow("self: between moved pages") << 6 << QList<int>{2, 3} << 3 << QList<int>{0, 1, 2, 3, 4, 5};
+    QTest::newRow("self: after last moved page") << 6 << QList<int>{2, 3} << 4 << QList<int>{0, 1, 2, 3, 4, 5};
+    QTest::newRow("self: single page before") << 6 << QList<int>{2} << 2 << QList<int>{0, 1, 2, 3, 4, 5};
+    QTest::newRow("self: single page after") << 6 << QList<int>{2} << 3 << QList<int>{0, 1, 2, 3, 4, 5};
+    QTest::newRow("self: everything") << 4 << QList<int>{0, 1, 2, 3} << 2 << QList<int>{0, 1, 2, 3};
+}
+
+void ViewerContextMenuTest::pageReorderOrderMath()
+{
+    QFETCH(int, pageCount);
+    QFETCH(QList<int>, moved);
+    QFETCH(int, insertionRow);
+    QFETCH(QList<int>, expected);
+
+    const std::vector<pdf::PDFInteger> movedPages(moved.cbegin(), moved.cend());
+    const std::vector<pdf::PDFInteger> order = pdfviewer::PDFPageReorder::computeNewPageOrder(pageCount, movedPages, insertionRow);
+    const std::vector<pdf::PDFInteger> expectedOrder(expected.cbegin(), expected.cend());
+    QCOMPARE(order, expectedOrder);
+    QVERIFY(pdfviewer::PDFPageReorder::isPermutation(order, pageCount));
+    QCOMPARE(pdfviewer::PDFPageReorder::isIdentity(order), pdfviewer::PDFPageReorder::isIdentity(expectedOrder));
+
+    // Validation helpers used by the controller.
+    QVERIFY(!pdfviewer::PDFPageReorder::isPermutation({}, pageCount));
+    std::vector<pdf::PDFInteger> duplicate = order;
+    duplicate.back() = duplicate.front();
+    if (pageCount > 1)
+    {
+        QVERIFY(!pdfviewer::PDFPageReorder::isPermutation(duplicate, pageCount));
+    }
+    std::vector<pdf::PDFInteger> outOfRange = order;
+    outOfRange.back() = pageCount;
+    QVERIFY(!pdfviewer::PDFPageReorder::isPermutation(outOfRange, pageCount));
+    std::vector<pdf::PDFInteger> shorter = order;
+    shorter.pop_back();
+    QVERIFY(!pdfviewer::PDFPageReorder::isPermutation(shorter, pageCount));
+    std::vector<pdf::PDFInteger> negative = order;
+    negative.front() = -1;
+    QVERIFY(!pdfviewer::PDFPageReorder::isPermutation(negative, pageCount));
+
+    // The moved pages are found at their new positions, in their original relative order.
+    const std::vector<pdf::PDFInteger> normalized = pdfviewer::PDFPageReorder::normalizePages(movedPages, pageCount);
+    const std::vector<pdf::PDFInteger> newRows = pdfviewer::PDFPageReorder::mapOldToNew(order, normalized);
+    QCOMPARE(newRows.size(), normalized.size());
+    for (size_t i = 0; i < normalized.size(); ++i)
+    {
+        QCOMPARE(order[size_t(newRows[i])], normalized[i]);
+        if (i > 0)
+        {
+            QVERIFY(newRows[i] > newRows[i - 1]);
+        }
+    }
+}
+
+void ViewerContextMenuTest::pageReorderInsertionGeometry()
+{
+    using pdfviewer::PDFPageReorder;
+    const auto rowAt = [](const std::vector<QRect>& rects, const QPoint& point) { return PDFPageReorder::computeInsertionPoint(rects, point).row; };
+
+    // Three columns, 100 x 140 items, 10 px spacing, 7 items (the last row has one).
+    std::vector<QRect> grid;
+    for (int i = 0; i < 7; ++i)
+    {
+        grid.push_back(QRect(5 + (i % 3) * 110, 5 + (i / 3) * 150, 100, 140));
+    }
+    QVERIFY(PDFPageReorder::computeInsertionPoint(grid, QPoint(125, 200)).horizontalFlow);
+    QCOMPARE(rowAt(grid, QPoint(125, 200)), 4);     // left half of item 4: before it
+    QCOMPARE(rowAt(grid, QPoint(200, 200)), 5);     // right half of item 4: after it
+    QCOMPARE(rowAt(grid, QPoint(219, 200)), 5);     // gap between item 4 and 5
+    QCOMPARE(rowAt(grid, QPoint(400, 200)), 6);     // blank space at the end of the row
+    QCOMPARE(rowAt(grid, QPoint(400, 350)), 7);     // blank space beside the single item of the last row
+    QCOMPARE(rowAt(grid, QPoint(90, 310)), 7);      // right half of the last item
+    QCOMPARE(rowAt(grid, QPoint(20, 310)), 6);      // left half of the last item
+    QCOMPARE(rowAt(grid, QPoint(50, 600)), 7);      // below everything: end of the document
+    QCOMPARE(rowAt(grid, QPoint(200, 480)), 7);
+    QCOMPARE(rowAt(grid, QPoint(50, 0)), 0);        // above everything
+    QCOMPARE(rowAt(grid, QPoint(8, 20)), 0);        // first page, left half
+    QCOMPARE(rowAt(grid, QPoint(50, 150)), 3);      // between rows: in front of the lower row
+    QCOMPARE(rowAt({}, QPoint(10, 10)), 0);
+
+    // The result follows the geometry, not fixed pixel values: the same layout at another thumbnail size.
+    std::vector<QRect> tinyGrid;
+    for (int i = 0; i < 7; ++i)
+    {
+        tinyGrid.push_back(QRect(2 + (i % 3) * 40, 2 + (i / 3) * 60, 36, 56));
+    }
+    QCOMPARE(rowAt(tinyGrid, QPoint(2 + 40 + 4, 70)), 4);
+    QCOMPARE(rowAt(tinyGrid, QPoint(2 + 40 + 30, 70)), 5);
+    QCOMPARE(rowAt(tinyGrid, QPoint(500, 70)), 6);
+    QCOMPARE(rowAt(tinyGrid, QPoint(10, 5000)), 7);
+
+    // One column: the vertical axis decides.
+    std::vector<QRect> column;
+    for (int i = 0; i < 4; ++i)
+    {
+        column.push_back(QRect(5, 5 + i * 150, 100, 140));
+    }
+    QVERIFY(!PDFPageReorder::computeInsertionPoint(column, QPoint(30, 20)).horizontalFlow);
+    QCOMPARE(rowAt(column, QPoint(30, 20)), 0);     // upper half of the first item
+    QCOMPARE(rowAt(column, QPoint(30, 120)), 1);    // lower half
+    QCOMPARE(rowAt(column, QPoint(90, 120)), 1);    // x does not matter in a column
+    QCOMPARE(rowAt(column, QPoint(30, 148)), 1);    // gap
+    QCOMPARE(rowAt(column, QPoint(300, 200)), 1);   // blank beside the second item, upper half
+    QCOMPARE(rowAt(column, QPoint(30, 2000)), 4);
+
+    // Mixed portrait / landscape items in one row.
+    const std::vector<QRect> mixed = { QRect(5, 5, 100, 140), QRect(115, 45, 140, 100), QRect(265, 5, 100, 140) };
+    QCOMPARE(rowAt(mixed, QPoint(125, 100)), 1);
+    QCOMPARE(rowAt(mixed, QPoint(240, 100)), 2);
+    QCOMPARE(rowAt(mixed, QPoint(150, 20)), 1);     // above the landscape item, left of its centre
+    QCOMPARE(rowAt(mixed, QPoint(230, 20)), 2);
+
+    // The indicator is drawn next to the item the decision was made on.
+    const PDFPageReorder::InsertionPoint point = PDFPageReorder::computeInsertionPoint(grid, QPoint(200, 200));
+    QCOMPARE(point.anchor, 4);
+    QVERIFY(point.after);
+}
+
+void ViewerContextMenuTest::thumbnailReorderWorkflow()
+{
+#ifdef Q_OS_LINUX
+    QSKIP("Editor thumbnail interactions are covered by the Windows runtime job.");
+#endif
+    const QString path = m_temp.filePath("thumbnail-reorder.pdf");
+    QVERIFY(writePdfFixture(path, 6));
+
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    auto* drawProxy = controller->getPdfWidget()->getDrawWidgetProxy();
+    drawProxy->setPageLayout(pdf::PageLayout::OneColumn);
+
+    auto* sidebarDock = editor.findChild<QDockWidget*>("SidebarDockWidget");
+    auto* thumbnails = editor.findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(sidebarDock);
+    QVERIFY(thumbnails);
+    QVERIFY(showThumbnailsPage(&editor));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 6);
+    QTRY_VERIFY(thumbnails->visualRect(thumbnails->model()->index(0, 0)).isValid());
+    QVERIFY(thumbnails->isReorderEnabled());
+    QVERIFY(thumbnails->dragEnabled());
+    QVERIFY(thumbnails->model()->flags(thumbnails->model()->index(0, 0)) & Qt::ItemIsDragEnabled);
+
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+    QAction* redoAction = editor.findChild<QAction*>("actionRedo");
+    QVERIFY(undoAction);
+    QVERIFY(redoAction);
+
+    const std::vector<pdf::PDFObjectReference> original = reorderPageReferences(controller->getDocument());
+    QCOMPARE(original.size(), size_t(6));
+
+    // Page references are only rearranged, never copied: position i must hold the original reference of page expected[i].
+    const auto verifyArrangement = [&](const std::vector<int>& expected)
+    {
+        const std::vector<pdf::PDFObjectReference> current = reorderPageReferences(controller->getDocument());
+        QCOMPARE(current.size(), original.size());
+        QCOMPARE(thumbnails->model()->rowCount(), int(original.size()));
+        for (size_t position = 0; position < expected.size(); ++position)
+        {
+            QVERIFY2(current[position] == original[size_t(expected[position])], qPrintable(QStringLiteral("position %1").arg(position)));
+        }
+    };
+    const auto click = [&](int row, Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+    {
+        QTRY_VERIFY(thumbnails->visualRect(thumbnails->model()->index(row, 0)).isValid());
+        thumbnails->scrollTo(thumbnails->model()->index(row, 0));
+        QCoreApplication::processEvents();
+        QTest::mouseClick(thumbnails->viewport(), Qt::LeftButton, modifiers, thumbnails->visualRect(thumbnails->model()->index(row, 0)).center());
+        QCoreApplication::processEvents();
+    };
+    const auto dropSelection = [&](int row, bool after)
+    {
+        const std::vector<int> rows = selectedThumbnailRows(thumbnails);
+        const std::vector<pdf::PDFInteger> pages(rows.cbegin(), rows.cend());
+        dropThumbnails(thumbnails, pages, thumbnailDropPoint(thumbnails, row, after));
+    };
+    // The sidebar stays on the thumbnails page after a move and after Undo, so the next drag can start at once.
+    const auto undoToOriginal = [&]()
+    {
+        undoAction->trigger();
+        verifyArrangement({0, 1, 2, 3, 4, 5});
+        QVERIFY(thumbnails->isVisible());
+    };
+    const auto reorder = [&](const std::vector<int>& expected, int dropRow, bool after)
+    {
+        const pdf::PDFDocument* before = controller->getDocument();
+        dropSelection(dropRow, after);
+        QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != before, 5000);
+        verifyArrangement(expected);
+        QVERIFY(thumbnails->isVisible());
+    };
+
+    // 1. Single page forward: page 2 goes behind page 5.
+    click(1);
+    reorder({0, 2, 3, 4, 1, 5}, 4, true);
+    undoToOriginal();
+
+    // 2. Single page backward.
+    click(4);
+    reorder({0, 4, 1, 2, 3, 5}, 1, false);
+    undoToOriginal();
+
+    // 3. Contiguous pages forward: 1 2 3 4 5 6, move 2 3 behind 5 -> 1 4 5 2 3 6. Also checks the
+    //    selection and the page being read after the move, and Undo / Redo.
+    click(1);
+    click(2, Qt::ShiftModifier);
+    QCOMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2}));
+    // Reading page 5 while pages 2 and 3 are selected: moving the view synchronizes the thumbnails and
+    // collapses the selection, so the selection is made again afterwards (without navigating).
+    drawProxy->goToPage(4);
+    QTRY_COMPARE_WITH_TIMEOUT(controller->getPdfWidget()->getDrawWidget()->getCurrentPages().front(), pdf::PDFInteger(4), 5000);
+    QTest::qWait(50);
+    thumbnails->selectionModel()->clearSelection();
+    thumbnails->selectionModel()->select(thumbnails->model()->index(1, 0), QItemSelectionModel::Select);
+    thumbnails->selectionModel()->select(thumbnails->model()->index(2, 0), QItemSelectionModel::Select);
+    QCOMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2}));
+    reorder({0, 3, 4, 1, 2, 5}, 4, true);
+    QTRY_COMPARE_WITH_TIMEOUT(selectedThumbnailRows(thumbnails), (std::vector<int>{3, 4}), 5000);
+    // The page that was being read (original page 5) is now page 3 and stays in view.
+    QTRY_COMPARE_WITH_TIMEOUT(controller->getPdfWidget()->getDrawWidget()->getCurrentPages().front(), pdf::PDFInteger(2), 5000);
+    QVERIFY(controller->getDocument()->getCatalog()->getPage(2)->getPageReference() == original[4]);
+    undoToOriginal();
+    redoAction->trigger();
+    verifyArrangement({0, 3, 4, 1, 2, 5});
+    undoToOriginal();
+
+    // 4. Contiguous pages backward.
+    click(3);
+    click(4, Qt::ShiftModifier);
+    reorder({0, 3, 4, 1, 2, 5}, 1, false);
+    undoToOriginal();
+
+    // 5. Ctrl selection of separate pages.
+    click(1);
+    click(3, Qt::ControlModifier);
+    QCOMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 3}));
+    reorder({0, 2, 4, 1, 3, 5}, 4, true);
+    QTRY_COMPARE_WITH_TIMEOUT(selectedThumbnailRows(thumbnails), (std::vector<int>{3, 4}), 5000);
+    undoToOriginal();
+
+    // 6. Shift range to the front.
+    click(1);
+    click(4, Qt::ShiftModifier);
+    QCOMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2, 3, 4}));
+    reorder({1, 2, 3, 4, 0, 5}, 0, false);
+    undoToOriginal();
+
+    // 7. Drop before the first page.
+    click(3);
+    reorder({3, 0, 1, 2, 4, 5}, 0, false);
+    QTRY_COMPARE_WITH_TIMEOUT(selectedThumbnailRows(thumbnails), (std::vector<int>{0}), 5000);
+    undoToOriginal();
+
+    // 8. Drop behind the last page, and into the empty area of the view.
+    click(2);
+    reorder({0, 1, 3, 4, 5, 2}, 5, true);
+    undoToOriginal();
+    click(0);
+    click(1, Qt::ShiftModifier);
+    {
+        const QPoint blank(thumbnails->viewport()->width() - 2, thumbnails->viewport()->height() - 2);
+        if (!thumbnails->indexAt(blank).isValid())
+        {
+            const pdf::PDFDocument* before = controller->getDocument();
+            dropThumbnails(thumbnails, {0, 1}, blank);
+            QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != before, 5000);
+            verifyArrangement({2, 3, 4, 5, 0, 1});
+            undoToOriginal();
+        }
+    }
+
+    // 9. Dropping into the own area does not change the order and creates no undo entry.
+    const auto expectNoChange = [&](int row, bool after)
+    {
+        const pdf::PDFDocument* before = controller->getDocument();
+        const bool undoBefore = undoAction->isEnabled();
+        dropSelection(row, after);
+        QTest::qWait(50);
+        QVERIFY(controller->getDocument() == before);
+        QCOMPARE(undoAction->isEnabled(), undoBefore);
+        verifyArrangement({0, 1, 2, 3, 4, 5});
+    };
+    click(2);
+    click(3, Qt::ShiftModifier);
+    expectNoChange(2, false);   // before the first selected page
+    expectNoChange(2, true);    // between the selected pages
+    expectNoChange(3, true);    // after the last selected page
+    click(2);
+    expectNoChange(2, false);
+    expectNoChange(2, true);
+    expectNoChange(3, false);
+
+    // 10. / 11. The controller refuses anything that is not a complete permutation.
+    const pdf::PDFDocument* untouched = controller->getDocument();
+    const std::vector<std::vector<pdf::PDFInteger>> invalidOrders = {
+        { 0, 1, 2, 3, 4 },              // missing page (wrong size)
+        { 0, 1, 2, 3, 4, 5, 6 },        // too many
+        { 0, 1, 2, 3, 4, 9 },           // out of range
+        { 0, 1, 2, 3, 4, -1 },          // negative
+        { 0, 1, 2, 3, 4, 4 },           // duplicate, page 5 missing
+        { 1, 1, 2, 3, 4, 5 },           // duplicate
+        {},
+    };
+    for (const auto& order : invalidOrders)
+    {
+        QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("Page reorder rejected")));
+        QVERIFY(!controller->reorderPages(order));
+        QVERIFY(controller->getDocument() == untouched);
+        verifyArrangement({0, 1, 2, 3, 4, 5});
+    }
+    // The current order is a no-op, not an undo step.
+    const bool undoBefore = undoAction->isEnabled();
+    QVERIFY(!controller->reorderPages({0, 1, 2, 3, 4, 5}));
+    QVERIFY(controller->getDocument() == untouched);
+    QCOMPARE(undoAction->isEnabled(), undoBefore);
+
+    // 12. / 13. Several steps undo and redo in order.
+    QVERIFY(controller->reorderPages({1, 0, 2, 3, 4, 5}));
+    QVERIFY(controller->reorderPages({1, 0, 5, 4, 3, 2}));
+    verifyArrangement({0, 1, 5, 4, 3, 2});
+    undoAction->trigger();
+    verifyArrangement({1, 0, 2, 3, 4, 5});
+    undoAction->trigger();
+    verifyArrangement({0, 1, 2, 3, 4, 5});
+    redoAction->trigger();
+    verifyArrangement({1, 0, 2, 3, 4, 5});
+    redoAction->trigger();
+    verifyArrangement({0, 1, 5, 4, 3, 2});
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::reorderPreservesContentAfterSave()
+{
+#ifdef Q_OS_LINUX
+    QSKIP("Editor thumbnail interactions are covered by the Windows runtime job.");
+#endif
+    const QString path = m_temp.filePath("reorder-content.pdf");
+    QVERIFY(writeReorderFixture(path));
+
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    controller->getPdfWidget()->getDrawWidgetProxy()->setPageLayout(pdf::PageLayout::OneColumn);
+
+    auto* sidebarDock = editor.findChild<QDockWidget*>("SidebarDockWidget");
+    auto* thumbnails = editor.findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(sidebarDock && thumbnails);
+    QVERIFY(showThumbnailsPage(&editor));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 4);
+    QTRY_VERIFY(thumbnails->visualRect(thumbnails->model()->index(0, 0)).isValid());
+
+    // Pages 1 and 2 (the form page and the rotated page) go behind the others: 3 4 1 2.
+    const std::vector<pdf::PDFObjectReference> original = reorderPageReferences(controller->getDocument());
+    QTest::mouseClick(thumbnails->viewport(), Qt::LeftButton, Qt::NoModifier, thumbnails->visualRect(thumbnails->model()->index(0, 0)).center());
+    QTest::mouseClick(thumbnails->viewport(), Qt::LeftButton, Qt::ShiftModifier, thumbnails->visualRect(thumbnails->model()->index(1, 0)).center());
+    const pdf::PDFDocument* before = controller->getDocument();
+    dropThumbnails(thumbnails, {0, 1}, thumbnailDropPoint(thumbnails, 3, true));
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != before, 5000);
+    const std::vector<int> expected = {2, 3, 0, 1};
+    const std::vector<pdf::PDFObjectReference> moved = reorderPageReferences(controller->getDocument());
+    for (size_t i = 0; i < expected.size(); ++i)
+    {
+        QVERIFY(moved[i] == original[size_t(expected[i])]);
+    }
+
+    const QString savedPath = m_temp.filePath("reorder-content-saved.pdf");
+    QVERIFY(annotationSaveAs(controller, &editor, savedPath));
+    QVERIFY(QFile::exists(savedPath));
+    controller->closeDocument();
+    controller->openDocument(savedPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    const pdf::PDFDocument* reopened = controller->getDocument();
+    const pdf::PDFCatalog* catalog = reopened->getCatalog();
+    QCOMPARE(catalog->getPageCount(), size_t(4));
+
+    // Order: the width of the media box identifies the original page.
+    const std::vector<int> widths = {420, 430, 400, 410};
+    for (size_t i = 0; i < widths.size(); ++i)
+    {
+        QCOMPARE(int(catalog->getPage(i)->getMediaBox().width()), widths[i]);
+    }
+
+    // Rotation stays with the page that had it (original page 2, now page 4).
+    for (size_t i = 0; i < 4; ++i)
+    {
+        QCOMPARE(catalog->getPage(i)->getPageRotation(), i == 3 ? pdf::PageRotation::Rotate90 : pdf::PageRotation::None);
+    }
+
+    // The annotation is still on the page it was created on (original page 3, now page 1).
+    for (size_t i = 0; i < 4; ++i)
+    {
+        const auto items = annotations(controller, int(i));
+        QCOMPARE(items.size(), i == 0 ? 1 : 0);
+    }
+    const auto items = annotations(controller, 0);
+    QCOMPARE(items.front()->asMarkupAnnotation()->getContents(), QStringLiteral("note-on-third-page"));
+    QVERIFY(items.front()->asMarkupAnnotation()->getPageReference() == catalog->getPage(0)->getPageReference());
+
+    // The form widget belongs to the same page object and keeps its value (original page 1, now page 3).
+    const pdf::PDFForm form = pdf::PDFForm::parse(reopened, catalog->getFormObject());
+    int fieldCount = 0;
+    form.apply([&](const pdf::PDFFormField* field)
+    {
+        if (field->getName(pdf::PDFFormField::FullyQualified) != QStringLiteral("reorder-name"))
+        {
+            return;
+        }
+        ++fieldCount;
+        QCOMPARE(pdf::PDFDocumentDataLoaderDecorator(reopened).readTextString(reopened->getObject(field->getValue()), QString()), QStringLiteral("Alice"));
+        QCOMPARE(field->getWidgets().size(), size_t(1));
+        QVERIFY(field->getWidgets().front().getPage() == catalog->getPage(2)->getPageReference());
+    });
+    QCOMPARE(fieldCount, 1);
+
+    // Text layer of every page is still the text of its original page.
+    auto* compiler = controller->getPdfWidget()->getDrawWidgetProxy()->getTextLayoutCompiler();
+    compiler->makeTextLayout();
+    QTRY_VERIFY_WITH_TIMEOUT(compiler->isTextLayoutReady(), 15000);
+    const std::vector<int> originalNumbers = {3, 4, 1, 2};
+    for (size_t i = 0; i < originalNumbers.size(); ++i)
+    {
+        QVERIFY2(pageText(compiler, pdf::PDFInteger(i)).contains(QStringLiteral("smoke page %1").arg(originalNumbers[i])),
+                 qPrintable(QStringLiteral("page %1: %2").arg(i + 1).arg(pageText(compiler, pdf::PDFInteger(i)))));
+    }
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::reorderFlattensNestedPageTree()
+{
+    // Pages 1 and 2 inherit MediaBox and Rotate from their parent node, pages 3 and 4 inherit a different MediaBox.
+    const QList<QByteArray> objects = {
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 4 >>",
+        "<< /Type /Pages /Parent 2 0 R /Kids [5 0 R 6 0 R] /Count 2 /MediaBox [0 0 500 700] /Rotate 90 >>",
+        "<< /Type /Pages /Parent 2 0 R /Kids [7 0 R 8 0 R] /Count 2 /MediaBox [0 0 300 400] >>",
+        "<< /Type /Page /Parent 3 0 R >>",
+        "<< /Type /Page /Parent 3 0 R >>",
+        "<< /Type /Page /Parent 4 0 R >>",
+        "<< /Type /Page /Parent 4 0 R >>",
+    };
+    QByteArray pdfData = "%PDF-1.4\n";
+    QList<qsizetype> offsets;
+    for (qsizetype index = 0; index < objects.size(); ++index)
+    {
+        offsets << pdfData.size();
+        pdfData += QByteArray::number(index + 1) + " 0 obj\n" + objects[index] + "\nendobj\n";
+    }
+    const qsizetype xrefOffset = pdfData.size();
+    pdfData += "xref\n0 " + QByteArray::number(objects.size() + 1) + "\n0000000000 65535 f \n";
+    for (const qsizetype offset : offsets)
+    {
+        pdfData += QByteArray::number(offset).rightJustified(10, '0') + " 00000 n \n";
+    }
+    pdfData += "trailer\n<< /Size " + QByteArray::number(objects.size() + 1) + " /Root 1 0 R >>\nstartxref\n" + QByteArray::number(xrefOffset) + "\n%%EOF\n";
+    const QString path = m_temp.filePath("nested-page-tree.pdf");
+    QFile fixture(path);
+    QVERIFY(fixture.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(fixture.write(pdfData), pdfData.size());
+    fixture.close();
+
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(4));
+    const std::vector<pdf::PDFObjectReference> original = reorderPageReferences(controller->getDocument());
+
+    QVERIFY(controller->reorderPages({3, 2, 1, 0}));
+    const pdf::PDFCatalog* catalog = controller->getDocument()->getCatalog();
+    QCOMPARE(catalog->getPageCount(), size_t(4));
+    const std::vector<pdf::PDFObjectReference> reordered = reorderPageReferences(controller->getDocument());
+    for (size_t i = 0; i < 4; ++i)
+    {
+        QVERIFY(reordered[i] == original[3 - i]);
+    }
+    // The inherited attributes travelled with the pages.
+    const std::vector<int> widths = {300, 300, 500, 500};
+    for (size_t i = 0; i < 4; ++i)
+    {
+        QCOMPARE(int(catalog->getPage(i)->getMediaBox().width()), widths[i]);
+        QCOMPARE(catalog->getPage(i)->getPageRotation(), i < 2 ? pdf::PageRotation::None : pdf::PageRotation::Rotate90);
+    }
+
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QVERIFY(reorderPageReferences(controller->getDocument()) == original);
+    QCOMPARE(int(controller->getDocument()->getCatalog()->getPage(0)->getMediaBox().width()), 500);
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::viewerThumbnailsAreReadOnly()
+{
+    auto* sidebarDock = m_window->findChild<QDockWidget*>("SidebarDockWidget");
+    auto* thumbnails = m_window->findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(sidebarDock);
+    QVERIFY(thumbnails);
+    QVERIFY(showThumbnailsPage(m_window.get()));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 3);
+    QTRY_VERIFY(thumbnails->visualRect(thumbnails->model()->index(0, 0)).isValid());
+
+    QVERIFY(!thumbnails->isReorderEnabled());
+    QVERIFY(!thumbnails->dragEnabled());
+    QVERIFY(!thumbnails->acceptDrops());
+
+    // Even a drop that reaches the view changes nothing.
+    const auto before = reorderPageReferences(m_window->getProgramController()->getDocument());
+    const pdf::PDFDocument* document = m_window->getProgramController()->getDocument();
+    dropThumbnails(thumbnails, {0}, thumbnailDropPoint(thumbnails, 2, true));
+    QTest::qWait(50);
+    QVERIFY(m_window->getProgramController()->getDocument() == document);
+    QVERIFY(reorderPageReferences(m_window->getProgramController()->getDocument()) == before);
+}
+
+void ViewerContextMenuTest::nativeThumbnailDragSmoke()
+{
+#ifndef Q_OS_WIN
+    QSKIP("Native drag smoke test needs Windows.");
+#else
+    if (qEnvironmentVariableIntValue("FAMILYPDF_NATIVE_DRAG_SMOKE") == 0 || QGuiApplication::platformName() != QLatin1String("windows"))
+    {
+        QSKIP("Moves the real mouse cursor: set FAMILYPDF_NATIVE_DRAG_SMOKE=1 and QT_QPA_PLATFORM=windows.");
+    }
+
+    const QString path = m_temp.filePath("thumbnail-native-drag.pdf");
+    QVERIFY(writePdfFixture(path, 6));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.setWindowFlag(Qt::WindowStaysOnTopHint, true);   // the real mouse must reach this window
+    editor.resize(1100, 900);
+    editor.show();
+    editor.raise();
+    editor.activateWindow();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    controller->getPdfWidget()->getDrawWidgetProxy()->setPageLayout(pdf::PageLayout::OneColumn);
+
+    auto* sidebarDock = editor.findChild<QDockWidget*>("SidebarDockWidget");
+    auto* thumbnails = editor.findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(sidebarDock && thumbnails);
+    QVERIFY(showThumbnailsPage(&editor));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 6);
+    QTRY_VERIFY(thumbnails->visualRect(thumbnails->model()->index(5, 0)).isValid());
+    QTest::qWait(300);
+    editor.activateWindow();
+
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+    QAction* redoAction = editor.findChild<QAction*>("actionRedo");
+    const std::vector<pdf::PDFObjectReference> original = reorderPageReferences(controller->getDocument());
+    const auto verifyArrangement = [&](const std::vector<int>& expected)
+    {
+        const std::vector<pdf::PDFObjectReference> current = reorderPageReferences(controller->getDocument());
+        QCOMPARE(current.size(), original.size());
+        for (size_t position = 0; position < expected.size(); ++position)
+        {
+            QVERIFY2(current[position] == original[size_t(expected[position])], qPrintable(QStringLiteral("position %1").arg(position)));
+        }
+    };
+    const auto itemCentre = [&](int row) { return thumbnails->visualRect(thumbnails->model()->index(row, 0)).center(); };
+    // The cursor of a real drag can be nudged by the person at the keyboard, so the exact drop row is
+    // not asserted. What is asserted is that the real drag ends in a drop on this view, and that the
+    // document, selection and history match the row the drop reported. A drag that ended in the own
+    // area of the selection (no change) or outside the view is repeated.
+    const auto nativeDrag = [&](int fromRow, int toRow, bool after, const std::vector<pdf::PDFInteger>& dragged) -> bool
+    {
+        for (int attempt = 1; attempt <= 4; ++attempt)
+        {
+            std::vector<pdf::PDFInteger> droppedPages;
+            int droppedRow = -1;
+            const auto connection = QObject::connect(thumbnails, &pdfviewer::PDFThumbnailsListView::pagesDropped, thumbnails, [&](const std::vector<pdf::PDFInteger>& pages, int row)
+            {
+                droppedPages = pages;
+                droppedRow = row;
+            });
+            const auto disconnect = qScopeGuard([&]() { QObject::disconnect(connection); });
+
+            const pdf::PDFDocument* before = controller->getDocument();
+            QWidget* top = thumbnails->window();
+            if (top->isMinimized())
+            {
+                top->showNormal();
+            }
+            top->raise();
+            top->activateWindow();
+            QTest::qWait(400);
+            const QPoint from = itemCentre(fromRow);
+            const QPoint to = thumbnailDropPoint(thumbnails, toRow, after);
+            if (!scheduleNativeDrag(thumbnails->viewport(), from, to))
+            {
+                qInfo() << "NATIVE attempt" << attempt << "the test window is not on top at the drag points";
+                return false;
+            }
+            const bool dropped = waitUntil([&]() { return droppedRow >= 0; }, 8000);
+            QTest::qWait(1500);   // the worker thread finishes its steps
+            if (!dropped)
+            {
+                qInfo() << "NATIVE attempt" << attempt << "no drop on the view was reported";
+                continue;
+            }
+            qInfo() << "NATIVE attempt" << attempt << "dragged" << dragged.size() << "page(s), reported insertion row" << droppedRow << "(aimed at" << (after ? toRow + 1 : toRow) << ")";
+            if (droppedPages != dragged)
+            {
+                return false;
+            }
+            const std::vector<pdf::PDFInteger> order = pdfviewer::PDFPageReorder::computeNewPageOrder(6, droppedPages, droppedRow);
+            if (pdfviewer::PDFPageReorder::isIdentity(order))
+            {
+                // Dropped on the own area: nothing may change.
+                if (controller->getDocument() != before)
+                {
+                    return false;
+                }
+                QTest::mouseClick(thumbnails->viewport(), Qt::LeftButton, Qt::NoModifier, itemCentre(dragged.front()));
+                continue;
+            }
+            if (!waitUntil([&]() { return controller->getDocument() != before; }, 5000)) return false;
+            const std::vector<pdf::PDFObjectReference> current = reorderPageReferences(controller->getDocument());
+            for (size_t position = 0; position < order.size(); ++position)
+            {
+                if (!(current[position] == original[size_t(order[position])]))
+                {
+                    return false;
+                }
+            }
+            const std::vector<pdf::PDFInteger> newRows = pdfviewer::PDFPageReorder::mapOldToNew(order, droppedPages);
+            const std::vector<int> expectedSelection(newRows.cbegin(), newRows.cend());
+            if (!waitUntil([&]() { return selectedThumbnailRows(thumbnails) == expectedSelection; }, 5000)) return false;
+            return true;
+        }
+        return false;
+    };
+
+    // Single page, dragged with the real mouse.
+    QTest::mouseClick(thumbnails->viewport(), Qt::LeftButton, Qt::NoModifier, itemCentre(1));
+    QVERIFY2(nativeDrag(1, 4, true, {1}), "single page native drag");
+
+    undoAction->trigger();
+    verifyArrangement({0, 1, 2, 3, 4, 5});
+    QTest::qWait(300);
+
+    // Several pages (Shift selection of pages 2 and 3), dragged with the real mouse.
+    QTest::mouseClick(thumbnails->viewport(), Qt::LeftButton, Qt::NoModifier, itemCentre(1));
+    QTest::mouseClick(thumbnails->viewport(), Qt::LeftButton, Qt::ShiftModifier, itemCentre(2));
+    QVERIFY2(nativeDrag(1, 4, true, {1, 2}), "multi page native drag");
+    const std::vector<pdf::PDFObjectReference> afterMultiDrag = reorderPageReferences(controller->getDocument());
+
+    undoAction->trigger();
+    verifyArrangement({0, 1, 2, 3, 4, 5});
+    redoAction->trigger();
+    QVERIFY(reorderPageReferences(controller->getDocument()) == afterMultiDrag);
+    undoAction->trigger();
+    verifyArrangement({0, 1, 2, 3, 4, 5});
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+#endif
+}
+
 
 QTEST_MAIN(ViewerContextMenuTest)
 #include "tst_viewercontextmenutest.moc"

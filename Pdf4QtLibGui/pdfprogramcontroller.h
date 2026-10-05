@@ -345,6 +345,12 @@ public:
     void deletePages(const std::vector<pdf::PDFInteger>& pageIndices);
     void rotatePages(const std::vector<pdf::PDFInteger>& pageIndices, int quarterTurns);
 
+    /// Reorders the pages of the document. \p newPageOrder must be a complete permutation of
+    /// the zero based page indices: element i is the old index of the page that becomes page i.
+    /// Only the page references of the page tree are rearranged. Returns true if the document
+    /// was changed; an invalid permutation or an unchanged order leaves the document untouched.
+    bool reorderPages(const std::vector<pdf::PDFInteger>& newPageOrder);
+
     void onActionTriggered(const pdf::PDFAction* action);
     void onDocumentModified(pdf::PDFModifiedDocument document);
     void updateActionsAvailability();

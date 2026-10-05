@@ -119,6 +119,10 @@ signals:
     void deletePagesRequested(std::vector<pdf::PDFInteger> pageIndices);
     void rotatePagesRequested(std::vector<pdf::PDFInteger> pageIndices, int quarterTurns);
 
+    /// Thumbnails were dragged to a new place. \p newPageOrder lists, for every new
+    /// position, the old (zero based) index of the page that goes there.
+    void reorderPagesRequested(std::vector<pdf::PDFInteger> newPageOrder);
+
 private:
     void updateGUI(Page preferredPage);
     void updateButtons();
@@ -135,6 +139,7 @@ private:
     void onAttachmentCustomContextMenuRequested(const QPoint& pos);
     void onThumbnailClicked(const QModelIndex& index);
     void onThumbnailContextMenuRequested(const QPoint& pos);
+    void onThumbnailPagesDropped(std::vector<pdf::PDFInteger> movedPages, int insertionRow);
     void onSignatureCustomContextMenuRequested(const QPoint& pos);
     void onOutlineTreeViewContextMenuRequested(const QPoint& pos);
     void onNotesTreeViewContextMenuRequested(const QPoint& pos);

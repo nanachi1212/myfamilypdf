@@ -1187,6 +1187,16 @@ QVariant PDFThumbnailsItemModel::data(const QModelIndex& index, int role) const
     return QVariant();
 }
 
+Qt::ItemFlags PDFThumbnailsItemModel::flags(const QModelIndex& index) const
+{
+    if (!index.isValid())
+    {
+        return Qt::NoItemFlags;
+    }
+
+    return Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDragEnabled;
+}
+
 void PDFThumbnailsItemModel::setThumbnailsSize(int size)
 {
     if (m_thumbnailSize != size)
