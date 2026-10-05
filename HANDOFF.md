@@ -13,9 +13,31 @@
 ## 目前狀態與下一步
 
 - 專案：`F:\Projects\Codex project\myfamilypdf`，Windows x64 PDF 閱讀／編輯工具。
-- 「縮圖拖曳重排頁面 v8」已實作並通過本機驗證，PR #17（branch `feature/thumbnail-page-reorder-v8`）。首次 CI 的 `build_ubuntu` 失敗：`ui_pdfsidebarwidget.h`（uic 產生）引用的 `pdfthumbnailslistview.h` 找不到，已修（見下）。本機 `gh` 未登入，看不到 job log，CI 狀態用公開 API 查；等 PR #17 所有 checks 綠燈後 squash merge，再同步 `main`、刪 branch。Merge PDFs 尚未開始。
+- 「縮圖拖曳重排頁面 v8」已 squash merge（PR #17，main `7cfa289b1f7e2a5c88c695062344c71870896c3d`，Windows／Ubuntu／runtime／CodeQL 全綠），不必重做。
+- 「Merge PDFs v9」已在 branch `feature/merge-pdfs-v9`（自 `7cfa289b` 建出）實作並通過本機驗證；commit／push／PR／CI／squash merge 的狀態見下方「Git 狀態」。本機 `gh` 未登入，由 ChatGPT／使用者建立 PR。
 - 先前「列印與圖片匯出 v7」已 merge（PR #15，squash，merge commit `60be9699b42d01a42b7860e153ccd77868b191b1`），不必重做 v6／v7。
 - `.ai-memory.toml` 是使用者原有 untracked 檔案，保留，不修改、不提交。
+
+## v9 已交付內容（Merge PDFs）
+
+- File → Merge PDFs...（Viewer／Editor 皆有，無開啟文件也可用）：選多份 PDF → 排序／選頁 → 合併 → 另存為「新的 PDF」。不修改來源或目前文件、不進 Undo、不自動關閉目前文件；成功後可選「Open Merged PDF」（有開啟文件時用既有 `openDocumentInNewTabRequested` 開新分頁）。
+- 對話框 `Pdf4QtLibGui/pdfmergepdfsdialog.*`：Add Files、Add Open Document（記憶體中的目前文件，含未存修改）、Remove、Move Up/Down、列表拖曳排序、每列檔名／頁數／頁面範圍（可編輯）、輸出檔＋Browse；覆蓋前詢問；輸出不得等於清單中的來源。
+- 輸出順序＝清單順序 → 各列頁面範圍順序（`3,1` 先第 3 頁再第 1 頁、可重複、`all`／「所有頁面」／空白＝全部）。既有 `PDFClosedIntervalSet::parsePageSelection` 會排序去重（列印／提取用），所以 v9 用 `PDFDocumentMerger::parsePageList`。
+- 引擎 `Pdf4QtLibCore/sources/pdfdocumentmerger.*`：重用 `PDFDocumentManipulator::assemble()` 多文件路徑（不建立第二套 object importer）、`PDFDocumentReader`＋密碼 callback（最多 3 次）、`PDFSecurityHandler::isAllowed`、`QSaveFile` 原子寫入（失敗／取消不動目的檔）。Manipulator/Writer 沒有 progress／cancel，所以用 `QtConcurrent` worker＋忙碌條＋Cancel，只在階段之間檢查取消。
+- 對 manipulator 的三個小改動（皆 opt-in 或外觀，PageMaster 行為不變）：`setDocumentCaption()`（大綱用檔名而非 "Document 0"）、`setAttachMergedCatalogObjects()`（`finalizeMergedObjects()` 上游從未被呼叫，多文件合併會丟掉 AcroForm／OCProperties；開啟後表單欄位、值、optional content 保留；**不**掛 Names，因 `mergeNames` 把 key 寫成 name 而非 string，且會把未選頁面拖進檔案）。另有 `pruneExcludedPages()`（合併後只在需要時執行）：頁面複製會把「被保留頁面連到的、或帶有表單欄位的」未選頁面當未使用物件留在檔案內，此步驟移除只在未選頁面上的欄位、把殘留參照改 null、刪除未使用物件。
+- PR #18 correctness review 修正（2026-10-06）：`collectObjectsAndCopyPages` 合併 AcroForm／OCProperties 前把指向 array／dictionary 的項目轉成直接物件（`dereferenceForMerge`）——原本 `/Fields`、`/DR`、`/OCGs` 是間接參照時會丟掉前面來源的欄位，或（先直接、後間接）丟出 `std::bad_variant_access` 穿出 worker；PageMaster 同受惠。`finishMergedForm()` 移除 `/XFA`、任一來源 `NeedAppearances true` 就保留 true。`mergeToFile` 把例外轉成錯誤訊息。重複頁的連結失效／欄位不在 `/Fields`、表單層級預設值以最後來源為準，已記入 `docs/merge-pdfs-v9.md` A 類限制。
+- 上游限制分類（細節見 `docs/merge-pdfs-v9.md`）：A 接受並文件化＝tagged structure tree／文件動作／threads 被移除、連到未選頁面的連結失效、部分頁面來源的書籤不保留；B 合併前警告＝加密來源（輸出不加密）、數位簽章（輸出必為無效，已用 OpenSSL 驗證）、不同來源同名表單欄位（不改名，可能共用值）、XFA、具名目的地；C 阻止＝無法開啟／密碼錯誤、來源權限未同時允許 copy 與 assemble、未選頁面、輸出等於來源。
+- 繁中／簡中已補（`PDF4QT_zh_TW.ts`、`PDF4QT_zh_CN.ts`：menu、`pdfviewer::PDFMergePdfsDialog`、`pdf::PDFDocumentMerger`、`Untitled`）。文件：`docs/merge-pdfs-v9.md`。沒有新增或升級 dependency，沒有改 writer／加密／簽章核心／AcroForm merge 核心。
+
+## v9 驗證證據（本機 Release）
+
+- `UnitTestsMergePdfs`（新，Core 引擎、真實檔案、寫出後讀回）：45 通過＋1 skip（`writeSmokeArtifacts` 需環境變數；含新 `formAndLayersWithIndirectEntries` 與頁 `3,1,3` 三個獨立頁面物件）。涵蓋解析器（順序／重複／錯誤）、2／3 份來源、範圍／自訂順序／重複頁、混尺寸＋旋轉＋CropBox、註解與 /P、AcroForm 同名／不同名、未選頁面與欄位與連結不殘留、書籤、具名目的地警告、跨來源連結、optional content、JPEG 2000 位元組相同、加密來源（密碼／錯誤密碼／取消／權限不足）、簽章來源（警告＋輸出無有效簽章）、覆蓋、來源＝目的、取消與失敗原子性、來源不變。
+- `UnitTestsViewer` 新增 6 項：`mergePdfsEntriesAreAvailable`、`mergePdfsDialogWorkflow`、`mergePdfsOutputOrderAndTextLayerAfterReopen`（輸出在 FamilyPDF 重開、每頁文字層）、`mergePdfsBlocksAndWarns`、`mergePdfsCancelLeavesNoPartialFile`、`mergePdfsTranslations`：全 PASS。
+- 回歸 smoke PASS：v8 重排（`pageReorder*`、`thumbnailReorderWorkflow`、`reorderPreservesContentAfterSave`、`reorderFlattensNestedPageTree`、`viewerThumbnailsAreReadOnly`）、提取、列印／匯出（`printAndExportEntriesAreAvailable`、`printDialogOptionsAndCancel`、`exportImagesDialogWorkflow`、`exportSelectionAsImageWorkflow`、`filledFormPrintsAndExports`）、`menuActionsOperateOnTheDocument`、繁中資源；`UnitTestsDocumentEdit` 23、`UnitTestsForms` 4、`UnitTestsBookmarks` 20、`UnitTestsSecurity` 6。
+- 既有 flaky（非 v9 regression，已用 main 基準確認）：`UnitTestsViewer` 依序跑 `searchExperience`→`thumbnailSelectionAndPageManagement`（offscreen、300 秒 watchdog），main@`7cfa289b`（`build/baseline-main-build`，worktree `build/baseline-main-src`）3 次卡 2 次、PR 3 次卡 3 次，卡點相同：`deletePages({5})` 後的 `performSaveAs()`（之後的 `QFile::exists` 未執行），main 沒有任何 merge 程式碼。根因未查（需另開任務）；不可用 sleep／放寬 timeout 掩蓋。
+- 效能（Release、合成小檔，只記錄）：2 份小檔 4 ms；10 份×20 頁（200 頁）約 20 ms；5 份×200 頁（1,000 頁）約 78 ms；JPEG 2000 掃描頁×500（500 頁）載入 186 ms、合併寫出 102 ms。無瓶頸。
+- `dist/FamilyPDF` 只更新自家二進位（exe、`Pdf4QtLib*.dll`、`pdfplugins`、zh qm）；Viewer／Editor clean-PATH 啟動並開啟合併檔 PASS（載入的模組皆來自封裝資料夾，另有輸入法注入的 DLL）。
+- NOT_TESTED：Edge 開啟合併結果的目視檢查（範例檔可用 `FAMILYPDF_MERGE_ARTIFACT_DIR=<dir> UnitTestsMergePdfs` 產生，`build/merge-v9` 已有一份）；列表以滑鼠拖曳排序；XFA 警告。
 
 ## v8 已交付內容（縮圖拖曳重排）
 
@@ -50,7 +72,8 @@
 
 ## Git 狀態
 
-- v8：branch `feature/thumbnail-page-reorder-v8`，PR #17（`gh` 未登入，用公開 API 查 CI）。
+- v9：branch `feature/merge-pdfs-v9`（本機驗證完成；commit／push／PR 狀態以 `git log`／GitHub 為準，見最終回報）。
+- v8：PR #17 已 squash merge（`7cfa289b`）。
 - v7：PR #15 已 squash merge 為 `60be9699`，本機 `main` 已同步，feature branch 已刪除（本機與遠端）。本機 `gh` 仍未登入，無法自行建立 PR 或查 CI；merge 由使用者在 GitHub 完成。
 
 ## 限制與接手注意事項
@@ -60,10 +83,12 @@
 - 區域匯出只支援文字選取；高 DPI 區域匯出會先渲染整頁再裁切（受 1.2 億像素上限保護）。
 - 原有限制仍適用：密碼欄位不保存、`/Tabs /S` 以 annotation order 代替、現有 full-rewrite save 不保留已簽署 PDF 的原簽章有效性（見 `docs/forms-signatures-v6.md`）。
 - **本機建置環境（重要）**：系統為 zh-TW，MSVC 的 `/showIncludes` 前綴為中文，CMake 偵測成亂碼，導致 Ninja 不追蹤標頭（`ninja -t deps` 為 `#deps 0`）。本輪已把 `build/phase0-upstream-release/CMakeFiles/rules.ninja` 的 `msvc_deps_prefix` 改為 `注意: 包含檔案:` 並完整重建；CMake 重新產生時會被還原，需重做。另外重新 configure 曾觸發 vcpkg 移除並重建失敗（`vcpkg_installed` 被清空），已由 `FamilyPDF-tools/binary-cache` 的 zip 還原，並以 `-DVCPKG_MANIFEST_INSTALL=OFF` 固定；build 目錄內第三方 DLL 因此與 `dist` 的 hash 不同（同版本）。細節見使用者記憶 `familypdf-local-build-quirks`。
+- v9 新增原始檔後又 re-configure 過一次，已把備份的 `rules.ninja` 第 17 行貼回；注意新增／修改 `.ui`、CMakeLists 會再度觸發 re-run 並讓該行變亂碼，build 中途 re-run 時那一輪編出的 obj 會是 `#deps 0`（改 `pdfdocumentmerger.h`、`pdfmergepdfsdialog.h` 時要 touch 引用它的 .cpp）。PowerShell 工具會擋 `Remove-Item`，刪檔用 `[IO.File]::Delete`。
 - 工具位於同層 `FamilyPDF-tools`；既有 build 為 `build/phase0-upstream-release`。本機不要為文件更新或 CI 等待重跑 Full。
 
 ## 需要深入時再讀
 
+- v9 行為、上游限制分類與測試：`docs/merge-pdfs-v9.md`；引擎 `Pdf4QtLibCore/sources/pdfdocumentmerger.*`，對話框 `Pdf4QtLibGui/pdfmergepdfsdialog.*`，流程 `pdfprogramcontroller.cpp` 的 `mergePdfs`，測試 `UnitTests/tst_mergepdfstest.cpp` 與 `tst_viewercontextmenutest.cpp` 的 `mergePdfs*`。
 - v8 行為與資料流：`docs/page-reorder-v8.md`；核心 `Pdf4QtLibGui/pdfpagereorder.*`、`pdfthumbnailslistview.*`，控制器 `pdfprogramcontroller.cpp` 的 `reorderPages`；測試見 `tst_viewercontextmenutest.cpp` 的 `pageReorder*`、`thumbnailReorderWorkflow`、`reorderPreservesContentAfterSave`、`reorderFlattensNestedPageTree`、`nativeThumbnailDragSmoke`。
 - v7 行為與限制：`docs/print-export-v7.md`；核心 `Pdf4QtLibGui/pdfpageoutput.*`，對話框 `pdfprintdialog.*`、`pdfexportimagesdialog.*`，流程 `pdfprogramcontroller.cpp` 的 `runPrintWorkflow`／`runExportImagesWorkflow`／`exportSelectionAsImage`。
 - v7 回歸：`UnitTests/tst_printexporttest.cpp`；`tst_viewercontextmenutest.cpp` 的 `printAndExportEntriesAreAvailable`、`printDialogOptionsAndCancel`、`exportImagesDialogWorkflow`、`exportSelectionAsImageWorkflow`、`filledFormPrintsAndExports`、`printExportLargeDocumentBenchmark`。

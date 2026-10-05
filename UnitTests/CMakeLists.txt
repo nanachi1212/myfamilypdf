@@ -55,6 +55,7 @@ endif()
 
 add_familypdf_qt_test(UnitTestsForms tst_formbuildertest.cpp)
 add_familypdf_qt_test(UnitTestsDocumentEdit tst_documentedittest.cpp)
+add_familypdf_qt_test(UnitTestsMergePdfs tst_mergepdfstest.cpp)
 
 if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
     add_familypdf_qt_test(UnitTestsPrintExport tst_printexporttest.cpp)

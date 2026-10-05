@@ -48,6 +48,10 @@
 #include "pdfpagereorder.h"
 #include "pdfprintdialog.h"
 #include "pdfexportimagesdialog.h"
+#include "pdfmergepdfsdialog.h"
+#include "pdfsecurityhandler.h"
+#include <QMenuBar>
+#include <QProgressBar>
 #include "pdfpageoutput.h"
 #include "pdfcms.h"
 #include "pdffont.h"
@@ -97,7 +101,7 @@ bool waitUntil(Condition&& condition, int timeoutMs)
     return true;
 }
 
-bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool withText = true, bool unicode = false, bool malformed = false)
+bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool withText = true, bool unicode = false, bool malformed = false, const QByteArray& textPrefix = "FamilyPDF smoke page ")
 {
     const int fontObject = 3 + pageCount * 2;
     QByteArray kids;
@@ -119,7 +123,7 @@ bool writePdfFixture(const QString& path, int pageCount, int lines = 1, bool wit
         if (withText)
             for (int line = 0; line < lines; ++line)
                 stream += "BT /F1 16 Tf 30 " + QByteArray::number(535-line*20) + " Td ("
-                    + (unicode ? QByteArray("ABCD 2026 ABCD") : QByteArray("FamilyPDF smoke page ") + QByteArray::number(page+1)) + ") Tj ET\n";
+                    + (unicode ? QByteArray("ABCD 2026 ABCD") : textPrefix + QByteArray::number(page+1)) + ") Tj ET\n";
         else
             stream = "q 0.7 g 20 20 300 500 re f Q\n";
         if (malformed && page == 0) stream += "Q\n"; // Unbalanced restore after valid text.
@@ -223,6 +227,12 @@ private slots:
     void exportSelectionAsImageWorkflow();
     void filledFormPrintsAndExports();
     void printExportLargeDocumentBenchmark();
+    void mergePdfsEntriesAreAvailable();
+    void mergePdfsDialogWorkflow();
+    void mergePdfsOutputOrderAndTextLayerAfterReopen();
+    void mergePdfsBlocksAndWarns();
+    void mergePdfsCancelLeavesNoPartialFile();
+    void mergePdfsTranslations();
 
 private:
     QAction* action(const char* name) const { return m_window->findChild<QAction*>(QLatin1String(name)); }
@@ -275,7 +285,8 @@ void ViewerContextMenuTest::init()
 #endif
     if (testFunction == "thumbnailSelectionAndPageManagement" || testFunction.startsWith("annotation")
         || testFunction.startsWith("pageReorder") || testFunction == "thumbnailReorderWorkflow"
-        || testFunction == "reorderPreservesContentAfterSave" || testFunction == "reorderFlattensNestedPageTree" || testFunction == "nativeThumbnailDragSmoke")
+        || testFunction == "reorderPreservesContentAfterSave" || testFunction == "reorderFlattensNestedPageTree" || testFunction == "nativeThumbnailDragSmoke"
+        || testFunction.startsWith("mergePdfs"))
     {
         return;
     }
@@ -3670,6 +3681,574 @@ void ViewerContextMenuTest::nativeThumbnailDragSmoke()
 #endif
 }
 
+
+// ---- Merge PDFs (v9) -------------------------------------------------------------------------------------
+
+namespace
+{
+
+/// Answers the message boxes that appear while a dialog runs. \p choose picks the button of a box (nullptr: default).
+class MessageBoxAnswerer : public QObject
+{
+public:
+    explicit MessageBoxAnswerer(std::function<QAbstractButton*(QMessageBox*)> choose, QObject* parent = nullptr) :
+        QObject(parent),
+        m_choose(std::move(choose))
+    {
+        connect(&m_timer, &QTimer::timeout, this, &MessageBoxAnswerer::poll);
+        m_timer.start(10);
+    }
+
+    QStringList texts;                      ///< Text of every message box that was answered
+
+private:
+    void poll()
+    {
+        if (auto* box = qobject_cast<QMessageBox*>(QApplication::activeModalWidget()))
+        {
+            texts << box->text();
+            QAbstractButton* button = m_choose ? m_choose(box) : nullptr;
+            if (!button)
+            {
+                button = box->defaultButton() ? static_cast<QAbstractButton*>(box->defaultButton()) : (box->buttons().isEmpty() ? nullptr : box->buttons().front());
+            }
+            if (button)
+            {
+                button->click();
+            }
+            else
+            {
+                box->accept();
+            }
+        }
+    }
+
+    std::function<QAbstractButton*(QMessageBox*)> m_choose;
+    QTimer m_timer;
+};
+
+QAbstractButton* boxButton(QMessageBox* box, const QString& textPart)
+{
+    for (QAbstractButton* button : box->buttons())
+    {
+        if (button->text().contains(textPart, Qt::CaseInsensitive))
+        {
+            return button;
+        }
+    }
+    return nullptr;
+}
+
+QStringList mergeListRows(QTreeWidget* list)
+{
+    QStringList rows;
+    for (int i = 0; i < list->topLevelItemCount(); ++i)
+    {
+        rows << QStringLiteral("%1|%2|%3").arg(list->topLevelItem(i)->text(0), list->topLevelItem(i)->text(1), list->topLevelItem(i)->text(2));
+    }
+    return rows;
+}
+
+QByteArray fileBytes(const QString& path)
+{
+    QFile file(path);
+    return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+}
+
+QString writeEncryptedFixture(const QString& path, const QString& userPassword, const QString& ownerPassword, uint32_t permissions)
+{
+    pdf::PDFDocumentBuilder builder;
+    for (int i = 1; i <= 2; ++i)
+    {
+        const pdf::PDFObjectReference page = builder.appendPage(QRectF(0, 0, 200 + i, 300));
+        pdf::PDFPageContentStreamBuilder content(&builder);
+        QPainter* painter = content.begin(page);
+        painter->fillRect(QRectF(10, 10, 50, 50), Qt::blue);
+        content.end(painter);
+    }
+    pdf::PDFSecurityHandlerFactory::SecuritySettings settings;
+    settings.algorithm = pdf::PDFSecurityHandlerFactory::AES_256;
+    settings.encryptContents = pdf::PDFSecurityHandlerFactory::All;
+    settings.userPassword = userPassword;
+    settings.ownerPassword = ownerPassword;
+    settings.permissions = permissions;
+    settings.id = QByteArrayLiteral("merge-ui-test-id-0123456789");
+    builder.setSecurityHandler(pdf::PDFSecurityHandlerFactory::createSecurityHandler(settings));
+    const pdf::PDFDocument document = builder.build();
+    pdf::PDFDocumentWriter writer(nullptr);
+    const pdf::PDFOperationResult result = writer.write(path, &document, true);
+    return result ? QString() : result.getErrorMessage();
+}
+
+} // namespace
+
+void ViewerContextMenuTest::mergePdfsEntriesAreAvailable()
+{
+    // Merge PDFs makes a new file, so both applications offer it, with or without an open document.
+    pdfviewer::PDFViewerMainWindow viewer;
+    pdfviewer::PDFEditorMainWindow editor;
+    for (QMainWindow* window : { static_cast<QMainWindow*>(&viewer), static_cast<QMainWindow*>(&editor) })
+    {
+        window->resize(900, 700);
+        window->show();
+        QAction* merge = window->findChild<QAction*>("actionMergePdfs");
+        QVERIFY(merge);
+        QVERIFY(merge->isEnabled());
+        QVERIFY(merge->text().contains("Merge PDFs"));
+        bool inFileMenu = false;
+        for (QMenu* menu : window->menuBar()->findChildren<QMenu*>())
+        {
+            inFileMenu = inFileMenu || (menu->objectName() == "menuFile" && menu->actions().contains(merge));
+        }
+        QVERIFY(inFileMenu);
+    }
+    viewer.getProgramController()->openDocument(m_pdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(viewer.getProgramController()->getDocument(), 15000);
+    QVERIFY(viewer.findChild<QAction*>("actionMergePdfs")->isEnabled());
+}
+
+void ViewerContextMenuTest::mergePdfsDialogWorkflow()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    const pdf::PDFDocument* openDocument = controller->getDocument();
+
+    const QString zetaPath = m_temp.filePath("zeta.pdf");
+    QVERIFY(writePdfFixture(zetaPath, 2, 1, true, false, false, "ZETA page "));
+    const QString outputPath = m_temp.filePath("merged-ui.pdf");
+    QFile::remove(outputPath);
+    const QByteArray sourceBefore = fileBytes(m_pdfPath);
+    const QByteArray zetaBefore = fileBytes(zetaPath);
+
+    QStringList rowsBeforeMerge;
+    QString infoText;
+    QString defaultRange;
+    int stage = 0;
+    MessageBoxAnswerer answerer([](QMessageBox* box) { return boxButton(box, "Close"); });
+    QTimer timer;
+    connect(&timer, &QTimer::timeout, &editor, [&]()
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFMergePdfsDialog*>(QApplication::activeModalWidget());
+        if (!dialog)
+        {
+            return;
+        }
+        if (stage == 0)
+        {
+            stage = 1;
+            auto* list = dialog->findChild<QTreeWidget*>("mergeList");
+            QVERIFY(dialog->findChild<QPushButton*>("mergeAddCurrentButton")->isVisible());
+            QVERIFY(!dialog->findChild<QPushButton*>("mergeButton")->isEnabled());      // nothing to merge yet
+            dialog->findChild<QPushButton*>("mergeAddCurrentButton")->click();
+            dialog->addFiles({ zetaPath });
+            QCOMPARE(list->topLevelItemCount(), 2);
+            defaultRange = list->topLevelItem(0)->text(2);
+            // Page ranges: the open document keeps pages 1 and 3, the second PDF gives page 2 and then page 1.
+            list->topLevelItem(0)->setText(2, "1,3");
+            list->topLevelItem(1)->setText(2, "2,1");
+            // Move the second PDF to the top with the button, then check Move Down and the borders.
+            list->setCurrentItem(list->topLevelItem(1));
+            QVERIFY(dialog->findChild<QPushButton*>("mergeUpButton")->isEnabled());
+            QVERIFY(!dialog->findChild<QPushButton*>("mergeDownButton")->isEnabled());
+            dialog->findChild<QPushButton*>("mergeUpButton")->click();
+            QVERIFY(!dialog->findChild<QPushButton*>("mergeUpButton")->isEnabled());
+            QVERIFY(dialog->findChild<QPushButton*>("mergeDownButton")->isEnabled());
+            dialog->findChild<QPushButton*>("mergeDownButton")->click();
+            dialog->findChild<QPushButton*>("mergeUpButton")->click();
+            // Remove and add again (the removed row must not leave anything behind).
+            list->setCurrentItem(list->topLevelItem(1));
+            dialog->findChild<QPushButton*>("mergeRemoveButton")->click();
+            QCOMPARE(list->topLevelItemCount(), 1);
+            dialog->findChild<QPushButton*>("mergeAddCurrentButton")->click();
+            QCOMPARE(list->topLevelItemCount(), 2);
+            list->topLevelItem(1)->setText(2, "1,3");
+            rowsBeforeMerge = mergeListRows(list);
+            infoText = dialog->findChild<QLabel*>("mergeInfoLabel")->text();
+            dialog->findChild<QLineEdit*>("mergeOutputEdit")->setText(outputPath);
+            auto* mergeButton = dialog->findChild<QPushButton*>("mergeButton");
+            QVERIFY(mergeButton->isEnabled());
+            QMetaObject::invokeMethod(mergeButton, &QPushButton::click, Qt::QueuedConnection);
+            return;
+        }
+        if (stage == 1 && !answerer.texts.isEmpty())
+        {
+            stage = 2;
+            dialog->reject();       // The success message was answered with Close; the dialog stays open until closed.
+        }
+    });
+    timer.start(10);
+    editor.findChild<QAction*>("actionMergePdfs")->trigger();
+    timer.stop();
+
+    QCOMPARE(stage, 2);
+    QCOMPARE(defaultRange, QStringLiteral("All pages"));
+    QCOMPARE(rowsBeforeMerge.size(), 2);
+    QCOMPARE(rowsBeforeMerge[0], QStringLiteral("zeta.pdf|2|2,1"));
+    QCOMPARE(rowsBeforeMerge[1], QStringLiteral("three-pages.pdf (open document)|3|1,3"));
+    QVERIFY2(infoText.contains("4 page") || infoText.contains("page(s)"), qPrintable(infoText));
+    QCOMPARE(answerer.texts.size(), 1);
+    QVERIFY2(answerer.texts.front().contains("Saved 4 page"), qPrintable(answerer.texts.front()));
+
+    // Output: pages of the open document twice (list order, then range order).
+    pdf::PDFDocumentReader reader(nullptr, {}, true, false);
+    const pdf::PDFDocument merged = reader.readFromFile(outputPath);
+    QCOMPARE(reader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
+    QCOMPARE(merged.getCatalog()->getPageCount(), size_t(4));
+
+    // Sources and the open document are untouched; the output is a separate new file.
+    QCOMPARE(fileBytes(m_pdfPath), sourceBefore);
+    QCOMPARE(fileBytes(zetaPath), zetaBefore);
+    QCOMPARE(controller->getDocument(), openDocument);
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(3));
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::mergePdfsOutputOrderAndTextLayerAfterReopen()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    const QString alpha = m_temp.filePath("alpha.pdf");
+    const QString zeta = m_temp.filePath("zeta2.pdf");
+    QVERIFY(writePdfFixture(alpha, 3, 1, true, false, false, "ALPHA page "));
+    QVERIFY(writePdfFixture(zeta, 2, 1, true, false, false, "ZETA page "));
+    const QString outputPath = m_temp.filePath("merged-order.pdf");
+    QFile::remove(outputPath);
+
+    // Without an open document, the dialog starts with an empty list. After the merge "Open Merged PDF" opens the result.
+    pdfviewer::PDFViewerMainWindow viewer;
+    viewer.resize(1100, 900);
+    viewer.show();
+    auto* controller = viewer.getProgramController();
+    QVERIFY(!controller->getDocument());
+
+    int stage = 0;
+    MessageBoxAnswerer answerer([](QMessageBox* box) { return boxButton(box, "Open"); });
+    QTimer timer;
+    connect(&timer, &QTimer::timeout, &viewer, [&]()
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFMergePdfsDialog*>(QApplication::activeModalWidget());
+        if (dialog && stage == 0)
+        {
+            stage = 1;
+            QVERIFY(!dialog->findChild<QPushButton*>("mergeAddCurrentButton")->isVisible());
+            // ALPHA pages 1-2 then ZETA 2,1 then ALPHA 3 (the same file may be listed twice).
+            dialog->addFiles({ alpha, zeta, alpha });
+            auto* list = dialog->findChild<QTreeWidget*>("mergeList");
+            QCOMPARE(list->topLevelItemCount(), 3);
+            list->topLevelItem(0)->setText(2, "1-2");
+            list->topLevelItem(1)->setText(2, "2,1");
+            list->topLevelItem(2)->setText(2, "3");
+            dialog->findChild<QLineEdit*>("mergeOutputEdit")->setText(outputPath);
+            QMetaObject::invokeMethod(dialog->findChild<QPushButton*>("mergeButton"), &QPushButton::click, Qt::QueuedConnection);
+        }
+    });
+    timer.start(10);
+    viewer.findChild<QAction*>("actionMergePdfs")->trigger();
+    timer.stop();
+    QCOMPARE(stage, 1);
+    QCOMPARE(answerer.texts.size(), 1);
+
+    // "Open Merged PDF" opened the new file in this window.
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(5));
+    auto* compiler = controller->getPdfWidget()->getDrawWidgetProxy()->getTextLayoutCompiler();
+    compiler->makeTextLayout();
+    QTRY_VERIFY_WITH_TIMEOUT(compiler->isTextLayoutReady(), 15000);
+    const QStringList expected = { "ALPHA page 1", "ALPHA page 2", "ZETA page 2", "ZETA page 1", "ALPHA page 3" };
+    for (size_t i = 0; i < expected.size(); ++i)
+    {
+        QVERIFY2(pageText(compiler, pdf::PDFInteger(i)).contains(expected[int(i)]),
+                 qPrintable(QStringLiteral("page %1: %2").arg(i + 1).arg(pageText(compiler, pdf::PDFInteger(i)))));
+    }
+    controller->closeDocument();
+}
+
+void ViewerContextMenuTest::mergePdfsBlocksAndWarns()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    const QString plain = m_temp.filePath("plain-merge.pdf");
+    QVERIFY(writePdfFixture(plain, 2, 1, true, false, false, "PLAIN page "));
+    const QString signedFile = QFINDTESTDATA("fixtures/pyhanko-signed.pdf");
+    QVERIFY(!signedFile.isEmpty());
+    const QString restricted = m_temp.filePath("restricted-merge.pdf");
+    QVERIFY(writeEncryptedFixture(restricted, QString(), "owner", uint32_t(pdf::PDFSecurityHandler::Permission::PrintLowResolution)).isEmpty());
+    const QString locked = m_temp.filePath("locked-merge.pdf");
+    QVERIFY(writeEncryptedFixture(locked, "secret", "owner", 0xFFFFFFFFu).isEmpty());
+    const QString broken = m_temp.filePath("broken-merge.pdf");
+    {
+        QFile file(broken);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("not a pdf");
+    }
+    const QString outputPath = m_temp.filePath("merged-blocked.pdf");
+    QFile::remove(outputPath);
+
+    int passwordAsked = 0;
+    QString passwordToGive = QStringLiteral("wrong");
+    pdfviewer::PDFMergePdfsDialog::Request request;
+    request.directory = m_temp.path();
+    request.passwordCallback = [&](bool* ok) { ++passwordAsked; *ok = true; return passwordToGive; };
+
+    auto runMerge = [&](pdfviewer::PDFMergePdfsDialog& dialog, QMessageBox::StandardButton answer, QStringList* texts)
+    {
+        MessageBoxAnswerer answerer([answer](QMessageBox* box) -> QAbstractButton*
+        {
+            if (auto* button = box->button(answer))
+            {
+                return button;
+            }
+            return boxButton(box, "Close");
+        });
+        dialog.findChild<QLineEdit*>("mergeOutputEdit")->setText(outputPath);
+        QTimer::singleShot(0, dialog.findChild<QPushButton*>("mergeButton"), &QPushButton::click);
+        QTest::qWait(400);
+        *texts = answerer.texts;
+    };
+
+    {
+        pdfviewer::PDFMergePdfsDialog dialog(request, nullptr);
+        dialog.show();
+        auto* list = dialog.findChild<QTreeWidget*>("mergeList");
+
+        // A broken file and a file whose password is wrong are reported and not added (one message).
+        {
+            MessageBoxAnswerer answerer([](QMessageBox* box) { return boxButton(box, "OK"); });
+            dialog.addFiles({ broken, locked });
+            QCOMPARE(answerer.texts.size(), 1);
+            QVERIFY(answerer.texts.front().contains("broken-merge.pdf"));
+            QVERIFY(answerer.texts.front().contains("locked-merge.pdf"));
+        }
+        QCOMPARE(list->topLevelItemCount(), 0);
+        QCOMPARE(passwordAsked, 3);      // the wrong password is tried a limited number of times
+
+        // The right password adds it. The warning says that the output is not encrypted.
+        passwordToGive = "secret";
+        dialog.addFiles({ locked, plain });
+        QCOMPARE(list->topLevelItemCount(), 2);
+        QVERIFY2(dialog.findChild<QLabel*>("mergeInfoLabel")->text().contains("not encrypted"), qPrintable(dialog.findChild<QLabel*>("mergeInfoLabel")->text()));
+
+        // Answer "No" to the warning: nothing is written.
+        QStringList texts;
+        runMerge(dialog, QMessageBox::No, &texts);
+        QCOMPARE(texts.size(), 1);
+        QVERIFY2(texts.front().contains("not encrypted") && texts.front().contains("Do you want to merge anyway"), qPrintable(texts.front()));
+        QVERIFY(!QFileInfo::exists(outputPath));
+
+        // A signed PDF adds a signature warning.
+        dialog.addFiles({ signedFile });
+        QVERIFY2(dialog.findChild<QLabel*>("mergeInfoLabel")->text().contains("signature"), qPrintable(dialog.findChild<QLabel*>("mergeInfoLabel")->text()));
+        runMerge(dialog, QMessageBox::No, &texts);
+        QVERIFY(texts.front().contains("signature"));
+        QVERIFY(!QFileInfo::exists(outputPath));
+
+        // A PDF that does not allow copying blocks the merge: no way to confirm it, no output.
+        dialog.addFiles({ restricted });
+        QCOMPARE(list->topLevelItemCount(), 4);
+        QVERIFY2(dialog.findChild<QLabel*>("mergeInfoLabel")->text().contains("Cannot merge"), qPrintable(dialog.findChild<QLabel*>("mergeInfoLabel")->text()));
+        runMerge(dialog, QMessageBox::Yes, &texts);
+        QCOMPARE(texts.size(), 1);
+        QVERIFY2(texts.front().contains("restricted-merge.pdf"), qPrintable(texts.front()));
+        QVERIFY(!QFileInfo::exists(outputPath));
+
+        // Remove the blocking PDF; "Yes" to the warnings writes the file.
+        list->setCurrentItem(list->topLevelItem(3));
+        dialog.findChild<QPushButton*>("mergeRemoveButton")->click();
+        QCOMPARE(list->topLevelItemCount(), 3);
+        runMerge(dialog, QMessageBox::Yes, &texts);
+        QVERIFY(QFileInfo::exists(outputPath));
+
+        // Overwriting asks first; "No" keeps the file as it is.
+        const QByteArray written = fileBytes(outputPath);
+        QVERIFY(!written.isEmpty());
+        runMerge(dialog, QMessageBox::No, &texts);
+        QVERIFY2(texts.size() == 1 && texts.front().contains("already exists"), qPrintable(texts.join('|')));
+        QCOMPARE(fileBytes(outputPath), written);
+
+        // A range outside the PDF is refused with a message, nothing is written.
+        list->topLevelItem(1)->setText(2, "1-99");
+        QFile::remove(outputPath);
+        runMerge(dialog, QMessageBox::Yes, &texts);
+        QVERIFY2(texts.size() == 1 && texts.front().contains("between 1 and"), qPrintable(texts.join('|')));
+        QVERIFY(!QFileInfo::exists(outputPath));
+        QVERIFY(dialog.findChild<QLabel*>("mergeInfoLabel")->text().contains("between 1 and"));
+        list->topLevelItem(1)->setText(2, "All pages");
+
+        // The output file must not be one of the listed files.
+        dialog.findChild<QLineEdit*>("mergeOutputEdit")->setText(plain);
+        const QByteArray plainBefore = fileBytes(plain);
+        {
+            MessageBoxAnswerer answerer([](QMessageBox* box) { return boxButton(box, "OK"); });
+            QTimer::singleShot(0, dialog.findChild<QPushButton*>("mergeButton"), &QPushButton::click);
+            QTest::qWait(300);
+            QCOMPARE(answerer.texts.size(), 1);
+            QVERIFY(answerer.texts.front().contains("different"));
+        }
+        QCOMPARE(fileBytes(plain), plainBefore);
+    }
+
+    // The file written after "Yes" is a complete PDF that opens without a password: locked + plain + signed document.
+    pdf::PDFDocumentReader signedReader(nullptr, {}, true, false);
+    const pdf::PDFDocument signedDocument = signedReader.readFromFile(signedFile);
+    QCOMPARE(signedReader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
+    // (the output was removed by the "range" step above, so merge once more to check the written file)
+    {
+        pdfviewer::PDFMergePdfsDialog dialog(request, nullptr);
+        dialog.show();
+        dialog.addFiles({ locked, plain });
+        QStringList texts;
+        runMerge(dialog, QMessageBox::Yes, &texts);
+    }
+    pdf::PDFDocumentReader reader(nullptr, {}, true, false);
+    const pdf::PDFDocument merged = reader.readFromFile(outputPath);
+    QCOMPARE(reader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
+    QCOMPARE(merged.getCatalog()->getPageCount(), size_t(4));
+    QCOMPARE(int(merged.getStorage().getSecurityHandler()->getMode()), int(pdf::EncryptionMode::None));
+    Q_UNUSED(signedDocument);
+}
+
+void ViewerContextMenuTest::mergePdfsCancelLeavesNoPartialFile()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    // Many pages, so that the merge is still running when Cancel is pressed.
+    const QString big = m_temp.filePath("big-merge.pdf");
+    QVERIFY(writePdfFixture(big, 600, 1, true, false, false, "BIG page "));
+    const QString outputPath = m_temp.filePath("merged-cancel.pdf");
+    QFile::remove(outputPath);
+
+    pdfviewer::PDFMergePdfsDialog::Request request;
+    request.directory = m_temp.path();
+    pdfviewer::PDFMergePdfsDialog dialog(request, nullptr);
+    dialog.show();
+    dialog.addFiles({ big, big, big, big });
+    auto* list = dialog.findChild<QTreeWidget*>("mergeList");
+    QCOMPARE(list->topLevelItemCount(), 4);
+    dialog.findChild<QLineEdit*>("mergeOutputEdit")->setText(outputPath);
+
+    MessageBoxAnswerer answerer([](QMessageBox* box) { return boxButton(box, "Close"); });
+    auto* mergeButton = dialog.findChild<QPushButton*>("mergeButton");
+    auto* cancelButton = dialog.findChild<QPushButton*>("mergeCancelButton");
+    mergeButton->click();                                   // starts the worker
+    QVERIFY(!mergeButton->isEnabled());
+    QVERIFY(cancelButton->isVisible());
+    QVERIFY(dialog.findChild<QProgressBar*>("mergeProgressBar")->isVisible());
+    cancelButton->click();                                  // right away
+    QTRY_VERIFY_WITH_TIMEOUT(mergeButton->isEnabled(), 30000);
+
+    const QString status = dialog.findChild<QLabel*>("mergeStatusLabel")->text();
+    if (QFileInfo::exists(outputPath))
+    {
+        // The merge was faster than the cancel: then the file is complete.
+        pdf::PDFDocumentReader reader(nullptr, {}, true, false);
+        const pdf::PDFDocument merged = reader.readFromFile(outputPath);
+        QCOMPARE(reader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
+        QCOMPARE(merged.getCatalog()->getPageCount(), size_t(2400));
+        qInfo() << "merge finished before the cancel took effect:" << status;
+    }
+    else
+    {
+        QVERIFY2(status.contains("cancelled"), qPrintable(status));
+    }
+    QCOMPARE(answerer.texts.size(), QFileInfo::exists(outputPath) ? 1 : 0);
+    // No temporary files stay behind.
+    QStringList stray;
+    for (const QString& name : QDir(m_temp.path()).entryList(QDir::Files))
+    {
+        if (name.contains("merged-cancel"))
+        {
+            stray << name;
+        }
+    }
+    QVERIFY2(stray.size() == (QFileInfo::exists(outputPath) ? 1 : 0), qPrintable(stray.join(',')));
+}
+
+
+void ViewerContextMenuTest::mergePdfsTranslations()
+{
+    struct Language
+    {
+        pdf::PDFApplicationTranslator::ELanguage language;
+        QStringList menuAndButtons;     // Menu text, then the dialog widgets in this order: add, remove, up, down, merge, cancel, output label
+        QString allPages;
+        QStringList warningParts;       // Parts of the encryption and signature warnings
+    };
+    const QList<Language> languages = {
+        { pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_TRADITIONAL,
+          { QString::fromUtf8("\xE5\x90\x88\xE4\xBD\xB5 PDF"), QString::fromUtf8("\xE6\x96\xB0\xE5\xA2\x9E\xE6\xAA\x94\xE6\xA1\x88"),
+            QString::fromUtf8("\xE7\xA7\xBB\xE9\x99\xA4"), QString::fromUtf8("\xE4\xB8\x8A\xE7\xA7\xBB"), QString::fromUtf8("\xE4\xB8\x8B\xE7\xA7\xBB"),
+            QString::fromUtf8("\xE5\x90\x88\xE4\xBD\xB5"), QString::fromUtf8("\xE5\x8F\x96\xE6\xB6\x88"), QString::fromUtf8("\xE8\xBC\xB8\xE5\x87\xBA\xE6\xAA\x94\xE6\xA1\x88") },
+          QString::fromUtf8("\xE6\x89\x80\xE6\x9C\x89\xE9\xA0\x81\xE9\x9D\xA2"),
+          { QString::fromUtf8("\xE5\xB7\xB2\xE5\x8A\xA0\xE5\xAF\x86"), QString::fromUtf8("\xE6\x95\xB8\xE4\xBD\x8D\xE7\xB0\xBD\xE7\xAB\xA0") } },
+        { pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_SIMPLIFIED,
+          { QString::fromUtf8("\xE5\x90\x88\xE5\xB9\xB6 PDF"), QString::fromUtf8("\xE6\xB7\xBB\xE5\x8A\xA0\xE6\x96\x87\xE4\xBB\xB6"),
+            QString::fromUtf8("\xE7\xA7\xBB\xE9\x99\xA4"), QString::fromUtf8("\xE4\xB8\x8A\xE7\xA7\xBB"), QString::fromUtf8("\xE4\xB8\x8B\xE7\xA7\xBB"),
+            QString::fromUtf8("\xE5\x90\x88\xE5\xB9\xB6"), QString::fromUtf8("\xE5\x8F\x96\xE6\xB6\x88"), QString::fromUtf8("\xE8\xBE\x93\xE5\x87\xBA\xE6\x96\x87\xE4\xBB\xB6") },
+          QString::fromUtf8("\xE6\x89\x80\xE6\x9C\x89\xE9\xA1\xB5\xE9\x9D\xA2"),
+          { QString::fromUtf8("\xE5\xB7\xB2\xE5\x8A\xA0\xE5\xAF\x86"), QString::fromUtf8("\xE6\x95\xB0\xE5\xAD\x97\xE7\xAD\xBE\xE5\x90\x8D") } },
+    };
+
+    const QString signedFile = QFINDTESTDATA("fixtures/pyhanko-signed.pdf");
+    const QString dupA = m_temp.filePath("dup-a.pdf");
+    QVERIFY(writePdfFixture(dupA, 1, 1, true, false, false, "DUP page "));
+    for (const Language& language : languages)
+    {
+        pdf::PDFApplicationTranslator translator;
+        translator.setLanguage(language.language);
+        translator.installTranslator();
+
+        pdfviewer::PDFViewerMainWindow viewer;
+        viewer.show();
+        QVERIFY2(viewer.findChild<QAction*>("actionMergePdfs")->text().contains(language.menuAndButtons[0]), qPrintable(viewer.findChild<QAction*>("actionMergePdfs")->text()));
+        pdfviewer::PDFEditorMainWindow editor;
+        editor.show();
+        QVERIFY2(editor.findChild<QAction*>("actionMergePdfs")->text().contains(language.menuAndButtons[0]), qPrintable(editor.findChild<QAction*>("actionMergePdfs")->text()));
+
+        pdfviewer::PDFMergePdfsDialog::Request request;
+        request.directory = m_temp.path();
+        pdfviewer::PDFMergePdfsDialog dialog(request, nullptr);
+        dialog.show();
+        QVERIFY2(dialog.windowTitle().contains(language.menuAndButtons[0]), qPrintable(dialog.windowTitle()));
+        const char* names[] = { "mergeAddButton", "mergeRemoveButton", "mergeUpButton", "mergeDownButton", "mergeButton", "mergeCancelButton" };
+        for (int i = 0; i < 6; ++i)
+        {
+            const QString text = dialog.findChild<QPushButton*>(names[i])->text();
+            QVERIFY2(text.contains(language.menuAndButtons[i + 1]), qPrintable(QStringLiteral("%1: %2").arg(names[i], text)));
+        }
+        QVERIFY(dialog.findChildren<QLabel*>().size() > 0);
+        bool outputLabel = false;
+        for (QLabel* label : dialog.findChildren<QLabel*>())
+        {
+            outputLabel = outputLabel || label->text().contains(language.menuAndButtons[7]);
+        }
+        QVERIFY(outputLabel);
+        auto* list = dialog.findChild<QTreeWidget*>("mergeList");
+        QVERIFY(list->headerItem()->text(2).contains(QString::fromUtf8(language.language == pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_TRADITIONAL ? "\xE9\xA0\x81\xE9\x9D\xA2\xE7\xAF\x84\xE5\x9C\x8D" : "\xE9\xA1\xB5\xE9\x9D\xA2\xE8\x8C\x83\xE5\x9B\xB4")));
+
+        // An encrypted source and a signed source raise the encryption and the signature warning.
+        QVERIFY(!signedFile.isEmpty());
+        const QString locked = m_temp.filePath("locked-translation.pdf");
+        QVERIFY(writeEncryptedFixture(locked, QString(), "owner", 0xFFFFFFFFu).isEmpty());
+        dialog.addFiles({ dupA, locked, signedFile });
+        QCOMPARE(list->topLevelItemCount(), 3);
+        QVERIFY2(list->topLevelItem(0)->text(2) == language.allPages, qPrintable(list->topLevelItem(0)->text(2)));
+        const QString info = dialog.findChild<QLabel*>("mergeInfoLabel")->text();
+        QVERIFY2(info.contains(language.warningParts[0]), qPrintable(info));
+        QVERIFY2(info.contains(language.warningParts[1]), qPrintable(info));
+        // The page range written in the local language ("all pages") is accepted as "all".
+        const QString outputPath = m_temp.filePath("merged-translation.pdf");
+        QFile::remove(outputPath);
+        dialog.findChild<QLineEdit*>("mergeOutputEdit")->setText(outputPath);
+        MessageBoxAnswerer answerer([](QMessageBox* box) -> QAbstractButton* { return box->button(QMessageBox::No); });
+        QTimer::singleShot(0, dialog.findChild<QPushButton*>("mergeButton"), &QPushButton::click);
+        QTest::qWait(300);
+        QVERIFY(answerer.texts.size() >= 1);
+        QVERIFY2(answerer.texts.front().contains(language.warningParts[0]), qPrintable(answerer.texts.front()));
+        QVERIFY(!QFileInfo::exists(outputPath));            // the default answer to the warning is "No"
+    }
+}
 
 QTEST_MAIN(ViewerContextMenuTest)
 #include "tst_viewercontextmenutest.moc"

@@ -47,6 +47,7 @@ $Targets = @(
     'UnitTestsBookmarks',
     'UnitTestsForms',
     'UnitTestsDocumentEdit',
+    'UnitTestsMergePdfs',
     'UnitTestsPrintExport',
     'UnitTestsContentEditor',
     'release_translations'

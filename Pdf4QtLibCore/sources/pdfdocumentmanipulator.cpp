@@ -48,6 +48,29 @@ static QMarginsF mapCropMarginsToUnrotatedPage(QMarginsF cropMargins, PageRotati
     return cropMargins;
 }
 
+/// PDFObjectManipulator::merge sees direct objects only: an entry such as /Fields 12 0 R or /DR 13 0 R would
+/// replace the entry merged before, or be read as an array. Entries that refer to an array or a dictionary are
+/// made direct, down to \p depth dictionary levels; array items (e.g. the field references) stay as they are.
+static PDFObject dereferenceForMerge(const PDFObjectStorage* storage, const PDFObject& object, int depth)
+{
+    const PDFObject& dereferenced = storage->getObject(object);
+    if (!dereferenced.isDictionary() || depth == 0)
+    {
+        return dereferenced;
+    }
+
+    PDFDictionary dictionary = *dereferenced.getDictionary();
+    for (size_t i = 0, count = dictionary.getCount(); i < count; ++i)
+    {
+        const PDFObject& value = storage->getObject(dictionary.getValue(i));
+        if (value.isArray() || value.isDictionary())
+        {
+            dictionary.setEntry(dictionary.getKey(i), dereferenceForMerge(storage, value, depth - 1));
+        }
+    }
+    return PDFObject::createDictionary(std::make_shared<PDFDictionary>(qMove(dictionary)));
+}
+
 PDFOperationResult PDFDocumentManipulator::assemble(const AssembledPages& pages)
 {
     if (pages.empty())
@@ -109,6 +132,11 @@ PDFOperationResult PDFDocumentManipulator::assemble(const AssembledPages& pages)
             documentBuilder.removeThreads();
             documentBuilder.removeDocumentActions();
             documentBuilder.removeStructureTree();
+        }
+
+        if (m_attachMergedCatalogObjects)
+        {
+            finalizeMergedObjects(documentBuilder);
         }
 
         // Jakub Melka: we also create document parts for each document part (if we aren't
@@ -436,8 +464,8 @@ PDFDocumentManipulator::ProcessedPages PDFDocumentManipulator::collectObjectsAnd
             acroFormReference = references.back();
             references.pop_back();
 
-            documentBuilder.appendTo(m_mergedObjects[MOT_OCProperties], documentBuilder.getObjectByReference(ocPropertiesReference));
-            documentBuilder.appendTo(m_mergedObjects[MOT_Form], documentBuilder.getObjectByReference(acroFormReference));
+            documentBuilder.appendTo(m_mergedObjects[MOT_OCProperties], dereferenceForMerge(documentBuilder.getStorage(), documentBuilder.getObjectByReference(ocPropertiesReference), 2));
+            documentBuilder.appendTo(m_mergedObjects[MOT_Form], dereferenceForMerge(documentBuilder.getStorage(), documentBuilder.getObjectByReference(acroFormReference), 2));
             documentBuilder.mergeNames(m_mergedObjects[MOT_Names], namesReference);
             m_outlines[documentIndex] = outlineReference;
 
@@ -523,10 +551,9 @@ void PDFDocumentManipulator::finalizeMergedObjects(PDFDocumentBuilder& documentB
             documentBuilder.setCatalogOptionalContentProperties(m_mergedObjects[MOT_OCProperties]);
         }
 
-        if (!documentBuilder.getObjectByReference(m_mergedObjects[MOT_Names]).isNull())
-        {
-            documentBuilder.setCatalogNames(m_mergedObjects[MOT_Names]);
-        }
+        // The merged name tree is not attached: PDFDocumentBuilder::mergeNames writes the keys as names
+        // instead of strings (an invalid name tree), and its destinations would drag every page of the
+        // source documents, also the ones that were left out, into the result.
 
         if (!documentBuilder.getObjectByReference(m_mergedObjects[MOT_Form]).isNull())
         {
@@ -634,7 +661,7 @@ void PDFDocumentManipulator::addOutlineAndDocumentParts(PDFDocumentBuilder& docu
         if (documentIndex != -1 && m_documents.count(documentIndex))
         {
             const PDFDocument* document = m_documents.at(documentIndex);
-            documentTitle = document->getInfo()->title;
+            documentTitle = m_documentCaptions.count(documentIndex) ? m_documentCaptions.at(documentIndex) : document->getInfo()->title;
             if (documentTitle.isEmpty())
             {
                 documentTitle = tr("Document %1").arg(documentIndex);

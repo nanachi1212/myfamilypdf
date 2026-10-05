@@ -39,6 +39,7 @@
 #include "pdfrendertoimagesdialog.h"
 #include "pdfprintdialog.h"
 #include "pdfexportimagesdialog.h"
+#include "pdfmergepdfsdialog.h"
 #include "pdfpageoutput.h"
 #include "pdfpagereorder.h"
 #include "pdfoptimizedocumentdialog.h"
@@ -593,6 +594,10 @@ void PDFProgramController::initialize(Features features,
     if (QAction* action = m_actionManager->getAction(PDFActionManager::ExportPageImages))
     {
         connect(action, &QAction::triggered, this, [this]() { exportPagesAsImages(); });
+    }
+    if (QAction* action = m_actionManager->getAction(PDFActionManager::MergePdfs))
+    {
+        connect(action, &QAction::triggered, this, [this]() { mergePdfs(); });
     }
     if (QAction* action = m_actionManager->getAction(PDFActionManager::Optimize))
     {
@@ -2516,6 +2521,7 @@ void PDFProgramController::updateActionsAvailability()
     m_actionManager->setEnabled(PDFActionManager::Open, !isBusy);
     m_actionManager->setEnabled(PDFActionManager::Close, hasValidDocument);
     m_actionManager->setEnabled(PDFActionManager::Quit, !isBusy);
+    m_actionManager->setEnabled(PDFActionManager::MergePdfs, !isBusy);
     m_actionManager->setEnabled(PDFActionManager::Options, !isBusy);
     m_actionManager->setEnabled(PDFActionManager::ResetToFactorySettings, !isBusy);
     m_actionManager->setEnabled(PDFActionManager::About, !isBusy);
@@ -3573,6 +3579,41 @@ void PDFProgramController::extractPages(const std::vector<pdf::PDFInteger>& page
     }
 
     QMessageBox::information(m_mainWindow, tr("Extract Pages"), tr("Saved %1 pages to %2.").arg(assembledPages.size()).arg(QDir::toNativeSeparators(fileName)));
+}
+
+void PDFProgramController::mergePdfs()
+{
+    QString outputToOpen;
+    {
+        // The dialog keeps the open document (when it is added to the list), so automatic reload must not
+        // replace it while the dialog is open.
+        const pdf::PDFDocumentPointer documentKeepAlive = m_pdfDocument;
+        m_isOutputWorkflowActive = true;
+        const auto outputWorkflowGuard = qScopeGuard([this]() { m_isOutputWorkflowActive = false; });
+
+        PDFMergePdfsDialog::Request request;
+        const QFileInfo sourceInfo(getOriginalFileName());
+        request.directory = sourceInfo.absolutePath().isEmpty() ? m_settings->getDirectory() : sourceInfo.absolutePath();
+        if (m_pdfDocument)
+        {
+            request.currentDocument = pdf::PDFDocumentMerger::createSource(getOriginalFileName(),
+                                                                           sourceInfo.fileName().isEmpty() ? tr("Untitled") : sourceInfo.fileName(),
+                                                                           m_pdfDocument);
+        }
+
+        PDFMergePdfsDialog dialog(request, m_mainWindow);
+        dialog.exec();
+        if (dialog.isOpenOutputRequested())
+        {
+            outputToOpen = dialog.getOutputFile();
+        }
+    }
+
+    if (!outputToOpen.isEmpty())
+    {
+        // With a document already open this opens the merged PDF in a new tab; nothing is closed.
+        openDocument(outputToOpen);
+    }
 }
 
 void PDFProgramController::deletePages(const std::vector<pdf::PDFInteger>& pageIndices)

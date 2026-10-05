@@ -34,6 +34,7 @@
     <addaction name="actionSend_by_E_Mail"/>
     <addaction name="actionPrint"/>
     <addaction name="actionExportPageImages"/>
+    <addaction name="actionMergePdfs"/>
     <addaction name="separator"/>
     <addaction name="actionProperties"/>
     <addaction name="separator"/>
@@ -490,6 +491,11 @@
   <action name="actionExportPageImages">
    <property name="text">
     <string>Export Page(s) as &amp;Images...</string>
+   </property>
+  </action>
+  <action name="actionMergePdfs">
+   <property name="text">
+    <string>&amp;Merge PDFs...</string>
    </property>
   </action>
   <action name="actionRenderOptionDisplayAnnotations">
