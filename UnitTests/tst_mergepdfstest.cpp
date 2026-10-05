@@ -238,6 +238,7 @@ private slots:
     void bookmarksAndNamedDestinations();
     void pageLinksFollowTheirTargetPage();
     void optionalContentIsKept();
+    void formAndLayersWithIndirectEntries();
     void jpeg2000ImagesAreNotReencoded();
     void encryptedSourceWithPassword();
     void invalidPasswordAndCancel();
@@ -413,6 +414,12 @@ void MergePdfsTest::pageRangesAndCustomOrder()
     // A page used twice is copied twice, as typed. Output page widths prove each copy is the right page.
     merged = mergeToOutput({ { b, "2,2,1" } }, path("out3.pdf"));
     QCOMPARE(pageMarkers(merged), QStringList({ "B page 2", "B page 2", "B page 1" }));
+
+    // 3,1,3: three separate page objects (a page tree must not list one page object twice).
+    merged = mergeToOutput({ { b, "3,1,3" } }, path("out4.pdf"));
+    QCOMPARE(pageMarkers(merged), QStringList({ "B page 3", "B page 1", "B page 3" }));
+    QCOMPARE(countPageObjects(merged), 3);
+    QVERIFY(merged.getCatalog()->getPage(0)->getPageReference() != merged.getCatalog()->getPage(2)->getPageReference());
 }
 
 void MergePdfsTest::mixedSizesRotationsAndCropBox()
@@ -728,6 +735,72 @@ void MergePdfsTest::optionalContentIsKept()
             listed = listed || (item.isReference() && item.getReference() == layerReference.getReference());
         }
         QVERIFY(listed);
+    }
+}
+
+void MergePdfsTest::formAndLayersWithIndirectEntries()
+{
+    // /Fields, /DR, /OCGs and /D arrays may be indirect objects. Every order of direct and indirect sources must
+    // keep the fields and layers of all sources. A also needs appearances; B says it does not (that must not win).
+    auto sourcePdf = [](const QByteArray& name, bool indirect, const QByteArray& extraFormEntries)
+    {
+        const QByteArray content = "/OC /MC0 BDC 10 10 50 50 re f EMC";
+        return rawPdf({
+            "<< /Type /Catalog /Pages 2 0 R /AcroForm 5 0 R /OCProperties 8 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R /Annots [6 0 R] /Resources << /Properties << /MC0 10 0 R >> >> >>",
+            "<< /Length " + QByteArray::number(content.size()) + " >>\nstream\n" + content + "\nendstream",
+            (indirect ? QByteArray("<< /Fields 7 0 R /DR 11 0 R") : QByteArray("<< /Fields [6 0 R] /DR << /Font << /Helv 12 0 R >> >>"))
+                + " /DA (/Helv 0 Tf 0 g) " + extraFormEntries + " >>",
+            "<< /Type /Annot /Subtype /Widget /FT /Tx /T (" + name + ") /V (" + name + " value) /Rect [10 10 100 30] /P 3 0 R >>",
+            "[6 0 R]",
+            indirect ? "<< /OCGs 9 0 R /D << /Order 9 0 R /ON 9 0 R >> >>" : "<< /OCGs [10 0 R] /D << /Order [10 0 R] /ON [10 0 R] >> >>",
+            "[10 0 R]",
+            "<< /Type /OCG /Name (" + name + " layer) >>",
+            "<< /Font << /Helv 12 0 R >> >>",
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+            "<< /Length 7 >>\nstream\n<xdp/>\n\nendstream" });
+    };
+
+    for (const bool indirectA : { false, true })
+    {
+        for (const bool indirectB : { false, true })
+        {
+            const QString tag = QStringLiteral("A %1, B %2").arg(indirectA ? "indirect" : "direct", indirectB ? "indirect" : "direct");
+            QVERIFY(writeFile(path("a.pdf"), sourcePdf("a", indirectA, "/NeedAppearances true /XFA 13 0 R")));
+            QVERIFY(writeFile(path("b.pdf"), sourcePdf("b", indirectB, "/NeedAppearances false")));
+            const pdf::PDFDocument merged = mergeToOutput({ { path("a.pdf"), "all" }, { path("b.pdf"), "all" } }, path("out.pdf"));
+            QVERIFY2(merged.getCatalog(), qPrintable(tag));
+
+            const pdf::PDFForm form = pdf::PDFForm::parse(&merged, merged.getCatalog()->getFormObject());
+            QStringList names;
+            for (const auto& field : form.getFormFields())
+            {
+                names << field->getName(pdf::PDFFormField::FullyQualified);
+            }
+            QVERIFY2(names == QStringList({ "a", "b" }), qPrintable(tag + ": " + names.join(',')));
+
+            const pdf::PDFObjectStorage& storage = merged.getStorage();
+            const pdf::PDFDictionary* acroForm = storage.getDictionaryFromObject(merged.getCatalog()->getFormObject());
+            QVERIFY2(acroForm, qPrintable(tag));
+            const pdf::PDFDictionary* resources = storage.getDictionaryFromObject(acroForm->get("DR"));
+            const pdf::PDFDictionary* fonts = resources ? storage.getDictionaryFromObject(resources->get("Font")) : nullptr;
+            QVERIFY2(fonts && fonts->hasKey("Helv"), qPrintable(tag));
+            QVERIFY2(storage.getObject(acroForm->get("NeedAppearances")) == pdf::PDFObject::createBool(true), qPrintable(tag));
+            // The XFA form of one source cannot describe the merged document: it is not carried over (see the warning).
+            QVERIFY2(!acroForm->hasKey("XFA"), qPrintable(tag));
+
+            const pdf::PDFDictionary* trailer = storage.getDictionaryFromObject(storage.getTrailerDictionary());
+            const pdf::PDFDictionary* catalog = storage.getDictionaryFromObject(storage.getObject(trailer->get("Root")));
+            const pdf::PDFDictionary* properties = storage.getDictionaryFromObject(storage.getObject(catalog->get("OCProperties")));
+            QVERIFY2(properties, qPrintable(tag));
+            const pdf::PDFObject groups = storage.getObject(properties->get("OCGs"));
+            QVERIFY2(groups.isArray() && groups.getArray()->getCount() == 2, qPrintable(tag));
+            const pdf::PDFDictionary* defaults = storage.getDictionaryFromObject(properties->get("D"));
+            QVERIFY2(defaults, qPrintable(tag));
+            const pdf::PDFObject on = storage.getObject(defaults->get("ON"));
+            QVERIFY2(on.isArray() && on.getArray()->getCount() == 2, qPrintable(tag));
+        }
     }
 }
 

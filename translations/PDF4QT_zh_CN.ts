@@ -15573,6 +15573,7 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>将使用最�
     <message><source>Page numbers must be between 1 and %1.</source><translation>页码必须介于 1 到 %1 之间。</translation></message>
     <message><source>Range '%1' is reversed. Put the smaller page number first.</source><translation>范围“%1”顺序相反。请将较小的页码放前面。</translation></message>
     <message><source>Add at least one PDF file.</source><translation>请至少添加一个 PDF 文件。</translation></message>
+    <message><source>The PDFs could not be merged (%1).</source><translation>无法合并这些 PDF（%1）。</translation></message>
     <message><source>%1: the document has no pages.</source><translation>%1：文档没有任何页面。</translation></message>
     <message><source>%1: no pages selected.</source><translation>%1：尚未选择页面。</translation></message>
     <message><source>%1: the document permissions do not allow its pages to be copied into another PDF.</source><translation>%1：文档权限不允许将其页面复制到另一个 PDF。</translation></message>

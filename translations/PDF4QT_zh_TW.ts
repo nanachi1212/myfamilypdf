@@ -15635,6 +15635,7 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>將使用最�
     <message><source>Page numbers must be between 1 and %1.</source><translation>頁碼必須介於 1 到 %1 之間。</translation></message>
     <message><source>Range '%1' is reversed. Put the smaller page number first.</source><translation>範圍「%1」順序相反。請將較小的頁碼放前面。</translation></message>
     <message><source>Add at least one PDF file.</source><translation>請至少加入一個 PDF 檔案。</translation></message>
+    <message><source>The PDFs could not be merged (%1).</source><translation>無法合併這些 PDF（%1）。</translation></message>
     <message><source>%1: the document has no pages.</source><translation>%1：文件沒有任何頁面。</translation></message>
     <message><source>%1: no pages selected.</source><translation>%1：尚未選取頁面。</translation></message>
     <message><source>%1: the document permissions do not allow its pages to be copied into another PDF.</source><translation>%1：文件權限不允許將其頁面複製到另一個 PDF。</translation></message>

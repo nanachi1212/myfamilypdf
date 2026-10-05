@@ -145,6 +145,34 @@ void pruneExcludedPages(PDFDocument* document)
     *document = optimizer.takeOptimizedDocument();
 }
 
+/// Form-level entries that a plain dictionary merge gets wrong: the XFA form of a source cannot describe the merged
+/// document (the user was warned that it is not carried over), and when one source needs its field appearances
+/// generated, a later source's "NeedAppearances false" must not hide those field values.
+void finishMergedForm(PDFDocument* document, bool needAppearances)
+{
+    const PDFObject formObject = document->getCatalog()->getFormObject();
+    const PDFDictionary* formDictionary = document->getStorage().getDictionaryFromObject(formObject);
+    if (!formObject.isReference() || !formDictionary)
+    {
+        return;
+    }
+    const bool hasNeedAppearances = PDFDocumentDataLoaderDecorator(document).readBooleanFromDictionary(formDictionary, "NeedAppearances", false);
+    if (!formDictionary->hasKey("XFA") && (!needAppearances || hasNeedAppearances))
+    {
+        return;
+    }
+
+    PDFDictionary form = *formDictionary;
+    form.removeEntry("XFA");
+    if (needAppearances)
+    {
+        form.setEntry(PDFInplaceOrMemoryString("NeedAppearances"), PDFObject::createBool(true));
+    }
+    PDFDocumentBuilder builder(document);
+    builder.setObject(formObject.getReference(), PDFObject::createDictionary(std::make_shared<PDFDictionary>(std::move(form))));
+    *document = builder.build();
+}
+
 }   // namespace
 
 PDFDocumentMerger::Source PDFDocumentMerger::createSource(const QString& fileName, const QString& displayName, PDFDocumentPointer document)
@@ -433,16 +461,42 @@ PDFOperationResult PDFDocumentMerger::mergeToFile(const std::vector<Entry>& entr
         return tr("Cancelled.");
     }
 
+    // Upstream object code can throw on damaged input (also non-PDF exceptions); the merge must report it, not
+    // let it reach the caller's thread or event loop.
+    try
+    {
+        return mergeToFileImpl(entries, destination, isCancelled);
+    }
+    catch (const PDFException& exception)
+    {
+        return exception.getMessage();
+    }
+    catch (const std::exception& exception)
+    {
+        return tr("The PDFs could not be merged (%1).").arg(QString::fromLocal8Bit(exception.what()));
+    }
+}
+
+PDFOperationResult PDFDocumentMerger::mergeToFileImpl(const std::vector<Entry>& entries,
+                                                      const QString& destination,
+                                                      const std::function<bool()>& isCancelled)
+{
     PDFDocumentManipulator manipulator;
     manipulator.setOutlineMode(PDFDocumentManipulator::OutlineMode::Join);
     manipulator.setAttachMergedCatalogObjects(true);
     PDFDocumentManipulator::AssembledPages assembledPages;
+    bool needAppearances = false;
     for (size_t index = 0; index < entries.size(); ++index)
     {
         const Entry& entry = entries[index];
         if (!entry.source.document)
         {
             return tr("Invalid document.");
+        }
+        const PDFDocument* document = entry.source.document.data();
+        if (const PDFDictionary* form = document->getStorage().getDictionaryFromObject(document->getCatalog()->getFormObject()))
+        {
+            needAppearances = needAppearances || PDFDocumentDataLoaderDecorator(document).readBooleanFromDictionary(form, "NeedAppearances", false);
         }
         // One document index per list row: the same file listed twice stays two independent sources.
         const int documentIndex = int(index);
@@ -471,6 +525,7 @@ PDFOperationResult PDFDocumentMerger::mergeToFile(const std::vector<Entry>& entr
 
     PDFDocument assembled = manipulator.takeAssembledDocument();
     pruneExcludedPages(&assembled);
+    finishMergedForm(&assembled, needAppearances);
     if (isCancelled())
     {
         return tr("Cancelled.");

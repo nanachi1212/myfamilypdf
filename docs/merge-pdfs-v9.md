@@ -38,6 +38,15 @@ listed files are never changed, Undo/Redo is not involved, and the open document
     multi-document merge silently dropped the AcroForm and OCProperties of all sources. With the flag they
     are attached (form fields and widgets keep their values, optional content layers keep working).
     The merged Names tree is deliberately NOT attached (see below).
+  - Before a source's AcroForm / OCProperties is added to the merged one, entries that refer to an array or a dictionary
+    (`/Fields 12 0 R`, `/DR 13 0 R`, `/OCGs`, `/D /ON` ...) are made direct (`dereferenceForMerge`). The dictionary merge
+    only sees direct objects: an indirect `/Fields` replaced the fields merged before, or (direct array first, indirect
+    second) threw a non-PDF exception. This also applies to PageMaster, which runs the same merge.
+- `finishMergedForm()` (in `pdfdocumentmerger.cpp`): `/XFA` is removed from the merged AcroForm (the XFA form of one source
+  cannot describe the merged file; the user is warned that it is not carried over), and `/NeedAppearances true` is kept
+  when any source has it (a later source's `false` would hide field values that have no appearance stream).
+- `mergeToFile` turns any exception from the object code into an error message (the destination is untouched), so
+  damaged input cannot end the program from the worker thread.
 - `pruneExcludedPages()` (in `pdfdocumentmerger.cpp`, runs on the assembled document only when needed): the
   page copier also keeps every page that a kept page links to, or that carries a form field, as an unused
   object - i.e. pages the user left out, with their content, stayed in the file. The pass removes form
@@ -49,7 +58,14 @@ listed files are never changed, Undo/Redo is not involved, and the open document
 
 A - accepted and documented, no warning:
 - Tagged PDF structure tree, document actions (OpenAction/AA), article threads are removed in a multi-document merge.
-- Links to a page that was left out go nowhere. Links between pages of different sources are re-targeted correctly.
+- Links to a page that was left out go nowhere (the page entry of the destination becomes null; viewers ignore such a
+  link). Links between pages of different sources are re-targeted correctly.
+- A page listed twice: the second one is a full copy. Its links to other pages go nowhere, and its form widgets are not
+  listed in the AcroForm `/Fields` (FamilyPDF still shows them as a separate field with the same name; other viewers may
+  show only the appearance). The first copy keeps working links and fields.
+- A field whose widgets are split between kept and left-out pages keeps its left-out widgets as annotations without a page.
+- Form-level defaults are not reconciled: when sources disagree, the last source's `/DA`, `/SigFlags`, equally named `/DR`
+  resources and optional content `/BaseState` win.
 - Outline: one entry per source (file name; page range for partial sources); the source's own bookmarks
   are kept below it only when all its pages are used. Bookmarks of partial sources are dropped.
 - The generated document parts (`/DPartRoot`) come from the existing manipulator.
@@ -61,7 +77,8 @@ B - warning before merge (user must confirm):
   invalid (checked with the OpenSSL verifier: no valid signature in the output). No re-signing.
 - Form fields with the same name in more than one row: both fields are kept with their own value and widget,
   but names are not changed (the manipulator has no safe rename), so viewers may treat them as one field.
-- XFA form source: the dynamic XFA form is not carried over. (No XFA fixture; the warning is not exercised by a test.)
+- XFA form source: the XFA form is not carried over (`/XFA` is removed; the AcroForm fields stay). (No real XFA fixture;
+  the warning itself is not exercised by a test, the removal is.)
 - Named destinations: `PDFDocumentBuilder::mergeNames` writes the name tree keys as names instead of strings
   (an invalid tree) and its destinations drag all pages of the sources into the file, so the Names tree is
   not attached. Links that use a named destination do not work; bookmarks and page links do.
@@ -79,7 +96,8 @@ Needed core changes (deep copy / reference remapping, AcroForm merge core, write
 - `UnitTestsMergePdfs` (`UnitTests/tst_mergepdfstest.cpp`, engine, real files, reopened): parser (order, repeat,
   errors), 2 and 3 sources, ranges/custom order/repeats, mixed sizes + rotation + CropBox, annotations and /P,
   AcroForm different and duplicate names, excluded pages/fields/links leave nothing behind, bookmarks, named
-  destination warning, links across reordered sources, optional content, JPEG 2000 byte-identical, encrypted source with
+  destination warning, links across reordered sources, optional content, indirect `/Fields` `/DR` `/OCGs` in every
+  direct/indirect order with `/XFA` removed and `NeedAppearances` kept, page `3,1,3` as three page objects, JPEG 2000 byte-identical, encrypted source with
   password / wrong password / cancel / permission denied, signed source (warning + no valid signature), overwrite,
   source == destination, cancel and failure atomicity (no stray temp files), sources unchanged, timings.
 - `UnitTestsViewer`: `mergePdfsEntriesAreAvailable`, `mergePdfsDialogWorkflow` (menu, Add Open Document, ranges, move,

@@ -101,6 +101,11 @@ public:
                                           const QString& destination,
                                           const std::atomic_bool* cancel,
                                           bool* cancelled);
+
+private:
+    static PDFOperationResult mergeToFileImpl(const std::vector<Entry>& entries,
+                                              const QString& destination,
+                                              const std::function<bool()>& isCancelled);
 };
 
 }   // namespace pdf
