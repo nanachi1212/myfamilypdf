@@ -109,6 +109,14 @@ public:
     OutlineMode getOutlineMode() const;
     void setOutlineMode(OutlineMode outlineMode);
 
+    /// Caption used for a source document in the outline of a merged document, instead of its
+    /// /Info title or the generic "Document N" text.
+    void setDocumentCaption(int documentIndex, const QString& caption) { m_documentCaptions[documentIndex] = caption; }
+
+    /// If enabled, the AcroForm and OCProperties collected from the source documents are attached to
+    /// the catalog of a merged document (finalizeMergedObjects). Off by default, as before.
+    void setAttachMergedCatalogObjects(bool attach) { m_attachMergedCatalogObjects = attach; }
+
 private:
 
     struct ProcessedPage
@@ -165,6 +173,8 @@ private:
     PDFDocument m_assembledDocument;
     OutlineMode m_outlineMode = OutlineMode::DocumentParts;
     std::map<PDFInteger, PDFObjectReference> m_outlines;
+    std::map<PDFInteger, QString> m_documentCaptions;
+    bool m_attachMergedCatalogObjects = false;
 };
 
 }   // namespace pdf

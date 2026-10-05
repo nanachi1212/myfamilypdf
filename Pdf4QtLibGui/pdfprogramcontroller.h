@@ -125,6 +125,7 @@ public:
         SendByMail,
         RenderToImages,
         ExportPageImages,
+        MergePdfs,
         Optimize,
         OptimizeImages,
         Sanitize,
@@ -341,6 +342,7 @@ public:
     void performSaveAs();
     void launchOcrPlugin();
     void extractPages();
+    void mergePdfs();
     void extractPages(const std::vector<pdf::PDFInteger>& pageIndices);
     void deletePages(const std::vector<pdf::PDFInteger>& pageIndices);
     void rotatePages(const std::vector<pdf::PDFInteger>& pageIndices, int quarterTurns);

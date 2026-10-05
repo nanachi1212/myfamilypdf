@@ -169,6 +169,7 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     m_actionManager->setAction(PDFActionManager::RotateLeft, ui->actionRotateLeft);
     m_actionManager->setAction(PDFActionManager::Print, ui->actionPrint);
     m_actionManager->setAction(PDFActionManager::ExportPageImages, ui->actionExportPageImages);
+    m_actionManager->setAction(PDFActionManager::MergePdfs, ui->actionMergePdfs);
     m_actionManager->setAction(PDFActionManager::GoToDocumentStart, ui->actionGoToDocumentStart);
     m_actionManager->setAction(PDFActionManager::GoToDocumentEnd, ui->actionGoToDocumentEnd);
     m_actionManager->setAction(PDFActionManager::GoToNextPage, ui->actionGoToNextPage);

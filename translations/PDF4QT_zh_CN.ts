@@ -2276,6 +2276,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message><source>Export Page(s) as &amp;Images...</source><translation>将页面导出为图片(&amp;I)...</translation></message>
+    <message><source>&amp;Merge PDFs...</source><translation>合并 PDF(&amp;M)...</translation></message>
 </context>
 <context>
     <name>PDFEncryptionSettingsDialog</name>
@@ -5789,6 +5790,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message><source>Export Page(s) as &amp;Images...</source><translation>将页面导出为图片(&amp;I)...</translation></message>
+    <message><source>&amp;Merge PDFs...</source><translation>合并 PDF(&amp;M)...</translation></message>
 </context>
 <context>
     <name>PDFViewerSettingsDialog</name>
@@ -14282,6 +14284,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
 </context>
 <context>
     <name>pdfviewer::PDFProgramController</name>
+    <message><source>Untitled</source><translation>未命名</translation></message>
     <message>
         <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="796"/>
         <source>Printing document</source>
@@ -15562,5 +15565,71 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>将使用最�
     <message><source>Not enough memory to render page %1 at %2 x %3 pixels.</source><translation>内存不足，无法以 %2 x %3 像素绘制第 %1 页。</translation></message>
     <message><source>The selection on page %1 is outside of the page.</source><translation>第 %1 页的选中范围在页面之外。</translation></message>
     <message><source>Cannot write '%1': %2</source><translation>无法写入“%1”：%2</translation></message>
+</context>
+<context>
+    <name>pdf::PDFDocumentMerger</name>
+    <message><source>The password is not correct.</source><translation>密码不正确。</translation></message>
+    <message><source>Invalid page selection '%1'. Use all, page numbers or ranges such as 1-3,8,10-12.</source><translation>页面选择“%1”无效。请输入 all、页码或页面范围，例如 1-3,8,10-12。</translation></message>
+    <message><source>Page numbers must be between 1 and %1.</source><translation>页码必须介于 1 到 %1 之间。</translation></message>
+    <message><source>Range '%1' is reversed. Put the smaller page number first.</source><translation>范围“%1”顺序相反。请将较小的页码放前面。</translation></message>
+    <message><source>Add at least one PDF file.</source><translation>请至少添加一个 PDF 文件。</translation></message>
+    <message><source>%1: the document has no pages.</source><translation>%1：文档没有任何页面。</translation></message>
+    <message><source>%1: no pages selected.</source><translation>%1：尚未选择页面。</translation></message>
+    <message><source>%1: the document permissions do not allow its pages to be copied into another PDF.</source><translation>%1：文档权限不允许将其页面复制到另一个 PDF。</translation></message>
+    <message><source>Encrypted source (%1): the merged PDF is not encrypted and does not keep the password or permissions.</source><translation>已加密的来源（%1）：合并后的 PDF 不会加密，也不会保留密码或权限设置。</translation></message>
+    <message><source>Digitally signed source (%1): a signature cannot stay valid in a merged PDF. It will be shown as invalid or broken.</source><translation>含数字签名的来源（%1）：签名无法在合并后的 PDF 中保持有效，会显示为无效或已损坏。</translation></message>
+    <message><source>XFA form source (%1): the dynamic XFA form is not carried over.</source><translation>XFA 表单来源（%1）：动态 XFA 表单不会被带入合并结果。</translation></message>
+    <message><source>Named destinations (%1): internal links that use a named destination do not work in the merged PDF. Bookmarks and links to a page keep working.</source><translation>命名目标（%1）：使用命名目标的文档内部链接在合并后的 PDF 中将无法工作。书签与指向页面的链接仍可使用。</translation></message>
+    <message><source> (+%1 more)</source><translation>（另有 %1 个）</translation></message>
+    <message><source>Form fields with the same name exist in more than one source (%1). In the merged PDF they may share one value or behave unpredictably.</source><translation>有多个来源包含同名的表单字段（%1）。合并后的 PDF 中，它们可能共用同一个值，或出现不可预期的行为。</translation></message>
+    <message><source>No output file selected.</source><translation>尚未选择输出文件。</translation></message>
+    <message><source>The output file must be different from the source PDFs (%1).</source><translation>输出文件必须与源 PDF 不同（%1）。</translation></message>
+    <message><source>Cancelled.</source><translation>已取消。</translation></message>
+    <message><source>Invalid document.</source><translation>无效的文档。</translation></message>
+    <message><source>Missing page (%1) in a document.</source><translation>文档中找不到第 %1 页。</translation></message>
+</context>
+<context>
+    <name>pdfviewer::PDFMergePdfsDialog</name>
+    <message><source>Merge PDFs</source><translation>合并 PDF</translation></message>
+    <message><source>Add the PDFs to merge, put them in the order you want and choose the pages of each one. The result is saved as a new PDF; the PDFs in the list are not changed.</source><translation>添加要合并的 PDF，排好顺序，并为每个文件选择页面。结果会另存为新的 PDF，列表中的 PDF 不会被改动。</translation></message>
+    <message><source>File</source><translation>文件</translation></message>
+    <message><source>Pages</source><translation>页数</translation></message>
+    <message><source>Page range</source><translation>页面范围</translation></message>
+    <message><source>all, or pages and ranges such as 1-3,8,10-12. The order you type is kept: 3,1 gives page 3 and then page 1.</source><translation>all，或页码与范围，例如 1-3,8,10-12。会按照您输入的顺序输出：3,1 会先输出第 3 页，再输出第 1 页。</translation></message>
+    <message><source>&amp;Add Files...</source><translation>添加文件(&amp;A)...</translation></message>
+    <message><source>Add &amp;Open Document</source><translation>添加当前打开的文档(&amp;O)</translation></message>
+    <message><source>Adds the open document as it is now, including changes that are not saved yet.</source><translation>按当前状态添加打开的文档，包括尚未保存的修改。</translation></message>
+    <message><source>&amp;Remove</source><translation>移除(&amp;R)</translation></message>
+    <message><source>Move &amp;Up</source><translation>上移(&amp;U)</translation></message>
+    <message><source>Move &amp;Down</source><translation>下移(&amp;D)</translation></message>
+    <message><source>&amp;Browse...</source><translation>浏览(&amp;B)...</translation></message>
+    <message><source>&amp;Output file:</source><translation>输出文件(&amp;O)：</translation></message>
+    <message><source>&amp;Merge</source><translation>合并(&amp;M)</translation></message>
+    <message><source>&amp;Cancel</source><translation>取消(&amp;C)</translation></message>
+    <message><source>C&amp;lose</source><translation>关闭(&amp;L)</translation></message>
+    <message><source>All pages</source><translation>所有页面</translation></message>
+    <message><source>%1 (open document)</source><translation>%1（当前打开的文档）</translation></message>
+    <message><source>Encrypted document</source><translation>已加密的文档</translation></message>
+    <message><source>Enter password to access document content</source><translation>请输入密码以访问文档内容</translation></message>
+    <message><source>%1: %2</source><translation>%1：%2</translation></message>
+    <message><source>These files cannot be merged and were not added:</source><translation>下列文件无法合并，未添加到列表：</translation></message>
+    <message><source>Missing document.</source><translation>找不到文档。</translation></message>
+    <message><source>Add PDF Files</source><translation>添加 PDF 文件</translation></message>
+    <message><source>PDF document (*.pdf)</source><translation>PDF 文档 (*.pdf)</translation></message>
+    <message><source>Save Merged PDF</source><translation>保存合并后的 PDF</translation></message>
+    <message><source>Cannot merge: %1</source><translation>无法合并：%1</translation></message>
+    <message><source>Warning: %1</source><translation>警告：%1</translation></message>
+    <message><source>%1 page(s) will be written.</source><translation>将写入 %1 页。</translation></message>
+    <message><source>The PDFs cannot be merged:</source><translation>无法合并这些 PDF：</translation></message>
+    <message><source>The output file must be different from the PDFs in the list (%1). Choose another file name.</source><translation>输出文件必须与列表中的 PDF 不同（%1）。请选择其他文件名。</translation></message>
+    <message><source>%1 already exists. Do you want to replace it?</source><translation>%1 已存在。要替换它吗？</translation></message>
+    <message><source>Do you want to merge anyway?</source><translation>仍要合并吗？</translation></message>
+    <message><source>Merging %1 page(s)...</source><translation>正在合并 %1 页…</translation></message>
+    <message><source>Cancelling...</source><translation>正在取消…</translation></message>
+    <message><source>Saved %1 page(s) to %2.</source><translation>已将 %1 页保存到 %2。</translation></message>
+    <message><source>&amp;Open Merged PDF</source><translation>打开合并后的 PDF(&amp;O)</translation></message>
+    <message><source>The merge was cancelled. No file was written.</source><translation>已取消合并，未写入任何文件。</translation></message>
+    <message><source>The merge failed. No file was written.</source><translation>合并失败，未写入任何文件。</translation></message>
+    <message><source>No file was written.</source><translation>未写入任何文件。</translation></message>
 </context>
 </TS>

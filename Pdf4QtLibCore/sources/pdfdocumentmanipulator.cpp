@@ -111,6 +111,11 @@ PDFOperationResult PDFDocumentManipulator::assemble(const AssembledPages& pages)
             documentBuilder.removeStructureTree();
         }
 
+        if (m_attachMergedCatalogObjects)
+        {
+            finalizeMergedObjects(documentBuilder);
+        }
+
         // Jakub Melka: we also create document parts for each document part (if we aren't
         // manipulating a single document).
         if (!m_flags.testFlag(SingleDocument))
@@ -523,10 +528,9 @@ void PDFDocumentManipulator::finalizeMergedObjects(PDFDocumentBuilder& documentB
             documentBuilder.setCatalogOptionalContentProperties(m_mergedObjects[MOT_OCProperties]);
         }
 
-        if (!documentBuilder.getObjectByReference(m_mergedObjects[MOT_Names]).isNull())
-        {
-            documentBuilder.setCatalogNames(m_mergedObjects[MOT_Names]);
-        }
+        // The merged name tree is not attached: PDFDocumentBuilder::mergeNames writes the keys as names
+        // instead of strings (an invalid name tree), and its destinations would drag every page of the
+        // source documents, also the ones that were left out, into the result.
 
         if (!documentBuilder.getObjectByReference(m_mergedObjects[MOT_Form]).isNull())
         {
@@ -634,7 +638,7 @@ void PDFDocumentManipulator::addOutlineAndDocumentParts(PDFDocumentBuilder& docu
         if (documentIndex != -1 && m_documents.count(documentIndex))
         {
             const PDFDocument* document = m_documents.at(documentIndex);
-            documentTitle = document->getInfo()->title;
+            documentTitle = m_documentCaptions.count(documentIndex) ? m_documentCaptions.at(documentIndex) : document->getInfo()->title;
             if (documentTitle.isEmpty())
             {
                 documentTitle = tr("Document %1").arg(documentIndex);
