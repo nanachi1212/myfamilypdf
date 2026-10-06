@@ -998,6 +998,8 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
 #ifdef Q_OS_LINUX
     QSKIP("Editor thumbnail interactions are covered by the Windows runtime job.");
 #endif
+    static int testRunSequence = 0;
+    const int testRun = ++testRunSequence;
     const QString editorPath = m_temp.filePath("thumbnail-management.pdf");
     QVERIFY(writePdfFixture(editorPath, 6));
 
@@ -1090,7 +1092,7 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
     QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     const auto extractAndVerify = [&](const std::vector<pdf::PDFInteger>& pages, const QString& fileName, size_t expectedPageCount)
     {
-        const QString extractedPath = m_temp.filePath(fileName);
+        const QString extractedPath = m_temp.filePath(QString("%1-%2").arg(testRun).arg(fileName));
         QString savedPath;
         int extractionStage = 0;
         QTimer extractionTimer;
@@ -1166,15 +1168,21 @@ void ViewerContextMenuTest::thumbnailSelectionAndPageManagement()
     QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(6));
 
     controller->deletePages({5});
-    const QString modifiedPath = m_temp.filePath("thumbnail-management-saved.pdf");
+    const QString modifiedPath = m_temp.filePath(QString("thumbnail-management-saved-%1.pdf").arg(testRun));
+    QVERIFY(!QFile::exists(modifiedPath));
     QString savedModifiedPath;
     QTimer saveTimer;
     connect(&saveTimer, &QTimer::timeout, &editor, [&]()
     {
         if (auto* save = qobject_cast<QFileDialog*>(QApplication::activeModalWidget()))
         {
-            save->selectFile(modifiedPath);
+            save->setDirectory(QFileInfo(modifiedPath).absolutePath());
+            save->selectFile(QFileInfo(modifiedPath).fileName());
+            if (auto* filename = save->findChild<QLineEdit*>("fileNameEdit"))
+                filename->setText(modifiedPath);
             savedModifiedPath = save->selectedFiles().value(0);
+            if (savedModifiedPath != modifiedPath) return;
+            saveTimer.stop();
             static_cast<QDialog*>(save)->accept();
         }
     });

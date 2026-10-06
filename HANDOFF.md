@@ -1,6 +1,6 @@
 # FamilyPDF AI 交接文件
 
-更新日期：2026-10-05（Asia/Taipei）。本文件是 Claude、Codex 與其他 AI 的共同交接入口。
+更新日期：2026-10-06（Asia/Taipei）。本文件是 Claude、Codex 與其他 AI 的共同交接入口。
 
 ## 接手與更新規則
 
@@ -12,6 +12,7 @@
 
 ## 目前狀態與下一步
 
+- `UnitTestsViewer` 的間歇性 Save As 卡死已用 full dump 與 live non-invasive attach 定位為 test harness lifecycle，不是 search／writer／文件 reset：主執行緒停在 `QFileDialog::accept -> QFileDialogPrivate::itemAlreadyExists -> QMessageBox::warning -> QDialog::exec`；timer 正同步執行 `accept()`，不能重入處理內層 overwrite modal。其他 PDF compiler、file gatherer、watcher 與 thread-pool threads 都在正常 wait。`thumbnailSelectionAndPageManagement` 現為每次 invocation 配置唯一 extract／Save As 輸出，並直接設定 nonnative `fileNameEdit`、在 `accept()` 前停止 timer。Release offscreen 最小序列同 process 20/20、targeted 8/8、完整原順序 3/3（每次 65 passed／4 conditional skips）PASS；尚待 commit／push／PR／CI。
 - 專案：`F:\Projects\Codex project\myfamilypdf`，Windows x64 PDF 閱讀／編輯工具。
 - 「縮圖拖曳重排頁面 v8」已 squash merge（PR #17，main `7cfa289b1f7e2a5c88c695062344c71870896c3d`，Windows／Ubuntu／runtime／CodeQL 全綠），不必重做。
 - 「Merge PDFs v9」已在 branch `feature/merge-pdfs-v9`（自 `7cfa289b` 建出）實作並通過本機驗證；commit／push／PR／CI／squash merge 的狀態見下方「Git 狀態」。本機 `gh` 未登入，由 ChatGPT／使用者建立 PR。
