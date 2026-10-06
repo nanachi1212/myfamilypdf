@@ -30,6 +30,8 @@
 #include "pdfexception.h"
 #include "pdfexecutionpolicy.h"
 
+#include <QLabel>
+#include <QLineEdit>
 #include <QLocale>
 #include <QMessageBox>
 #include <QPageSize>
@@ -83,20 +85,38 @@ void PDFTreeFactory::popItem()
 
 PDFDocumentPropertiesDialog::PDFDocumentPropertiesDialog(const pdf::PDFDocument* document,
                                                          const PDFFileInfo* fileInfo,
-                                                         QWidget* parent) :
+                                                         QWidget* parent,
+                                                         bool canEditInfo) :
     QDialog(parent),
     ui(new Ui::PDFDocumentPropertiesDialog),
     m_document(document)
 {
     ui->setupUi(this);
 
-    initializeProperties(document);
+    initializeProperties(document, canEditInfo);
     initializeFileInfoProperties(fileInfo);
     initializeSecurity(document);
     initializeFonts(document);
     initializeDisplayAndPrintSettings(document);
     initializeXMPMetadata(document);
     connect(ui->xmpMetadataDefaultPushButton, &QPushButton::clicked, this, &PDFDocumentPropertiesDialog::createDefaultXMPMetadata);
+
+    if (!m_infoEditors.empty())
+    {
+        // Information dictionary and XMP are independent; we don't synchronize them,
+        // so warn (without blocking) that readers preferring XMP may show other values.
+        m_xmpMismatchLabel = new QLabel(tr("This PDF also contains XMP metadata. Some readers show XMP first, so the displayed title or author may differ from these values."), this);
+        m_xmpMismatchLabel->setObjectName("xmpMismatchLabel");
+        m_xmpMismatchLabel->setWordWrap(true);
+        m_xmpMismatchLabel->setVisible(false);
+        ui->propertiesGroupBoxLayout->addWidget(m_xmpMismatchLabel);
+
+        for (const InfoEditor& editor : m_infoEditors)
+        {
+            connect(editor.edit, &QLineEdit::textChanged, this, &PDFDocumentPropertiesDialog::updateXMPMismatchHint);
+        }
+        connect(ui->xmpMetadataPlainTextEdit, &QPlainTextEdit::textChanged, this, &PDFDocumentPropertiesDialog::updateXMPMismatchHint);
+    }
 
     const int minimumSectionSize = pdf::PDFWidgetUtils::scaleDPI_x(this, 300);
     for (QTreeWidget* widget : findChildren<QTreeWidget*>(QString(), Qt::FindChildrenRecursively))
@@ -114,24 +134,51 @@ PDFDocumentPropertiesDialog::~PDFDocumentPropertiesDialog()
     delete ui;
 }
 
-void PDFDocumentPropertiesDialog::initializeProperties(const pdf::PDFDocument* document)
+void PDFDocumentPropertiesDialog::initializeProperties(const pdf::PDFDocument* document, bool canEditInfo)
 {
     QLocale locale;
 
     // Initialize document properties
-    QTreeWidgetItem* propertiesRoot = new QTreeWidgetItem({ tr("Properties") });
+    QTreeWidgetItem* propertiesRoot = new QTreeWidgetItem({ tr("Document information") });
+    QTreeWidgetItem* systemRoot = new QTreeWidgetItem({ tr("System information") });
 
     const pdf::PDFDocumentInfo* info = document->getInfo();
     const pdf::PDFCatalog* catalog = document->getCatalog();
-    new QTreeWidgetItem(propertiesRoot, { tr("PDF version"), QString::fromLatin1(document->getVersion()) });
-    new QTreeWidgetItem(propertiesRoot, { tr("Title"), info->title });
-    new QTreeWidgetItem(propertiesRoot, { tr("Subject"), info->subject });
-    new QTreeWidgetItem(propertiesRoot, { tr("Author"), info->author });
-    new QTreeWidgetItem(propertiesRoot, { tr("Keywords"), info->keywords });
-    new QTreeWidgetItem(propertiesRoot, { tr("Creator"), info->creator });
-    new QTreeWidgetItem(propertiesRoot, { tr("Producer"), info->producer });
-    new QTreeWidgetItem(propertiesRoot, { tr("Creation date"), locale.toString(info->creationDate) });
-    new QTreeWidgetItem(propertiesRoot, { tr("Modified date"), locale.toString(info->modifiedDate) });
+
+    const std::pair<const char*, QString> infoEntries[] = {
+        { "Title", info->title },
+        { "Subject", info->subject },
+        { "Author", info->author },
+        { "Keywords", info->keywords },
+        { "Creator", info->creator },
+    };
+    const QString infoCaptions[] = { tr("Title"), tr("Subject"), tr("Author"), tr("Keywords"), tr("Creator") };
+
+    std::vector<std::pair<QTreeWidgetItem*, QLineEdit*>> itemEditors;
+    for (size_t i = 0; i < std::size(infoEntries); ++i)
+    {
+        const auto& [key, value] = infoEntries[i];
+        if (canEditInfo)
+        {
+            QTreeWidgetItem* item = new QTreeWidgetItem(propertiesRoot, { infoCaptions[i] });
+            QLineEdit* edit = new QLineEdit(value, this);
+            edit->setObjectName(QStringLiteral("info%1Edit").arg(QString::fromLatin1(key)));
+            m_infoEditors.push_back({ QByteArray(key), value, edit });
+            itemEditors.emplace_back(item, edit);
+        }
+        else
+        {
+            new QTreeWidgetItem(propertiesRoot, { infoCaptions[i], value });
+        }
+    }
+
+    const QString automaticToolTip = tr("Updated automatically when the document is changed.");
+    new QTreeWidgetItem(systemRoot, { tr("PDF version"), QString::fromLatin1(document->getVersion()) });
+    QTreeWidgetItem* producerItem = new QTreeWidgetItem(systemRoot, { tr("Producer"), info->producer });
+    new QTreeWidgetItem(systemRoot, { tr("Creation date"), locale.toString(info->creationDate) });
+    QTreeWidgetItem* modifiedItem = new QTreeWidgetItem(systemRoot, { tr("Modified date"), locale.toString(info->modifiedDate) });
+    producerItem->setToolTip(1, automaticToolTip);
+    modifiedItem->setToolTip(1, automaticToolTip);
 
     QString trapped;
     switch (info->trapped)
@@ -170,7 +217,14 @@ void PDFDocumentPropertiesDialog::initializeProperties(const pdf::PDFDocument* d
     new QTreeWidgetItem(contentRoot, { tr("Trapped"), trapped });
 
     ui->propertiesTreeWidget->addTopLevelItem(propertiesRoot);
+    ui->propertiesTreeWidget->addTopLevelItem(systemRoot);
     ui->propertiesTreeWidget->addTopLevelItem(contentRoot);
+
+    // Item widgets can be set only when the item is already in the tree
+    for (const auto& [item, edit] : itemEditors)
+    {
+        ui->propertiesTreeWidget->setItemWidget(item, 1, edit);
+    }
 
     if (!info->extra.empty())
     {
@@ -748,6 +802,25 @@ QByteArray PDFDocumentPropertiesDialog::getXMPMetadata() const
 bool PDFDocumentPropertiesDialog::isXMPMetadataModified() const
 {
     return ui->xmpMetadataPlainTextEdit->toPlainText() != m_originalXMPMetadataText;
+}
+
+std::vector<std::pair<QByteArray, QString>> PDFDocumentPropertiesDialog::getModifiedInfoEntries() const
+{
+    std::vector<std::pair<QByteArray, QString>> result;
+    for (const InfoEditor& editor : m_infoEditors)
+    {
+        if (editor.edit->text() != editor.originalValue)
+        {
+            result.emplace_back(editor.key, editor.edit->text());
+        }
+    }
+    return result;
+}
+
+void PDFDocumentPropertiesDialog::updateXMPMismatchHint()
+{
+    const bool hasXMP = m_hasOriginalXMPMetadataStream || !ui->xmpMetadataPlainTextEdit->toPlainText().isEmpty();
+    m_xmpMismatchLabel->setVisible(hasXMP && !getModifiedInfoEntries().empty());
 }
 
 }   // namespace pdfviewer

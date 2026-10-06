@@ -1969,17 +1969,68 @@ void PDFProgramController::onActionPropertiesTriggered()
 {
     Q_ASSERT(m_pdfDocument);
 
-    PDFDocumentPropertiesDialog documentPropertiesDialog(m_pdfDocument.data(), &m_fileInfo, m_mainWindow);
-    if (documentPropertiesDialog.exec() == QDialog::Accepted && documentPropertiesDialog.isXMPMetadataModified())
+    // Document information is editable only in the editor (it has undo/redo) and when modification is permitted
+    const bool canEditInfo = m_undoRedoManager &&
+                             m_pdfDocument->getStorage().getSecurityHandler()->isAllowed(pdf::PDFSecurityHandler::Permission::Modify);
+    PDFDocumentPropertiesDialog documentPropertiesDialog(m_pdfDocument.data(), &m_fileInfo, m_mainWindow, canEditInfo);
+    if (documentPropertiesDialog.exec() != QDialog::Accepted)
+    {
+        return;
+    }
+
+    const bool isXMPMetadataModified = documentPropertiesDialog.isXMPMetadataModified();
+    const std::vector<std::pair<QByteArray, QString>> infoEntries = documentPropertiesDialog.getModifiedInfoEntries();
+    if (isXMPMetadataModified || !infoEntries.empty())
     {
         pdf::PDFDocumentModifier modifier(m_pdfDocument.data());
         pdf::PDFDocumentBuilder* builder = modifier.getBuilder();
-        builder->setCatalogMetadata(documentPropertiesDialog.getXMPMetadata());
+        if (isXMPMetadataModified)
+        {
+            builder->setCatalogMetadata(documentPropertiesDialog.getXMPMetadata());
+        }
+
+        for (const auto& [key, value] : infoEntries)
+        {
+            if (value.isEmpty())
+            {
+                // setDocumentTitle("") etc. would store an empty string; a null value removes the entry
+                pdf::PDFObjectFactory factory;
+                factory.beginDictionary();
+                factory.beginDictionaryItem(key);
+                factory << nullptr;
+                factory.endDictionaryItem();
+                factory.endDictionary();
+                builder->updateDocumentInfo(factory.takeObject());
+            }
+            else if (key == "Title")
+            {
+                builder->setDocumentTitle(value);
+            }
+            else if (key == "Author")
+            {
+                builder->setDocumentAuthor(value);
+            }
+            else if (key == "Subject")
+            {
+                builder->setDocumentSubject(value);
+            }
+            else if (key == "Keywords")
+            {
+                builder->setDocumentKeywords(value);
+            }
+            else if (key == "Creator")
+            {
+                builder->setDocumentCreator(value);
+            }
+        }
 
         modifier.markReset();
         if (modifier.finalize())
         {
-            pdf::PDFModifiedDocument document(modifier.getDocument(), m_optionalContentActivity, modifier.getFlags());
+            // Reset alone clears the undo history; metadata changes must be undoable
+            pdf::PDFModifiedDocument::ModificationFlags flags = modifier.getFlags();
+            flags.setFlag(pdf::PDFModifiedDocument::PreserveUndoRedo);
+            pdf::PDFModifiedDocument document(modifier.getDocument(), m_optionalContentActivity, flags);
             onDocumentModified(qMove(document));
         }
     }

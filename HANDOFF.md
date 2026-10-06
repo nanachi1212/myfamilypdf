@@ -12,12 +12,32 @@
 
 ## 目前狀態與下一步
 
-- `UnitTestsViewer` 的間歇性 Save As 卡死已用 full dump 與 live non-invasive attach 定位為 test harness lifecycle，不是 search／writer／文件 reset：主執行緒停在 `QFileDialog::accept -> QFileDialogPrivate::itemAlreadyExists -> QMessageBox::warning -> QDialog::exec`；timer 正同步執行 `accept()`，不能重入處理內層 overwrite modal。其他 PDF compiler、file gatherer、watcher 與 thread-pool threads 都在正常 wait。`thumbnailSelectionAndPageManagement` 現為每次 invocation 配置唯一 extract／Save As 輸出，並直接設定 nonnative `fileNameEdit`、在 `accept()` 前停止 timer。Release offscreen 最小序列同 process 20/20、targeted 8/8、完整原順序 3/3（每次 65 passed／4 conditional skips）PASS；尚待 commit／push／PR／CI。
+- **v10「PDF Metadata 表單編輯」**：branch `feature/metadata-editor-v10`（自 main `6f71b077` 建出），本機實作與驗證完成；commit／push／PR／CI 狀態見「Git 狀態」。細節見下方「v10 已交付內容」。
+- `UnitTestsViewer` 間歇性 Save As 卡死（test harness lifecycle）已修並 merge（PR #19，main `6f71b077`）。
 - 專案：`F:\Projects\Codex project\myfamilypdf`，Windows x64 PDF 閱讀／編輯工具。
 - 「縮圖拖曳重排頁面 v8」已 squash merge（PR #17，main `7cfa289b1f7e2a5c88c695062344c71870896c3d`，Windows／Ubuntu／runtime／CodeQL 全綠），不必重做。
-- 「Merge PDFs v9」已在 branch `feature/merge-pdfs-v9`（自 `7cfa289b` 建出）實作並通過本機驗證；commit／push／PR／CI／squash merge 的狀態見下方「Git 狀態」。本機 `gh` 未登入，由 ChatGPT／使用者建立 PR。
+- 「Merge PDFs v9」已 squash merge（PR #18，main `2e0f9c86`），不必重做。
 - 先前「列印與圖片匯出 v7」已 merge（PR #15，squash，merge commit `60be9699b42d01a42b7860e153ccd77868b191b1`），不必重做 v6／v7。
 - `.ai-memory.toml` 是使用者原有 untracked 檔案，保留，不修改、不提交。
+
+## v10 已交付內容（PDF Metadata 表單編輯）
+
+- Editor 的 File → Properties：Info 的 Title／Author／Subject／Keywords／Creator 以 `QLineEdit` 編輯（`pdfdocumentpropertiesdialog.*`，`canEditInfo` 參數；物件名 `info<Key>Edit`）。樹狀分「文件資訊」與「系統資訊」；PDF version／Producer／Creation date／Modified date 一律唯讀，Producer 與 ModDate 有 tooltip「文件變更時自動更新」。
+- 可編輯條件＝有 Undo/Redo（只有 Editor）且安全性 `isAllowed(Modify)`；Viewer 或無修改權限時與以前相同為純文字。原 raw XMP 編輯器行為不變（Viewer 也仍可改 XMP，沿用上游）。
+- 寫回在 `PDFProgramController::onActionPropertiesTriggered` 的同一個 `PDFDocumentModifier`（XMP＋Info 一個 transaction、一個 Undo step）。非空值重用 `setDocumentTitle/Author/Subject/Keywords/Creator`（`createTextString`：非 PDFDocEncoding 自動 UTF-16BE）。Cancel 或值與原值相同 → 不建立 modification、不進 Undo。
+- **空值語意（實測）**：`setDocumentTitle("")` 會寫入空字串（key 仍在）；所以清空時改用 `updateDocumentInfo({Key: null})`，`mergeTo` 的 `RemoveNullObjects` 會真正刪除 key。存檔重開後 key 不存在。
+- **Producer／日期（實測）**：`PDFDocumentBuilder::build()` 的 `updateTrailerDictionary` 每次修改都覆寫 Producer 與 ModDate；CreationDate 保留不變（測試以秒比對）。
+- **Undo 修正**：原本 Properties 寫回只標 `Reset`，`setDocument` 在沒有 `PreserveUndoRedo` 時會清空整個 Undo 歷史（上游既有問題，XMP 修改也受影響）。現在加上 `PreserveUndoRedo`，與 Optimize／Sanitize 相同。
+- **XMP 政策**：v10 不同步、不 parse、不改寫 XMP。文件有 XMP（原有或對話框內已輸入）且 Info 有變動時，Properties 分頁顯示非阻塞提示 `xmpMismatchLabel`；不阻止儲存、不跳 modal。
+- **簽章／加密**：沒有既有的「簽章文件修改警告」；metadata 修改走共同的 `onDocumentModified`，依 v6 政策清除舊位元組版本的驗證結果，full-rewrite 存檔不保留原簽章有效性，未新增第二套警告。可修改的加密文件編輯後 Save As 仍為加密、重開值正確；無 Modify 權限時 Info 唯讀。
+- `PDFDocumentPropertiesDialog` 加上 `PDF4QTLIBGUILIBSHARED_EXPORT`（測試需要，與 v7–v9 對話框一致）。繁中／簡中翻譯已補 4 個字串。未改 writer／parser／加密／簽章核心，未新增或升級 dependency。
+
+## v10 驗證證據（本機 Release）
+
+- `UnitTestsViewer` 新增 6 項：`metadataEditSaveUndoRedo`（五欄位含繁中／日文／emoji、系統欄位唯讀、單一 Undo 還原全部、Redo、Save As → 重開、CreationDate 不變、Producer／ModDate 合法）、`metadataEmptyFieldRemovesEntry`（確認 setter 留空字串；對話框清空 → Save → 重開 key 不存在）、`metadataCancelAndUnchangedAreNoOps`、`metadataXMPMismatchHint`（提示顯示／隱藏、XMP bytes 不變、XMP＋Info 同一 Undo step、無 XMP 不提示）、`metadataViewerIsReadOnly`、`metadataSignedAndEncryptedDocuments`（pyhanko 簽章 fixture、AES-256 加密 roundtrip、無 Modify 權限唯讀）：offscreen 6/6 PASS，`QT_QPA_PLATFORM=windows` 原生視窗 6/6 PASS（無截圖）。
+- 回歸 PASS：`menuActionsOperateOnTheDocument`、`traditionalChineseMenuAndSvgResources`、`annotationNoteWorkflow`、`formWorkflow`、`signaturePresentation`、`signatureVerificationWorkflow`、`formValidationAndMalformed`、`reorderPreservesContentAfterSave`、`thumbnailSelectionAndPageManagement`、`viewerThumbnailsAreReadOnly`；`UnitTestsDocumentEdit` 5、`UnitTestsForms` 4、`UnitTestsSecurity` 6、`UnitTestsBookmarks` 20。編譯後 zh_TW／zh_CN `.qm` 已含新字串。
+- NOT_TESTED：完整 `UnitTestsViewer`／完整 CTest（交給 CI）、`dist/FamilyPDF` 封裝更新、人工目視 Properties 版面。
+- 本機 build 注意：`rules.ninja` 的 `msvc_deps_prefix` 目前又是亂碼（header 依賴不追蹤）；本輪改 header 後以 touch 相關 `.cpp` 強制重編。
 
 ## v9 已交付內容（Merge PDFs）
 
@@ -73,9 +93,10 @@
 
 ## Git 狀態
 
-- v9：branch `feature/merge-pdfs-v9`（本機驗證完成；commit／push／PR 狀態以 `git log`／GitHub 為準，見最終回報）。
+- v10：branch `feature/metadata-editor-v10`，本機驗證完成；commit／push／PR／CI／merge 以 `git log`／GitHub 為準。CI 全綠前不得 merge。
+- v9：PR #18 已 squash merge（`2e0f9c86`）；Save As 測試卡死修正 PR #19（`6f71b077`）。
 - v8：PR #17 已 squash merge（`7cfa289b`）。
-- v7：PR #15 已 squash merge 為 `60be9699`，本機 `main` 已同步，feature branch 已刪除（本機與遠端）。本機 `gh` 仍未登入，無法自行建立 PR 或查 CI；merge 由使用者在 GitHub 完成。
+- v7：PR #15 已 squash merge 為 `60be9699`。本機 `gh` 已登入 `nanachi1212`（2026-10-06 確認）。
 
 ## 限制與接手注意事項
 
