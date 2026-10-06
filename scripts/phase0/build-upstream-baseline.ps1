@@ -28,18 +28,7 @@ $VcpkgRoot = Join-Path $ToolsRoot 'vcpkg'
 $VcpkgToolchain = Join-Path $VcpkgRoot 'scripts\buildsystems\vcpkg.cmake'
 $VsWhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
 $Targets = @(
-    'PdfTool',
-    'Pdf4QtViewer',
-    'Pdf4QtEditor',
-    'Pdf4QtPageMaster',
-    'Pdf4QtDiff',
-    'EditorPlugin',
-    'RedactPlugin',
-    'SignaturePlugin',
-    'FormPlugin',
-    'DocumentEditPlugin',
-    'OfficeExportPlugin',
-    'FamilyPDFValidationTests',
+    'all',
     'release_translations'
 )
 
@@ -270,10 +259,11 @@ if ($Stage -in @('All', 'Configure')) {
         "-DCMAKE_PREFIX_PATH=$QtPrefix",
         "-DPDF4QT_QT_ROOT=$QtPrefix",
         '-DPDF4QT_BUILD_TESTS=ON',
-        '-DPDF4QT_INSTALL_PREPARE_WIX_INSTALLER=OFF',
-        '-DPDF4QT_INSTALL_MSVC_REDISTRIBUTABLE=OFF',
-        '-DPDF4QT_INSTALL_DEPENDENCIES=OFF',
-        '-DPDF4QT_INSTALL_QT_DEPENDENCIES=OFF'
+        '-DPDF4QT_INSTALL_PREPARE_WIX_INSTALLER=ON',
+        '-DPDF4QT_INSTALL_MSVC_REDISTRIBUTABLE=ON',
+        '-DPDF4QT_INSTALL_DEPENDENCIES=ON',
+        '-DPDF4QT_INSTALL_QT_DEPENDENCIES=ON',
+        '-DPDF4QT_INSTALL_TO_USR=ON'
     )
     $configureLog = Join-Path $BuildDirectory 'configure.log'
     Invoke-LoggedNative -FilePath $Cmake -ArgumentList $configureArguments -LogPath $configureLog
@@ -306,6 +296,17 @@ if ($Stage -in @('All', 'Test')) {
     Invoke-LoggedNative -FilePath $Cmake -ArgumentList $testArguments -LogPath $testLog
     $stopwatch.Stop()
     $metrics | Add-Member -NotePropertyName test_seconds -NotePropertyValue ([math]::Round($stopwatch.Elapsed.TotalSeconds, 3)) -Force
+}
+
+if ($Stage -eq 'All') {
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $installLog = Join-Path $BuildDirectory 'install.log'
+    Invoke-LoggedNative -FilePath $Cmake -ArgumentList @(
+        '--install', $BuildDirectory,
+        '--config', 'Release'
+    ) -LogPath $installLog
+    $stopwatch.Stop()
+    $metrics | Add-Member -NotePropertyName install_seconds -NotePropertyValue ([math]::Round($stopwatch.Elapsed.TotalSeconds, 3)) -Force
 }
 
 $metrics | Add-Member -NotePropertyName build_directory -NotePropertyValue $BuildDirectory -Force
