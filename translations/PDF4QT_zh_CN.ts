@@ -14167,6 +14167,8 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <translation>批注</translation>
     </message>
     <message><source>Export Selection as Image...</source><translation>将选中范围导出为图片...</translation></message>
+    <message><source>Insert Blank Page...</source><translation>插入空白页...</translation></message>
+    <message><source>Insert Pages from PDF...</source><translation>从 PDF 插入页面...</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFEncryptionSettingsDialog</name>
@@ -14517,6 +14519,9 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>%1 page(s) were sent to the printer.</source><translation>已将 %1 页发送到打印机。</translation></message>
     <message><source>Select some text first, then export the selection as an image.</source><translation>请先选中文字，再将选中范围导出为图片。</translation></message>
     <message><source>The selection has no visible area to export.</source><translation>选中范围没有可导出的可见区域。</translation></message>
+    <message><source>Insert Blank Page</source><translation>插入空白页</translation></message>
+    <message><source>Insert Pages from PDF</source><translation>从 PDF 插入页面</translation></message>
+    <message><source>Insert the pages?</source><translation>要插入这些页面吗？</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFRecentFileManager</name>
@@ -15043,6 +15048,8 @@ Do you want to perform this action?</source>
     </message>
     <message><source>Print Selected Pages...</source><translation>打印选中的页面...</translation></message>
     <message><source>Export Selected Pages as Images...</source><translation>将选中的页面导出为图片...</translation></message>
+    <message><source>Insert Blank Page...</source><translation>插入空白页...</translation></message>
+    <message><source>Insert Pages from PDF...</source><translation>从 PDF 插入页面...</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFViewerMainWindow</name>
@@ -15652,5 +15659,65 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>将使用最�
     <message><source>The merge was cancelled. No file was written.</source><translation>已取消合并，未写入任何文件。</translation></message>
     <message><source>The merge failed. No file was written.</source><translation>合并失败，未写入任何文件。</translation></message>
     <message><source>No file was written.</source><translation>未写入任何文件。</translation></message>
+</context>
+<context>
+    <name>pdf::PDFPageInserter</name>
+    <message><source>The page tree of the current document cannot be changed safely.</source><translation>当前文档的页面树结构无法安全修改。</translation></message>
+    <message><source>The selected pages refer to other parts of the PDF in a way that cannot be separated safely.</source><translation>选取的页面与此 PDF 的其他部分相互引用，无法安全分离。</translation></message>
+    <message><source>The selected pages of this PDF contain form fields and cannot be inserted safely yet.</source><translation>此 PDF 的选取页面包含表单字段，目前无法安全插入。</translation></message>
+    <message><source>This PDF is digitally signed. Pages of signed PDFs cannot be inserted yet.</source><translation>此 PDF 含有数字签名，目前无法插入已签名 PDF 的页面。</translation></message>
+    <message><source>This PDF is a tagged (accessible) PDF. Pages of tagged PDFs cannot be inserted yet.</source><translation>此 PDF 为标记（无障碍）PDF，目前无法插入标记 PDF 的页面。</translation></message>
+    <message><source>The selected pages use optional content (layers) and cannot be inserted yet.</source><translation>选取的页面使用可选内容（图层），目前无法插入。</translation></message>
+    <message><source>The selected pages contain multimedia or 3D content and cannot be inserted yet.</source><translation>选取的页面包含多媒体或 3D 内容，目前无法插入。</translation></message>
+    <message><source>The selected pages contain JavaScript, launch or other actions that cannot be inserted.</source><translation>选取的页面包含 JavaScript、启动程序或其他无法插入的动作。</translation></message>
+    <message><source>No pages selected.</source><translation>尚未选取页面。</translation></message>
+    <message><source>Page %1 is selected more than once. Each page can be inserted only once.</source><translation>第 %1 页被选取了不止一次。每一页只能插入一次。</translation></message>
+    <message><source>No document is open.</source><translation>没有打开的文档。</translation></message>
+    <message><source>The current document contains an XFA form. Pages cannot be inserted into it.</source><translation>当前文档包含 XFA 表单，无法插入页面。</translation></message>
+    <message><source>The current document does not allow inserting pages.</source><translation>当前文档的权限不允许插入页面。</translation></message>
+    <message><source>The page labels of the current document cannot be read reliably. Pages are not inserted, so the labels do not change.</source><translation>无法可靠读取当前文档的页面标签。为避免标签被改变，不会插入页面。</translation></message>
+    <message><source>A bookmark of the current document points to a page number instead of a page. Inserting pages would change where it leads.</source><translation>当前文档有书签以页码（而非页面）指定目标，插入页面会改变它链接到的位置。</translation></message>
+    <message><source>The current document is a tagged (accessible) PDF. Pages of other PDFs cannot be inserted into it yet; blank pages can.</source><translation>当前文档为标记（无障碍）PDF，目前无法插入其他 PDF 的页面；可以插入空白页。</translation></message>
+    <message><source>The PDF could not be opened.</source><translation>无法打开此 PDF。</translation></message>
+    <message><source>The permissions of this PDF do not allow copying and assembling its pages.</source><translation>此 PDF 的权限不允许复制及组合其页面。</translation></message>
+    <message><source>Invalid insert position or page size.</source><translation>插入位置或页面大小无效。</translation></message>
+    <message><source>The page could not be inserted.</source><translation>无法插入页面。</translation></message>
+    <message><source>The page could not be inserted: %1</source><translation>无法插入页面：%1</translation></message>
+    <message><source>Invalid insert position.</source><translation>插入位置无效。</translation></message>
+    <message><source>Invalid page selection.</source><translation>页面选取无效。</translation></message>
+    <message><source>Page %1 of the PDF cannot be read.</source><translation>无法读取此 PDF 的第 %1 页。</translation></message>
+    <message><source>The pages could not be inserted.</source><translation>无法插入这些页面。</translation></message>
+    <message><source>The pages could not be inserted: %1</source><translation>无法插入这些页面：%1</translation></message>
+    <message><source>%1 link(s) on the inserted pages lead to pages that are not inserted. They stay visible but no longer jump anywhere.</source><translation>插入页面上有 %1 个链接指向未插入的页面。这些链接仍会显示，但不再跳转。</translation></message>
+    <message><source>The inserted pages will no longer have the encryption of the source PDF.</source><translation>来源页面插入后将不再保留来源 PDF 的加密保护。</translation></message>
+</context>
+<context>
+    <name>pdfviewer::PDFInsertPagesDialog</name>
+    <message><source>Insert Blank Page</source><translation>插入空白页</translation></message>
+    <message><source>Insert Pages from PDF</source><translation>从 PDF 插入页面</translation></message>
+    <message><source>A4 (210 × 297 mm)</source><translation>A4（210 × 297 mm）</translation></message>
+    <message><source>Size:</source><translation>大小：</translation></message>
+    <message><source>Browse...</source><translation>浏览...</translation></message>
+    <message><source>File:</source><translation>文件：</translation></message>
+    <message><source>Choose one PDF file.</source><translation>请选择一个 PDF 文件。</translation></message>
+    <message><source>all, or for example 3,1 or 2-5</source><translation>all，或例如 3,1、2-5</translation></message>
+    <message><source>Pages are inserted in the order typed. Each page can be used once.</source><translation>页面按输入顺序插入，每一页只能使用一次。</translation></message>
+    <message><source>Pages:</source><translation>页面：</translation></message>
+    <message><source>Before page %1</source><translation>第 %1 页之前</translation></message>
+    <message><source>After page %1</source><translation>第 %1 页之后</translation></message>
+    <message><source>At the beginning of the document</source><translation>文档开头</translation></message>
+    <message><source>At the end of the document</source><translation>文档末尾</translation></message>
+    <message><source>Position:</source><translation>位置：</translation></message>
+    <message><source>Encrypted document</source><translation>已加密的文档</translation></message>
+    <message><source>Enter password to access document content</source><translation>请输入密码以访问文档内容</translation></message>
+    <message><source>%1: %2</source><translation>%1：%2</translation></message>
+    <message><source>%1 has %2 pages.</source><translation>%1 共有 %2 页。</translation></message>
+    <message><source>Choose a PDF file first.</source><translation>请先选择 PDF 文件。</translation></message>
+    <message><source>Same as page %1</source><translation>与第 %1 页相同</translation></message>
+    <message><source>Same as page %1 (%2 × %3 mm)</source><translation>与第 %1 页相同（%2 × %3 mm）</translation></message>
+    <message><source>The new page becomes page %1 of %2.</source><translation>新页面将成为第 %1 页（共 %2 页）。</translation></message>
+    <message><source>The inserted pages start at page %1.</source><translation>插入的页面从第 %1 页开始。</translation></message>
+    <message><source>The inserted pages become pages %1–%2 of %3.</source><translation>插入的页面将成为第 %1–%2 页（共 %3 页）。</translation></message>
+    <message><source>PDF document (*.pdf)</source><translation>PDF 文档 (*.pdf)</translation></message>
 </context>
 </TS>
