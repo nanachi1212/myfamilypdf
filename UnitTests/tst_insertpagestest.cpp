@@ -1103,6 +1103,10 @@ void InsertPagesTest::activeContentIsBlocked()
         "<< /Type /Annot /Subtype /Square /Rect [0 0 10 10] /AA << /E << /S /URI /URI (x) >> >> >>",
         "<< /Type /Annot /Subtype /RichMedia /Rect [0 0 10 10] >>",
         "<< /Type /Annot /Subtype /Screen /Rect [0 0 10 10] >>",
+        "<< /Type /Annot /Subtype /Link /Rect [0 0 10 10] /PA << /S /Launch /F (cmd.exe) >> >>",
+        "<< /Type /Annot /Subtype /Link /Rect [0 0 10 10] /PA << /S /GoToR /F (other.pdf) /D [0 /Fit] >> >>",
+        "<< /Type /Annot /Subtype /Square /Rect [0 0 10 10] /Private << /Hidden << /S /Launch /F (cmd.exe) >> >> >>",
+        "<< /Type /Annot /Subtype /Link /Rect [0 0 10 10] /A << /S /GoTo /D [0 /Fit] /Next [<< /S /Launch /F (x) >>] >> >>",
     };
     int index = 0;
     for (const QByteArray& annotation : annotations)
@@ -1347,6 +1351,20 @@ void InsertPagesTest::pageLabelsPreserved()
     const pdf::PDFDocumentPointer brokenTarget = openDocument(writeFixture("labels-broken.pdf", broken.build()));
     QVERIFY(!PDFPageInserter::insertBlankPage(brokenTarget.data(), 1, QRectF(0, 0, 100, 100), QRectF(), pdf::PageRotation::None, &result));
     QVERIFY(!result);
+
+    // Huge start numbers (Roman numerals and letters grow with the number): refused at once.
+    for (const QByteArray& nums : { QByteArray("[0 << /S /A /St 500000 >>]"), QByteArray("[0 << /S /R /St 200000 >>]"),
+                                    QByteArray("[0 << /S /D /St 2000000000 >>]") })
+    {
+        Fixture huge("H", 2);
+        huge.catalogExtra = " /PageLabels << /Nums " + nums + " >>";
+        const pdf::PDFDocumentPointer hugeTarget = openDocument(writeFixture("labels-huge.pdf", huge.build()));
+        QVERIFY(hugeTarget);
+        QElapsedTimer timer;
+        timer.start();
+        QVERIFY(!PDFPageInserter::insertBlankPage(hugeTarget.data(), 1, QRectF(0, 0, 100, 100), QRectF(), pdf::PageRotation::None, &result));
+        QVERIFY(timer.elapsed() < 1000);
+    }
 }
 
 void InsertPagesTest::failureLeavesTargetUnchanged()

@@ -116,11 +116,19 @@ PageLabels readPageLabels(const PDFDocument* document)
     result.ranges = PDFNumberTreeLoader<PDFPageLabel>::parse(&document->getStorage(), catalog->get("PageLabels"));
     // The ranges must start at the first page and be unique. An entry that is not a label dictionary is parsed as an
     // empty label of page 0 with start 0, so it shows up here as a duplicate or as an invalid start number.
+    // Start numbers are bounded: Roman numerals and letters grow with the number (a huge /St would make the label text
+    // huge), and the label arithmetic must not overflow.
+    const PDFInteger pageCount = PDFInteger(document->getCatalog()->getPageCount());
     result.valid = !result.ranges.empty() && result.ranges.front().getPageIndex() == 0;
     for (size_t i = 0; result.valid && i < result.ranges.size(); ++i)
     {
-        result.valid = result.ranges[i].getPageStartNumber() >= 1 &&
-                       (i == 0 || result.ranges[i].getPageIndex() > result.ranges[i - 1].getPageIndex());
+        const PDFPageLabel& range = result.ranges[i];
+        const bool decimal = range.getNumberingStyle() == PDFPageLabel::NumberingStyle::DecimalArabic ||
+                             range.getNumberingStyle() == PDFPageLabel::NumberingStyle::None;
+        const PDFInteger maximumStart = decimal ? PDFInteger(1000000000) : PDFInteger(100000);
+        result.valid = range.getPageStartNumber() >= 1 && range.getPageStartNumber() <= maximumStart &&
+                       range.getPageIndex() <= pageCount &&
+                       (i == 0 || range.getPageIndex() > result.ranges[i - 1].getPageIndex());
     }
     return result;
 }
@@ -492,8 +500,14 @@ QString validateReachableGraph(const PDFObjectStorage* storage, const std::set<P
         {
             return PDFPageInserter::tr("The selected pages contain multimedia or 3D content and cannot be inserted yet.");
         }
+        // An action can sit under any key (/A, /PA, /Next, name trees...): every dictionary whose /S is an action type,
+        // or that is stored where actions are stored, is an action. Only URI and GoTo without a chain are allowed.
+        static const std::set<QByteArray> actionTypes = { "GoTo", "GoToR", "GoToE", "GoToDp", "Launch", "Thread", "URI", "Sound", "Movie",
+                                                          "Hide", "Named", "SubmitForm", "ResetForm", "ImportData", "JavaScript",
+                                                          "SetOCGState", "Rendition", "Trans", "GoTo3DView", "RichMediaExecute" };
         const QByteArray actionType = getName(storage, dictionary, "S");
-        const bool isAction = type == "Action" || ((parentKey == "A" || parentKey == "Next") && !actionType.isEmpty());
+        const bool isAction = type == "Action" || actionTypes.count(actionType) ||
+                              ((parentKey == "A" || parentKey == "PA" || parentKey == "Next") && dictionary->hasKey("S"));
         if (dictionary->hasKey("AA") || dictionary->hasKey("JS") ||
             (isAction && ((actionType != "URI" && actionType != "GoTo") || dictionary->hasKey("Next"))))
         {

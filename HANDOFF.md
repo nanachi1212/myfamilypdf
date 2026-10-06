@@ -35,11 +35,11 @@
 
 ## v11 驗證證據（本機 Release）
 
-- `UnitTestsInsertPages`（新，Core 引擎，寫出後讀回）：32/32 PASS（Windows 平台與 ctest offscreen 皆 PASS）。涵蓋需求清單 1–7、9–35、37、38（Undo／Redo、Viewer 在 GUI 測試），特別 assertion：5 頁來源只選第 3 頁 → 輸出 Page 物件＝target＋1、其他頁的唯一文字串不在任何 stream、無 Bead／Thread、只新增 6 個物件（頁、內容、字型、註解×2、Info）。
+- `UnitTestsInsertPages`（新，Core 引擎，寫出後讀回）：`QT_QPA_PLATFORM=windows` 32/32 PASS；offscreen（CI 方式）31 PASS＋1 SKIP（`embeddedFontProgram`：offscreen 下 Qt 沒有可嵌入的字型，屬預期）。涵蓋需求清單 1–7、9–35、37、38（Undo／Redo、Viewer 在 GUI 測試），特別 assertion：5 頁來源只選第 3 頁 → 輸出 Page 物件＝target＋1、其他頁的唯一文字串不在任何 stream、無 Bead／Thread、只新增 6 個物件（頁、內容、字型、註解×2、Info）。
 - `UnitTestsViewer` 新增 7 項：`insertPagesViewerIsReadOnly`、`insertPagesEditorEntries`、`insertPagesEditorBlankWorkflow`、`insertPagesEditorFromPdfWorkflow`、`insertPagesEditorFailureAndWarnings`、`insertPagesEditorUndoMemory`、`insertPagesEditorTranslations`：offscreen 7/7 PASS；`QT_QPA_PLATFORM=windows` 原生視窗 6/6 PASS（不含量測項，無截圖）。
 - 回歸 smoke PASS（同一行程 49/49）：v8 `pageReorder*`、`thumbnailReorderWorkflow`、`reorderPreservesContentAfterSave`、`reorderFlattensNestedPageTree`、`viewerThumbnailsAreReadOnly`；刪除／旋轉／提取 `thumbnailSelectionAndPageManagement`；v9 `mergePdfs*` 6 項；v10 `metadata*` 6 項；`formWorkflow`、`signatureVerificationWorkflow`、`menuActionsOperateOnTheDocument`、`traditionalChineseMenuAndSvgResources`；`UnitTestsMergePdfs` 45＋1 skip、`UnitTestsDocumentEdit` 23、`UnitTestsForms` 4、`UnitTestsBookmarks` 20、`UnitTestsSecurity` 6。
 - 效能（Release，只記錄）：空白頁 <1 ms；外部 1 頁 <1 ms（+4 物件）；外部 100 頁約 1 ms；500 頁掃描來源載入 127–183 ms，只插 1 頁 <1 ms、只新增 5 個物件（頁、內容、影像、字型、Info；沒有 page-tree leakage），插 400 頁 13–18 ms、輸出 11.7 MB；Editor 內插 400 頁 17–20 ms，private memory 94.0 → 107.0 MB，Undo 後 107.0、Redo 後 107.0（Undo 保留整份快照，未重寫 Undo manager）。因此外部匯入同步執行（等待游標），沒有加 worker。
-- Focused review（graph isolation／PageLabels／表單·tag·簽章閘門／動作與目的地／加密／原子性／Undo／來源生命週期）找到並已修 2 個 P2：空白頁可能從 flat page tree root 繼承 `/Rotate`／`/CropBox`（改為一律明確寫入，已加測試）；0 頁文件時 anchor 計算的 `std::clamp` 未定義行為（加防護）。
+- Focused review（graph isolation／PageLabels／表單·tag·簽章閘門／動作與目的地／加密／原子性／Undo／來源生命週期）找到並已修 2 個 P2：空白頁可能從 flat page tree root 繼承 `/Rotate`／`/CropBox`（改為一律明確寫入，已加測試）；0 頁文件時 anchor 計算的 `std::clamp` 未定義行為（加防護）。Commit 後的安全審查再修 2 項：PageLabels 的 `/St` 過大時，羅馬數字／字母標籤字串隨數字暴增（DoS）→ 限制 `/St`（羅馬／字母 ≤ 100000、十進位 ≤ 1e9），超過視為無法可靠解析並拒絕插頁；動作只在 `/A`／`/Next` 下被辨識 → 改為任何 `/S` 是動作類型的字典（含 `/PA`、私有 key 下）都要過 URI／GoTo 白名單。兩者皆加測試。
 - NOT_TESTED：完整 `UnitTestsViewer`／完整 CTest（交給 CI）、`dist/FamilyPDF` 封裝更新、人工目視對話框版面、Edge 開啟輸出檔。
 - 本機 build：新增檔案觸發 re-configure，`rules.ninja` 第 17 行 `msvc_deps_prefix` 已依 `FamilyPDF-tools/saveas-fix-prefix-build` 還原為 UTF-8「注意: 包含檔案:」，並 touch 引用改動標頭的 .cpp 強制重編。
 
