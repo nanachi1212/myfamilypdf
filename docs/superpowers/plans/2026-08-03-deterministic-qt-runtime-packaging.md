@@ -14,7 +14,6 @@
 
 - Modify: `scripts/phase0/package-windows-runtime.ps1` — 移除不穩定工具呼叫，固定部署 release runtime。
 - Modify: `scripts/qa/test-windeployqt-environment.ps1` — 驗證腳本不再執行 windeployqt、沒有警告且 runtime 完整。
-- Modify: `docs/REQUIREMENTS-AUDIT.md`、`docs/RELEASE-STATUS.md`、`docs/WORKSPACE-HANDOFF.md` — 記錄確定性封裝證據與新產物雜湊。
 
 ### Task 1: 建立不得呼叫 windeployqt 的 RED 契約
 
@@ -78,7 +77,6 @@ Expected: CTest 6/6、Office 10/10、OCR、Viewer／Editor、多文件、PDF 比
 **Files:**
 - Modify: `docs/REQUIREMENTS-AUDIT.md`
 - Modify: `docs/RELEASE-STATUS.md`
-- Modify: `docs/WORKSPACE-HANDOFF.md`
 
 - [x] **Step 1: 重建兩種安裝檔**
 

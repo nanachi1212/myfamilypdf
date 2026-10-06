@@ -15,7 +15,6 @@
 - Create: `scripts/qa/smoke-pdf-security.ps1` — 建立 fixture，驗證 AES-256、密碼、權限、解密及 GUI。
 - Modify: `scripts/qa/run-final-regression.ps1` — 將 PDF security 納入正式可攜版總回歸與 summary。
 - Modify: `scripts/qa/smoke-full-installer.ps1` — 驗證完整與精簡安裝後的安全功能。
-- Modify: `README.md`、`docs/REQUIREMENTS-AUDIT.md`、`docs/RELEASE-STATUS.md`、`docs/WORKSPACE-HANDOFF.md` — 加入密碼保護功能與證據。
 
 ### Task 1: 建立 PDF security 冒煙測試
 
@@ -82,7 +81,6 @@ Expected: CTest 6/6、Office 11/11、PDF security、OCR、PDF 比較、多文件
 - Modify: `README.md`
 - Modify: `docs/REQUIREMENTS-AUDIT.md`
 - Modify: `docs/RELEASE-STATUS.md`
-- Modify: `docs/WORKSPACE-HANDOFF.md`
 
 - [x] **Step 1: 更新家庭版功能與驗證邊界**
 

@@ -16,7 +16,6 @@
 - Modify: `office-export/familypdf_office_export/extract.py` — 以文字起點聚類偵測 2–3 欄並泛化文字／圖片分類。
 - Modify: `office-export/tests/test_multicolumn_export.py` — 新增三欄真實 PDF 與 DOCX 行為測試。
 - Modify: `scripts/qa/smoke-office-export.ps1` — 驗證封裝 helper 的三欄輸出。
-- Modify: `README.md`、`docs/REQUIREMENTS-AUDIT.md`、`docs/RELEASE-STATUS.md`、`docs/WORKSPACE-HANDOFF.md` — 更新功能、限制及正式產物證據。
 
 ### Task 1: 建立三欄 RED 測試
 
@@ -104,7 +103,6 @@ Expected: 11 tests, 0 failures；既有單欄、等寬雙欄、不等寬雙欄�
 - Modify: `README.md`
 - Modify: `docs/REQUIREMENTS-AUDIT.md`
 - Modify: `docs/RELEASE-STATUS.md`
-- Modify: `docs/WORKSPACE-HANDOFF.md`
 
 - [x] **Step 1: 加入封裝 helper 三欄冒煙測試**
 
