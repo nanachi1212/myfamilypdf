@@ -49,6 +49,7 @@
 #include "pdfprintdialog.h"
 #include "pdfexportimagesdialog.h"
 #include "pdfmergepdfsdialog.h"
+#include "pdfdocumentpropertiesdialog.h"
 #include "pdfsecurityhandler.h"
 #include <QMenuBar>
 #include <QProgressBar>
@@ -64,6 +65,10 @@
 #include <QPrinterInfo>
 #include <QThreadPool>
 #include <QTreeWidget>
+#include <QTreeWidgetItemIterator>
+#include <QPlainTextEdit>
+#include <QRegularExpression>
+#include <QTimeZone>
 #include "pdfdocumentbuilder.h"
 #include "pdfannotation.h"
 #include "pdfwidgetannotation.h"
@@ -233,6 +238,12 @@ private slots:
     void mergePdfsBlocksAndWarns();
     void mergePdfsCancelLeavesNoPartialFile();
     void mergePdfsTranslations();
+    void metadataEditSaveUndoRedo();
+    void metadataEmptyFieldRemovesEntry();
+    void metadataCancelAndUnchangedAreNoOps();
+    void metadataXMPMismatchHint();
+    void metadataViewerIsReadOnly();
+    void metadataSignedAndEncryptedDocuments();
 
 private:
     QAction* action(const char* name) const { return m_window->findChild<QAction*>(QLatin1String(name)); }
@@ -286,7 +297,7 @@ void ViewerContextMenuTest::init()
     if (testFunction == "thumbnailSelectionAndPageManagement" || testFunction.startsWith("annotation")
         || testFunction.startsWith("pageReorder") || testFunction == "thumbnailReorderWorkflow"
         || testFunction == "reorderPreservesContentAfterSave" || testFunction == "reorderFlattensNestedPageTree" || testFunction == "nativeThumbnailDragSmoke"
-        || testFunction.startsWith("mergePdfs"))
+        || testFunction.startsWith("mergePdfs") || testFunction.startsWith("metadata"))
     {
         return;
     }
@@ -4256,6 +4267,429 @@ void ViewerContextMenuTest::mergePdfsTranslations()
         QVERIFY2(answerer.texts.front().contains(language.warningParts[0]), qPrintable(answerer.texts.front()));
         QVERIFY(!QFileInfo::exists(outputPath));            // the default answer to the warning is "No"
     }
+}
+
+namespace
+{
+
+const QByteArray metadataKeys[] = { "Title", "Author", "Subject", "Keywords", "Creator" };
+
+QString writeMetadataFixture(const QString& path, bool withXMP, bool encrypted = false, uint32_t permissions = 0xFFFFFFFFu)
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.appendPage(QRectF(0, 0, 200, 300));
+    builder.setDocumentTitle("Original Title");
+    builder.setDocumentAuthor("Original Author");
+    builder.setDocumentSubject("Original Subject");
+    builder.setDocumentKeywords("original");
+    builder.setDocumentCreator("Original Creator");
+    builder.setDocumentCreationDate(QDateTime(QDate(2020, 1, 2), QTime(3, 4, 5), QTimeZone::UTC));
+    if (withXMP)
+    {
+        builder.setCatalogMetadata("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"/></x:xmpmeta>");
+    }
+    if (encrypted)
+    {
+        pdf::PDFSecurityHandlerFactory::SecuritySettings settings;
+        settings.algorithm = pdf::PDFSecurityHandlerFactory::AES_256;
+        settings.encryptContents = pdf::PDFSecurityHandlerFactory::All;
+        settings.ownerPassword = QStringLiteral("owner");
+        settings.permissions = permissions;
+        settings.id = QByteArrayLiteral("metadata-test-id-0123456789");
+        builder.setSecurityHandler(pdf::PDFSecurityHandlerFactory::createSecurityHandler(settings));
+    }
+    const pdf::PDFDocument document = builder.build();
+    pdf::PDFDocumentWriter writer(nullptr);
+    const pdf::PDFOperationResult result = writer.write(path, &document, true);
+    return result ? QString() : result.getErrorMessage();
+}
+
+pdf::PDFDocument readMetadataPdf(const QString& path, bool* ok)
+{
+    pdf::PDFDocumentReader reader(nullptr, [](bool* passwordOk) { *passwordOk = false; return QString(); }, false, false);
+    pdf::PDFDocument document = reader.readFromFile(path);
+    *ok = reader.getReadingResult() == pdf::PDFDocumentReader::Result::OK;
+    return document;
+}
+
+bool infoHasKey(const pdf::PDFDocument* document, const char* key)
+{
+    const pdf::PDFDictionary* info = document->getDictionaryFromObject(document->getTrailerDictionary()->get("Info"));
+    return info && info->hasKey(key);
+}
+
+QStringList infoValues(const pdf::PDFDocument* document)
+{
+    const pdf::PDFDocumentInfo* info = document->getInfo();
+    return { info->title, info->author, info->subject, info->keywords, info->creator };
+}
+
+QList<QLineEdit*> infoEdits(QDialog* dialog)
+{
+    return dialog->findChildren<QLineEdit*>(QRegularExpression("^info.*Edit$"));
+}
+
+/// Opens Document Properties and lets act() work with it; the dialog is accepted when act() returns true.
+bool runPropertiesDialog(QMainWindow* window, const std::function<bool(pdfviewer::PDFDocumentPropertiesDialog*)>& act)
+{
+    bool handled = false;
+    QTimer timer;
+    QObject::connect(&timer, &QTimer::timeout, window, [&]()
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFDocumentPropertiesDialog*>(QApplication::activeModalWidget());
+        if (!dialog)
+        {
+            return;
+        }
+        timer.stop();
+        handled = true;
+        if (act(dialog))
+        {
+            dialog->accept();
+        }
+        else
+        {
+            dialog->reject();
+        }
+    });
+    timer.start(10);
+    window->findChild<QAction*>("actionProperties")->trigger();
+    return handled;
+}
+
+QStringList unicodeMetadataValues()
+{
+    return { QString::fromUtf8("\xE5\xAE\xB6\xE5\xBA\xAD\xE6\x96\x87\xE4\xBB\xB6 \xF0\x9F\x93\x84 \xE6\xB8\xAC\xE8\xA9\xA6"),
+             QString::fromUtf8("\xE9\x9B\xAB\xE9\x9B\xAB"),
+             QString::fromUtf8("\xE6\xB8\xAC\xE8\xA9\xA6\xE8\xB3\x87\xE6\x96\x99"),
+             QString::fromUtf8("PDF,\xE5\xAE\xB6\xE5\xBA\xAD,\xE6\xB8\xAC\xE8\xA9\xA6"),
+             QStringLiteral("FamilyPDF Tests 1.0") };
+}
+
+const QStringList originalMetadataValues = { "Original Title", "Original Author", "Original Subject", "original", "Original Creator" };
+
+} // namespace
+
+void ViewerContextMenuTest::metadataEditSaveUndoRedo()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    const QString path = m_temp.filePath("metadata-edit.pdf");
+    QVERIFY(writeMetadataFixture(path, false).isEmpty());
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(900, 700);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QCOMPARE(infoValues(controller->getDocument()), originalMetadataValues);
+    const QDateTime creationDate = controller->getDocument()->getInfo()->creationDate;
+    QVERIFY(creationDate.isValid());
+
+    // All five entries are edited in one dialog; Producer and the dates have no editor.
+    const QStringList values = unicodeMetadataValues();
+    bool systemFieldsReadOnly = false;
+    QVERIFY(runPropertiesDialog(&editor, [&](pdfviewer::PDFDocumentPropertiesDialog* dialog)
+    {
+        if (infoEdits(dialog).size() != 5)
+        {
+            return false;
+        }
+        for (int i = 0; i < 5; ++i)
+        {
+            dialog->findChild<QLineEdit*>(QStringLiteral("info%1Edit").arg(QString::fromLatin1(metadataKeys[i])))->setText(values[i]);
+        }
+        systemFieldsReadOnly = true;
+        auto* tree = dialog->findChild<QTreeWidget*>("propertiesTreeWidget");
+        for (QTreeWidgetItemIterator it(tree); *it; ++it)
+        {
+            systemFieldsReadOnly = systemFieldsReadOnly && !(*it)->flags().testFlag(Qt::ItemIsEditable);
+        }
+        return true;
+    }));
+    QVERIFY(systemFieldsReadOnly);
+    QCOMPARE(infoValues(controller->getDocument()), values);
+
+    // One Undo step restores all fields, Redo applies them again.
+    QAction* undo = editor.findChild<QAction*>("actionUndo");
+    QAction* redo = editor.findChild<QAction*>("actionRedo");
+    QVERIFY(undo->isEnabled());
+    undo->trigger();
+    QCOMPARE(infoValues(controller->getDocument()), originalMetadataValues);
+    QVERIFY(redo->isEnabled());
+    QVERIFY(!undo->isEnabled());
+    redo->trigger();
+    QCOMPARE(infoValues(controller->getDocument()), values);
+
+    const QString savedPath = m_temp.filePath("metadata-edit-saved.pdf");
+    QFile::remove(savedPath);
+    QVERIFY(annotationSaveAs(controller, &editor, savedPath));
+    controller->closeDocument();
+
+    bool ok = false;
+    const pdf::PDFDocument saved = readMetadataPdf(savedPath, &ok);
+    QVERIFY(ok);
+    QCOMPARE(infoValues(&saved), values);
+    QCOMPARE(saved.getInfo()->creationDate.toSecsSinceEpoch(), creationDate.toSecsSinceEpoch());
+    QVERIFY(!saved.getInfo()->producer.isEmpty());
+    QVERIFY(saved.getInfo()->modifiedDate.isValid());
+
+    controller->openDocument(savedPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QCOMPARE(infoValues(controller->getDocument()), values);
+}
+
+void ViewerContextMenuTest::metadataEmptyFieldRemovesEntry()
+{
+    const QString path = m_temp.filePath("metadata-empty.pdf");
+    QVERIFY(writeMetadataFixture(path, false).isEmpty());
+
+    // The builder setter itself keeps the key with an empty string; the dialog must remove it instead.
+    {
+        bool ok = false;
+        pdf::PDFDocument original = readMetadataPdf(path, &ok);
+        QVERIFY(ok);
+        pdf::PDFDocumentBuilder builder(&original);
+        builder.setDocumentTitle(QString());
+        const pdf::PDFDocument built = builder.build();
+        QVERIFY(infoHasKey(&built, "Title"));
+    }
+
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(900, 700);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QVERIFY(runPropertiesDialog(&editor, [](pdfviewer::PDFDocumentPropertiesDialog* dialog)
+    {
+        dialog->findChild<QLineEdit*>("infoTitleEdit")->clear();
+        dialog->findChild<QLineEdit*>("infoKeywordsEdit")->clear();
+        return true;
+    }));
+    QVERIFY(!infoHasKey(controller->getDocument(), "Title"));
+    QVERIFY(!infoHasKey(controller->getDocument(), "Keywords"));
+    QVERIFY(infoHasKey(controller->getDocument(), "Author"));
+
+    controller->performSave();
+    controller->closeDocument();
+    bool ok = false;
+    const pdf::PDFDocument saved = readMetadataPdf(path, &ok);
+    QVERIFY(ok);
+    QVERIFY(!infoHasKey(&saved, "Title"));
+    QVERIFY(!infoHasKey(&saved, "Keywords"));
+    QCOMPARE(saved.getInfo()->title, QString());
+    QCOMPARE(saved.getInfo()->author, QStringLiteral("Original Author"));
+}
+
+void ViewerContextMenuTest::metadataCancelAndUnchangedAreNoOps()
+{
+    const QString path = m_temp.filePath("metadata-noop.pdf");
+    QVERIFY(writeMetadataFixture(path, false).isEmpty());
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(900, 700);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    const pdf::PDFDocument* before = controller->getDocument();
+    QAction* undo = editor.findChild<QAction*>("actionUndo");
+    QVERIFY(!undo->isEnabled());
+
+    // Cancel discards edits.
+    QVERIFY(runPropertiesDialog(&editor, [](pdfviewer::PDFDocumentPropertiesDialog* dialog)
+    {
+        dialog->findChild<QLineEdit*>("infoTitleEdit")->setText("Cancelled");
+        return false;
+    }));
+    QCOMPARE(controller->getDocument(), before);
+    QVERIFY(!undo->isEnabled());
+
+    // OK with values equal to the original ones is not a modification.
+    QVERIFY(runPropertiesDialog(&editor, [](pdfviewer::PDFDocumentPropertiesDialog* dialog)
+    {
+        QLineEdit* title = dialog->findChild<QLineEdit*>("infoTitleEdit");
+        title->setText("Changed");
+        title->setText("Original Title");
+        return dialog->getModifiedInfoEntries().empty();
+    }));
+    QCOMPARE(controller->getDocument(), before);
+    QVERIFY(!undo->isEnabled());
+    QCOMPARE(infoValues(controller->getDocument()), originalMetadataValues);
+}
+
+void ViewerContextMenuTest::metadataXMPMismatchHint()
+{
+    const QString withXMP = m_temp.filePath("metadata-xmp.pdf");
+    const QString withoutXMP = m_temp.filePath("metadata-no-xmp.pdf");
+    QVERIFY(writeMetadataFixture(withXMP, true).isEmpty());
+    QVERIFY(writeMetadataFixture(withoutXMP, false).isEmpty());
+
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(900, 700);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(withXMP);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    auto xmpBytes = [](const pdf::PDFDocument* document)
+    {
+        const pdf::PDFObject metadata = document->getObject(document->getCatalog()->getMetadata());
+        return metadata.isStream() ? document->getDecodedStream(metadata.getStream()) : QByteArray();
+    };
+    const QByteArray xmpBefore = xmpBytes(controller->getDocument());
+    QVERIFY(!xmpBefore.isEmpty());
+
+    // The hint appears only while document information differs from the original; nothing blocks OK.
+    bool hiddenInitially = false;
+    bool shownAfterEdit = false;
+    bool hiddenAfterRevert = false;
+    QVERIFY(runPropertiesDialog(&editor, [&](pdfviewer::PDFDocumentPropertiesDialog* dialog)
+    {
+        QLabel* hint = dialog->findChild<QLabel*>("xmpMismatchLabel");
+        QLineEdit* title = dialog->findChild<QLineEdit*>("infoTitleEdit");
+        if (!hint || !title)
+        {
+            return false;
+        }
+        hiddenInitially = hint->isHidden();
+        title->setText("New Title");
+        shownAfterEdit = !hint->isHidden();
+        title->setText("Original Title");
+        hiddenAfterRevert = hint->isHidden();
+        title->setText("New Title");
+        return true;
+    }));
+    QVERIFY(hiddenInitially);
+    QVERIFY(shownAfterEdit);
+    QVERIFY(hiddenAfterRevert);
+    QCOMPARE(controller->getDocument()->getInfo()->title, QStringLiteral("New Title"));
+    QCOMPARE(xmpBytes(controller->getDocument()), xmpBefore);     // XMP is not rewritten
+
+    // Raw XMP and document information edited together form a single undo step.
+    const QByteArray newXMP = "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"/>";
+    QVERIFY(runPropertiesDialog(&editor, [&](pdfviewer::PDFDocumentPropertiesDialog* dialog)
+    {
+        dialog->findChild<QPlainTextEdit*>("xmpMetadataPlainTextEdit")->setPlainText(QString::fromUtf8(newXMP));
+        dialog->findChild<QLineEdit*>("infoAuthorEdit")->setText("Combined Author");
+        return true;
+    }));
+    QCOMPARE(controller->getDocument()->getInfo()->author, QStringLiteral("Combined Author"));
+    QCOMPARE(xmpBytes(controller->getDocument()), newXMP);
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QCOMPARE(controller->getDocument()->getInfo()->author, QStringLiteral("Original Author"));
+    QCOMPARE(controller->getDocument()->getInfo()->title, QStringLiteral("New Title"));
+    QCOMPARE(xmpBytes(controller->getDocument()), xmpBefore);
+    controller->closeDocument();
+
+    controller->openDocument(withoutXMP);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    bool hiddenWithoutXMP = false;
+    QVERIFY(runPropertiesDialog(&editor, [&](pdfviewer::PDFDocumentPropertiesDialog* dialog)
+    {
+        dialog->findChild<QLineEdit*>("infoTitleEdit")->setText("New Title");
+        QLabel* hint = dialog->findChild<QLabel*>("xmpMismatchLabel");
+        hiddenWithoutXMP = hint && hint->isHidden();
+        return false;
+    }));
+    QVERIFY(hiddenWithoutXMP);
+}
+
+void ViewerContextMenuTest::metadataViewerIsReadOnly()
+{
+    const QString path = m_temp.filePath("metadata-viewer.pdf");
+    QVERIFY(writeMetadataFixture(path, true).isEmpty());
+    pdfviewer::PDFViewerMainWindow viewer;
+    viewer.resize(900, 700);
+    viewer.show();
+    auto* controller = viewer.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    const pdf::PDFDocument* before = controller->getDocument();
+
+    bool readOnly = false;
+    bool titleShown = false;
+    QVERIFY(runPropertiesDialog(&viewer, [&](pdfviewer::PDFDocumentPropertiesDialog* dialog)
+    {
+        readOnly = infoEdits(dialog).isEmpty() && dialog->getModifiedInfoEntries().empty() && !dialog->findChild<QLabel*>("xmpMismatchLabel");
+        auto* tree = dialog->findChild<QTreeWidget*>("propertiesTreeWidget");
+        for (QTreeWidgetItemIterator it(tree); *it; ++it)
+        {
+            titleShown = titleShown || (*it)->text(1) == QStringLiteral("Original Title");
+            readOnly = readOnly && !(*it)->flags().testFlag(Qt::ItemIsEditable);
+        }
+        return true;
+    }));
+    QVERIFY(readOnly);
+    QVERIFY(titleShown);
+    QCOMPARE(controller->getDocument(), before);
+}
+
+void ViewerContextMenuTest::metadataSignedAndEncryptedDocuments()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(900, 700);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    auto editTitle = [&](const QString& title)
+    {
+        return runPropertiesDialog(&editor, [&](pdfviewer::PDFDocumentPropertiesDialog* dialog)
+        {
+            QLineEdit* edit = dialog->findChild<QLineEdit*>("infoTitleEdit");
+            if (edit)
+            {
+                edit->setText(title);
+            }
+            return edit != nullptr;
+        });
+    };
+
+    // Signed: editing goes through the common modification path, which drops the verification
+    // results of the old byte revision (v6 policy); no separate metadata warning exists.
+    const QString signedSource = QFINDTESTDATA("fixtures/pyhanko-signed.pdf");
+    QVERIFY(!signedSource.isEmpty());
+    const QString signedPath = m_temp.filePath("metadata-signed.pdf");
+    QFile::remove(signedPath);
+    QVERIFY(QFile::copy(signedSource, signedPath));
+    QFile::setPermissions(signedPath, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    controller->openDocument(signedPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!controller->getSignatures()->empty(), 15000);
+    QVERIFY(editTitle("Signed Title"));
+    QCOMPARE(controller->getDocument()->getInfo()->title, QStringLiteral("Signed Title"));
+    QVERIFY(controller->getSignatures()->empty());
+    controller->closeDocument();
+
+    // Encrypted with modification allowed: edit, Save As, reopen; the output stays encrypted.
+    const QString encryptedPath = m_temp.filePath("metadata-encrypted.pdf");
+    QVERIFY(writeMetadataFixture(encryptedPath, false, true).isEmpty());
+    controller->openDocument(encryptedPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    const QString title = unicodeMetadataValues().front();
+    QVERIFY(editTitle(title));
+    const QString encryptedSaved = m_temp.filePath("metadata-encrypted-saved.pdf");
+    QFile::remove(encryptedSaved);
+    QVERIFY(annotationSaveAs(controller, &editor, encryptedSaved));
+    controller->closeDocument();
+    bool ok = false;
+    const pdf::PDFDocument saved = readMetadataPdf(encryptedSaved, &ok);
+    QVERIFY(ok);
+    QCOMPARE(saved.getInfo()->title, title);
+    QCOMPARE(saved.getInfo()->author, QStringLiteral("Original Author"));
+    QVERIFY(saved.getStorage().getSecurityHandler()->getMode() != pdf::EncryptionMode::None);
+
+    // Without the modify permission, document information is shown read-only (existing permission policy).
+    const QString restrictedPath = m_temp.filePath("metadata-restricted.pdf");
+    QVERIFY(writeMetadataFixture(restrictedPath, false, true, 0xFFFFFFFFu & ~uint32_t(pdf::PDFSecurityHandler::Permission::Modify)).isEmpty());
+    controller->openDocument(restrictedPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    bool restrictedReadOnly = false;
+    QVERIFY(runPropertiesDialog(&editor, [&](pdfviewer::PDFDocumentPropertiesDialog* dialog)
+    {
+        restrictedReadOnly = infoEdits(dialog).isEmpty();
+        return true;
+    }));
+    QVERIFY(restrictedReadOnly);
+    QVERIFY(!editor.findChild<QAction*>("actionUndo")->isEnabled());
 }
 
 QTEST_MAIN(ViewerContextMenuTest)

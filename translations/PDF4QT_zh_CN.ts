@@ -13669,6 +13669,26 @@ li.checked::marker { content: &quot;\2612&quot;; }
 <context>
     <name>pdfviewer::PDFDocumentPropertiesDialog</name>
     <message>
+        <location filename="../Pdf4QtLibGui/pdfdocumentpropertiesdialog.cpp"/>
+        <source>Document information</source>
+        <translation>文档信息</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfdocumentpropertiesdialog.cpp"/>
+        <source>System information</source>
+        <translation>系统信息</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfdocumentpropertiesdialog.cpp"/>
+        <source>Updated automatically when the document is changed.</source>
+        <translation>文档更改时自动更新。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfdocumentpropertiesdialog.cpp"/>
+        <source>This PDF also contains XMP metadata. Some readers show XMP first, so the displayed title or author may differ from these values.</source>
+        <translation>此 PDF 同时包含 XMP 元数据。部分阅读器会优先显示 XMP，因此显示的标题或作者可能与此处不同。</translation>
+    </message>
+    <message>
         <location filename="../Pdf4QtLibGui/pdfdocumentpropertiesdialog.cpp" line="122"/>
         <source>Properties</source>
         <translation>属性</translation>

@@ -24,6 +24,7 @@
 #define PDFDOCUMENTPROPERTIESDIALOG_H
 
 #include "pdfglobal.h"
+#include "pdf4qtlibgui_export.h"
 
 #include <QDialog>
 #include <QFuture>
@@ -31,6 +32,8 @@
 #include <QDateTime>
 
 class QTreeWidgetItem;
+class QLineEdit;
+class QLabel;
 
 namespace Ui
 {
@@ -59,7 +62,7 @@ struct PDFFileInfo
     QDateTime lastReadTime;
 };
 
-class PDFDocumentPropertiesDialog : public QDialog
+class PDF4QTLIBGUILIBSHARED_EXPORT PDFDocumentPropertiesDialog : public QDialog
 {
     Q_OBJECT
 
@@ -67,13 +70,19 @@ private:
     using BaseClass = QDialog;
 
 public:
+    /// \param canEditInfo Title, Author, Subject, Keywords and Creator can be edited
     explicit PDFDocumentPropertiesDialog(const pdf::PDFDocument* document,
                                          const PDFFileInfo* fileInfo,
-                                         QWidget* parent);
+                                         QWidget* parent,
+                                         bool canEditInfo = false);
     virtual ~PDFDocumentPropertiesDialog() override;
 
     QByteArray getXMPMetadata() const;
     bool isXMPMetadataModified() const;
+
+    /// Document information entries changed by the user, as (key, new value).
+    /// An empty value means the entry should be removed.
+    std::vector<std::pair<QByteArray, QString>> getModifiedInfoEntries() const;
 
 protected:
     virtual void closeEvent(QCloseEvent* event) override;
@@ -81,15 +90,26 @@ protected:
 private:
     Ui::PDFDocumentPropertiesDialog* ui;
 
-    void initializeProperties(const pdf::PDFDocument* document);
+    void initializeProperties(const pdf::PDFDocument* document, bool canEditInfo);
     void initializeFileInfoProperties(const PDFFileInfo* fileInfo);
     void initializeSecurity(const pdf::PDFDocument* document);
     void initializeFonts(const pdf::PDFDocument* document);
     void initializeDisplayAndPrintSettings(const pdf::PDFDocument* document);
     void initializeXMPMetadata(const pdf::PDFDocument* document);
     void createDefaultXMPMetadata();
+    void updateXMPMismatchHint();
 
     void onFontsFinished();
+
+    struct InfoEditor
+    {
+        QByteArray key;
+        QString originalValue;
+        QLineEdit* edit = nullptr;
+    };
+
+    std::vector<InfoEditor> m_infoEditors;
+    QLabel* m_xmpMismatchLabel = nullptr;
 
     std::vector<QTreeWidgetItem*> m_fontTreeWidgetItems;
     QFuture<void> m_future;
