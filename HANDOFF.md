@@ -13,7 +13,7 @@
 ## 目前狀態與下一步
 
 - **v11「Editor 內插入頁面」**：branch `feature/insert-pages-v11`（自 main `a22ad8c7` 建出），實作、本機 Release 驗證與 focused review 完成；commit／push／PR／CI／merge 狀態見「Git 狀態」。細節見下方「v11 已交付內容」與 `docs/insert-pages-v11.md`。
-- **PR #21 validation 修正**：確認 Phase 0 `$Targets` 漏列 `UnitTestsInsertPages`；已加入 `scripts/phase0/build-upstream-baseline.ps1`，PowerShell AST、target 名稱比對與本機 targeted CTest 均通過，待 commit／push。
+- **PR #21 validation 修正**：確認 Phase 0 `$Targets` 漏列 `UnitTestsInsertPages`；已加入 `scripts/phase0/build-upstream-baseline.ps1`，PowerShell AST、target 名稱比對與本機 targeted CTest 均通過，commit `78b9e88e` 已 push。
 - v10「PDF Metadata 表單編輯」已 squash merge（PR #20，main `a22ad8c7`），不必重做。
 - `UnitTestsViewer` 間歇性 Save As 卡死（test harness lifecycle）已修並 merge（PR #19，main `6f71b077`）。
 - 專案：`F:\Projects\Codex project\myfamilypdf`，Windows x64 PDF 閱讀／編輯工具。
@@ -117,7 +117,7 @@
 
 ## Git 狀態
 
-- v11：branch `feature/insert-pages-v11`，PR「Add safe page insertion workflow v11」；PR #21 validation 的 Phase 0 target 修正待 commit／push；push 後停止輪詢 CI，由 ChatGPT 監控。CI 全綠前不得 merge（squash）。
+- v11：branch `feature/insert-pages-v11`，PR「Add safe page insertion workflow v11」；PR #21 validation 的 Phase 0 target 修正已 push，後續停止輪詢 CI，由 ChatGPT 監控。CI 全綠前不得 merge（squash）。
 - v10：PR #20 已 squash merge（`a22ad8c7`）。
 - v9：PR #18 已 squash merge（`2e0f9c86`）；Save As 測試卡死修正 PR #19（`6f71b077`）。
 - v8：PR #17 已 squash merge（`7cfa289b`）。
