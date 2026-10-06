@@ -157,7 +157,6 @@ Expected: raster 圖片、既有單欄／雙欄／表格／CLI 行為全部 PASS
 **Files:**
 - Modify: `docs/REQUIREMENTS-AUDIT.md`
 - Modify: `docs/RELEASE-STATUS.md`
-- Modify: `docs/WORKSPACE-HANDOFF.md`
 
 - [x] **Step 1: 重建可攜包、核心安裝檔與完整安裝檔**
 

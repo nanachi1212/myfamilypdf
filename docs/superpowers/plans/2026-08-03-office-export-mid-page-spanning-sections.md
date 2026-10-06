@@ -139,7 +139,6 @@ Expected: 中段標題、兩個雙欄表格及 10 個可編輯段落通過；Off
 **Files:**
 - Modify: `docs/REQUIREMENTS-AUDIT.md`
 - Modify: `docs/RELEASE-STATUS.md`
-- Modify: `docs/WORKSPACE-HANDOFF.md`
 
 - [x] **Step 1: 重建可攜包、核心安裝檔與完整安裝檔**
 

@@ -34,7 +34,7 @@ if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
 if (-not $SkipTests) {
     Push-Location $officeRoot
     try {
-        & $venvPython -m unittest discover -s tests -v
+        & $venvPython -m pytest tests -q
         if ($LASTEXITCODE -ne 0) {
             throw "Office export tests failed with exit code $LASTEXITCODE."
         }

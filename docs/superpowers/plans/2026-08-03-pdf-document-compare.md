@@ -215,7 +215,6 @@ Expected: 完整與精簡安裝 exit code `0`，兩者都有 `Pdf4QtDiff.exe`，
 - Modify: `README.md`
 - Modify: `docs/REQUIREMENTS-AUDIT.md`
 - Modify: `docs/RELEASE-STATUS.md`
-- Modify: `docs/WORKSPACE-HANDOFF.md`
 
 - [x] **Step 1: 執行來源與封裝測試**
 

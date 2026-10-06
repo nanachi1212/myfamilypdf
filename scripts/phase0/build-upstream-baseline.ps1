@@ -39,18 +39,7 @@ $Targets = @(
     'FormPlugin',
     'DocumentEditPlugin',
     'OfficeExportPlugin',
-    'UnitTests',
-    'UnitTestsImageOptimizer',
-    'UnitTestsFontEncoding',
-    'UnitTestsSecurity',
-    'UnitTestsViewer',
-    'UnitTestsBookmarks',
-    'UnitTestsForms',
-    'UnitTestsDocumentEdit',
-    'UnitTestsMergePdfs',
-    'UnitTestsInsertPages',
-    'UnitTestsPrintExport',
-    'UnitTestsContentEditor',
+    'FamilyPDFValidationTests',
     'release_translations'
 )
 
@@ -173,8 +162,17 @@ function Prepare-TestRuntime {
     $runtimeDirectory = Join-Path $BuildDirectory 'usr\bin'
     New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
 
-    foreach ($target in $Targets | Where-Object { $_ -like 'UnitTests*' }) {
-        $executable = Join-Path $runtimeDirectory "$target.exe"
+    $ctestJson = & $Ctest --test-dir $BuildDirectory --show-only=json-v1
+    if ($LASTEXITCODE -ne 0) {
+        throw "CTest could not enumerate registered tests (exit code $LASTEXITCODE)."
+    }
+    $ctestManifest = ($ctestJson -join [Environment]::NewLine) | ConvertFrom-Json
+    foreach ($test in $ctestManifest.tests) {
+        $executable = [string]$test.command[0]
+        if (-not (Test-Path -LiteralPath $executable -PathType Leaf) -and
+            [string]::IsNullOrEmpty([IO.Path]::GetExtension($executable))) {
+            $executable += '.exe'
+        }
         Assert-File -LiteralPath $executable
     }
 
@@ -243,8 +241,10 @@ Assert-File -LiteralPath (Join-Path $QtPrefix 'lib\cmake\Qt6\Qt6Config.cmake')
 Assert-File -LiteralPath $VcpkgToolchain
 $visualStudioRoot = Import-MsvcEnvironment
 $Cmake = Join-Path $visualStudioRoot 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
+$Ctest = Join-Path (Split-Path -Parent $Cmake) 'ctest.exe'
 $Ninja = Join-Path $visualStudioRoot 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe'
 Assert-File -LiteralPath $Cmake
+Assert-File -LiteralPath $Ctest
 Assert-File -LiteralPath $Ninja
 
 New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null

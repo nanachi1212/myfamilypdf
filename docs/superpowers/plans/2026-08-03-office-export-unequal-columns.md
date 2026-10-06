@@ -17,7 +17,6 @@
 - Modify: `office-export/familypdf_office_export/docx_writer.py` — 依比例設定 Word 表格欄寬與圖片最大寬度。
 - Modify: `office-export/tests/test_multicolumn_export.py` — 建立不等寬真實 PDF fixture 並驗證 DOCX 結果。
 - Modify: `scripts/qa/smoke-office-export.ps1` — 封裝後 helper 的不等寬雙欄回歸。
-- Modify: `docs/REQUIREMENTS-AUDIT.md`、`docs/RELEASE-STATUS.md`、`docs/WORKSPACE-HANDOFF.md` — 更新完成範圍、證據與剩餘限制。
 
 ### Task 1: 以真實 PDF 建立不等寬雙欄 RED 測試
 
@@ -150,7 +149,6 @@ Expected: 10 tests, 0 failures。
 - Modify: `scripts/qa/smoke-office-export.ps1`
 - Modify: `docs/REQUIREMENTS-AUDIT.md`
 - Modify: `docs/RELEASE-STATUS.md`
-- Modify: `docs/WORKSPACE-HANDOFF.md`
 
 - [x] **Step 1: 擴充封裝 helper 冒煙測試**
 

@@ -130,7 +130,6 @@ Expected: Office Python 8/8 或更多全部 PASS；封裝 helper 產生標題段
 **Files:**
 - Modify: `docs/REQUIREMENTS-AUDIT.md`
 - Modify: `docs/RELEASE-STATUS.md`
-- Modify: `docs/WORKSPACE-HANDOFF.md`
 
 - [x] **Step 1: 重建正式可攜版與兩種安裝檔**
 
