@@ -12,13 +12,37 @@
 
 ## 目前狀態與下一步
 
-- **v10「PDF Metadata 表單編輯」**：branch `feature/metadata-editor-v10`（自 main `6f71b077` 建出），本機實作與驗證完成；commit／push／PR／CI 狀態見「Git 狀態」。細節見下方「v10 已交付內容」。
+- **v11「Editor 內插入頁面」**：branch `feature/insert-pages-v11`（自 main `a22ad8c7` 建出），實作、本機 Release 驗證與 focused review 完成；commit／push／PR／CI／merge 狀態見「Git 狀態」。細節見下方「v11 已交付內容」與 `docs/insert-pages-v11.md`。
+- **PR #21 validation 修正**：確認 Phase 0 `$Targets` 漏列 `UnitTestsInsertPages`；已加入 `scripts/phase0/build-upstream-baseline.ps1`，PowerShell AST、target 名稱比對與本機 targeted CTest 均通過，commit `78b9e88e` 已 push。
+- v10「PDF Metadata 表單編輯」已 squash merge（PR #20，main `a22ad8c7`），不必重做。
 - `UnitTestsViewer` 間歇性 Save As 卡死（test harness lifecycle）已修並 merge（PR #19，main `6f71b077`）。
 - 專案：`F:\Projects\Codex project\myfamilypdf`，Windows x64 PDF 閱讀／編輯工具。
 - 「縮圖拖曳重排頁面 v8」已 squash merge（PR #17，main `7cfa289b1f7e2a5c88c695062344c71870896c3d`，Windows／Ubuntu／runtime／CodeQL 全綠），不必重做。
 - 「Merge PDFs v9」已 squash merge（PR #18，main `2e0f9c86`），不必重做。
 - 先前「列印與圖片匯出 v7」已 merge（PR #15，squash，merge commit `60be9699b42d01a42b7860e153ccd77868b191b1`），不必重做 v6／v7。
 - `.ai-memory.toml` 是使用者原有 untracked 檔案，保留，不修改、不提交。
+
+## v11 已交付內容（Editor 內插入頁面）
+
+- 只在 Editor：Edit → Insert Blank Page... / Insert Pages from PDF...（anchor＝目前頁）；縮圖右鍵同兩項（anchor＝選取頁；多選時 Before 用第一頁、After 用最後一頁）。Viewer 沒有入口，controller（`insertBlankPageAt`／`insertPagesAt`）在沒有 Undo manager 時回 false。
+- 對話框 `Pdf4QtLibGui/pdfinsertpagesdialog.*`：位置（Before page N／After page N／開頭／末尾，顯示實際頁碼與「新頁面將成為第 X 頁」）；空白頁大小＝與 anchor 頁相同（MediaBox／CropBox／Rotate）或 A4；外部 PDF＝單一檔案＋頁面清單（保留輸入順序，`3,1,3` 重複直接報錯，不去重不排序）。
+- 引擎 `Pdf4QtLibCore/sources/pdfpageinserter.*`（受限 page import adapter，不是通用 importer）：重用 v9 `PDFDocumentMerger::loadSource`（密碼 callback、CopyContent＋Assemble）與 `parsePageList`、v8 flatten pattern、既有 `copyFrom`／`appendPage`／`setPages`。外部頁在來源 staging 副本中：寫入繼承的 MediaBox／CropBox／Resources／Rotate → 移除 `/Parent`、`/B`、`/DPart` → 註解 `/P` 指回本頁、移除指向未選頁的 `/IRT`／`/Popup`／`/Parent` → 連結改寫 → 走訪可達物件圖檢查 → 一次 batch `copyFrom` → 接到 target page tree → PageLabels → `finalize()`。全部成功後才 `onDocumentModified(Reset | PreserveUndoRedo | PreserveView)`（一個 Undo step），之後跳到第一個插入頁、選取所有插入縮圖。
+- 阻止（修改 target 前）：來源有表單欄位／XFA／rogue Widget／`/FT`（訊息「此 PDF 的選取頁面包含表單欄位，目前無法安全插入。」）、簽章（SigFlags／簽章欄位／Perms／`/ByteRange`）、tagged（StructTreeRoot、MarkInfo Marked、`/StructParent(s)`）、選取頁可達圖依賴 OCG／OCMD／`/OC`、JavaScript／Launch／表單動作／Named 等非 URI·GoTo 動作、`/AA`、`/JS`、動作鏈 `/Next`、多媒體／3D 註解、可達圖出現未選頁／Pages／Catalog／Outlines；來源權限不足；target 有 XFA（全部）、target tagged（只擋外部頁）、target 無 Assemble 權限、target 書籤用頁碼目的地、target PageLabels 無法可靠解析。
+- 警告（插入前一次，可取消）：連到未插入頁面的連結（保留註解外觀、移除 navigation）；加密來源插入未加密 target。
+- 連結：URI 保留；GoTo 到已選頁（明確／具名／頁碼）改成指向插入後的頁面物件；不匯入來源 Names tree 與書籤。Target 書籤指頁面物件，插頁後仍指原頁。
+- PageLabels：舊頁 label 全部不變（必要時拆 range、寫 `/St`）；插入頁 label＝`<前一頁 label>.<n>`（如 `ii.1`、`A-5.2`），開頭為 `0.<n>`；無 PageLabels 的文件不新增。
+- 加密：來源加密不繼承；target 加密沿用 target security handler（Save As 重開仍加密、需密碼）。未改 copyFrom／manipulator／AcroForm／structure／crypto／signature core，未新增或升級 dependency。
+- `PDFSidebarWidget::selectThumbnailPages` 改為 public（插頁後選取用），新增 signal `insertBlankPageRequested`／`insertPagesFromPdfRequested`；controller 新 signal `pagesInserted`。繁中／簡中已補（`pdf::PDFPageInserter`、`pdfviewer::PDFInsertPagesDialog` 兩個新 context 與 controller／sidebar／editor 選單字串）。
+
+## v11 驗證證據（本機 Release）
+
+- `UnitTestsInsertPages`（新，Core 引擎，寫出後讀回）：`QT_QPA_PLATFORM=windows` 32/32 PASS；offscreen（CI 方式）31 PASS＋1 SKIP（`embeddedFontProgram`：offscreen 下 Qt 沒有可嵌入的字型，屬預期）。涵蓋需求清單 1–7、9–35、37、38（Undo／Redo、Viewer 在 GUI 測試），特別 assertion：5 頁來源只選第 3 頁 → 輸出 Page 物件＝target＋1、其他頁的唯一文字串不在任何 stream、無 Bead／Thread、只新增 6 個物件（頁、內容、字型、註解×2、Info）。
+- `UnitTestsViewer` 新增 7 項：`insertPagesViewerIsReadOnly`、`insertPagesEditorEntries`、`insertPagesEditorBlankWorkflow`、`insertPagesEditorFromPdfWorkflow`、`insertPagesEditorFailureAndWarnings`、`insertPagesEditorUndoMemory`、`insertPagesEditorTranslations`：offscreen 7/7 PASS；`QT_QPA_PLATFORM=windows` 原生視窗 6/6 PASS（不含量測項，無截圖）。
+- 回歸 smoke PASS（同一行程 49/49）：v8 `pageReorder*`、`thumbnailReorderWorkflow`、`reorderPreservesContentAfterSave`、`reorderFlattensNestedPageTree`、`viewerThumbnailsAreReadOnly`；刪除／旋轉／提取 `thumbnailSelectionAndPageManagement`；v9 `mergePdfs*` 6 項；v10 `metadata*` 6 項；`formWorkflow`、`signatureVerificationWorkflow`、`menuActionsOperateOnTheDocument`、`traditionalChineseMenuAndSvgResources`；`UnitTestsMergePdfs` 45＋1 skip、`UnitTestsDocumentEdit` 23、`UnitTestsForms` 4、`UnitTestsBookmarks` 20、`UnitTestsSecurity` 6。
+- 效能（Release，只記錄）：空白頁 <1 ms；外部 1 頁 <1 ms（+4 物件）；外部 100 頁約 1 ms；500 頁掃描來源載入 127–183 ms，只插 1 頁 <1 ms、只新增 5 個物件（頁、內容、影像、字型、Info；沒有 page-tree leakage），插 400 頁 13–18 ms、輸出 11.7 MB；Editor 內插 400 頁 17–20 ms，private memory 94.0 → 107.0 MB，Undo 後 107.0、Redo 後 107.0（Undo 保留整份快照，未重寫 Undo manager）。因此外部匯入同步執行（等待游標），沒有加 worker。
+- Focused review（graph isolation／PageLabels／表單·tag·簽章閘門／動作與目的地／加密／原子性／Undo／來源生命週期）找到並已修 2 個 P2：空白頁可能從 flat page tree root 繼承 `/Rotate`／`/CropBox`（改為一律明確寫入，已加測試）；0 頁文件時 anchor 計算的 `std::clamp` 未定義行為（加防護）。Commit 後的安全審查再修 2 項：PageLabels 的 `/St` 過大時，羅馬數字／字母標籤字串隨數字暴增（DoS）→ 限制 `/St`（羅馬／字母 ≤ 100000、十進位 ≤ 1e9），超過視為無法可靠解析並拒絕插頁；動作只在 `/A`／`/Next` 下被辨識 → 改為任何 `/S` 是動作類型的字典（含 `/PA`、私有 key 下）都要過 URI／GoTo 白名單。兩者皆加測試。
+- NOT_TESTED：完整 `UnitTestsViewer`／完整 CTest（交給 CI）、`dist/FamilyPDF` 封裝更新、人工目視對話框版面、Edge 開啟輸出檔。
+- 本機 build：新增檔案觸發 re-configure，`rules.ninja` 第 17 行 `msvc_deps_prefix` 已依 `FamilyPDF-tools/saveas-fix-prefix-build` 還原為 UTF-8「注意: 包含檔案:」，並 touch 引用改動標頭的 .cpp 強制重編。
 
 ## v10 已交付內容（PDF Metadata 表單編輯）
 
@@ -93,7 +117,8 @@
 
 ## Git 狀態
 
-- v10：branch `feature/metadata-editor-v10`，本機驗證完成；commit／push／PR／CI／merge 以 `git log`／GitHub 為準。CI 全綠前不得 merge。
+- v11：branch `feature/insert-pages-v11`，PR「Add safe page insertion workflow v11」；PR #21 validation 的 Phase 0 target 修正已 push，後續停止輪詢 CI，由 ChatGPT 監控。CI 全綠前不得 merge（squash）。
+- v10：PR #20 已 squash merge（`a22ad8c7`）。
 - v9：PR #18 已 squash merge（`2e0f9c86`）；Save As 測試卡死修正 PR #19（`6f71b077`）。
 - v8：PR #17 已 squash merge（`7cfa289b`）。
 - v7：PR #15 已 squash merge 為 `60be9699`。本機 `gh` 已登入 `nanachi1212`（2026-10-06 確認）。
@@ -110,6 +135,7 @@
 
 ## 需要深入時再讀
 
+- v11 行為、政策與限制：`docs/insert-pages-v11.md`；引擎 `Pdf4QtLibCore/sources/pdfpageinserter.*`，對話框 `Pdf4QtLibGui/pdfinsertpagesdialog.*`，流程 `pdfprogramcontroller.cpp` 的 `insertBlankPage`／`insertPagesFromPdf`／`insertBlankPageAt`／`insertPagesAt`，測試 `UnitTests/tst_insertpagestest.cpp` 與 `tst_viewercontextmenutest.cpp` 的 `insertPages*`。
 - v9 行為、上游限制分類與測試：`docs/merge-pdfs-v9.md`；引擎 `Pdf4QtLibCore/sources/pdfdocumentmerger.*`，對話框 `Pdf4QtLibGui/pdfmergepdfsdialog.*`，流程 `pdfprogramcontroller.cpp` 的 `mergePdfs`，測試 `UnitTests/tst_mergepdfstest.cpp` 與 `tst_viewercontextmenutest.cpp` 的 `mergePdfs*`。
 - v8 行為與資料流：`docs/page-reorder-v8.md`；核心 `Pdf4QtLibGui/pdfpagereorder.*`、`pdfthumbnailslistview.*`，控制器 `pdfprogramcontroller.cpp` 的 `reorderPages`；測試見 `tst_viewercontextmenutest.cpp` 的 `pageReorder*`、`thumbnailReorderWorkflow`、`reorderPreservesContentAfterSave`、`reorderFlattensNestedPageTree`、`nativeThumbnailDragSmoke`。
 - v7 行為與限制：`docs/print-export-v7.md`；核心 `Pdf4QtLibGui/pdfpageoutput.*`，對話框 `pdfprintdialog.*`、`pdfexportimagesdialog.*`，流程 `pdfprogramcontroller.cpp` 的 `runPrintWorkflow`／`runExportImagesWorkflow`／`exportSelectionAsImage`。

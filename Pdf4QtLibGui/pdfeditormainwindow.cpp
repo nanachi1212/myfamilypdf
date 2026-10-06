@@ -76,6 +76,7 @@
 #include <QPointer>
 #include <QSignalBlocker>
 #include <QTabBar>
+#include <QTimer>
 
 #include <algorithm>
 
@@ -336,6 +337,16 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     ui->menuFile->insertAction(ui->actionProperties, extractPagesAction);
     connect(extractPagesAction, &QAction::triggered, m_programController, [this]() { m_programController->extractPages(); });
 
+    // Editor only: the Viewer has no page insertion (v11). The current page is the anchor.
+    QAction* insertBlankPageAction = new QAction(tr("Insert Blank Page..."), this);
+    insertBlankPageAction->setObjectName(QStringLiteral("actionInsertBlankPage"));
+    ui->menuEdit->insertAction(ui->actionPageGeometry, insertBlankPageAction);
+    connect(insertBlankPageAction, &QAction::triggered, m_programController, [this]() { m_programController->insertBlankPage({}); });
+    QAction* insertPagesFromPdfAction = new QAction(tr("Insert Pages from PDF..."), this);
+    insertPagesFromPdfAction->setObjectName(QStringLiteral("actionInsertPagesFromPdf"));
+    ui->menuEdit->insertAction(ui->actionPageGeometry, insertPagesFromPdfAction);
+    connect(insertPagesFromPdfAction, &QAction::triggered, m_programController, [this]() { m_programController->insertPagesFromPdf({}); });
+
     // Special tools
     QToolButton* insertStickyNoteButton = m_actionManager->createToolButtonForActionGroup(PDFActionManager::CreateStickyNoteGroup, ui->mainToolBar);
     ui->mainToolBar->addWidget(insertStickyNoteButton);
@@ -368,6 +379,15 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
             [this](const std::vector<pdf::PDFInteger>& pages, int quarterTurns) { m_programController->rotatePages(pages, quarterTurns); });
     connect(m_sidebarWidget, &PDFSidebarWidget::reorderPagesRequested, m_programController,
             [this](const std::vector<pdf::PDFInteger>& newPageOrder) { m_programController->reorderPages(newPageOrder); });
+    connect(m_sidebarWidget, &PDFSidebarWidget::insertBlankPageRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& anchorPages) { m_programController->insertBlankPage(anchorPages); });
+    connect(m_sidebarWidget, &PDFSidebarWidget::insertPagesFromPdfRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& anchorPages) { m_programController->insertPagesFromPdf(anchorPages); });
+    connect(m_programController, &PDFProgramController::pagesInserted, m_sidebarWidget, [this](const std::vector<pdf::PDFInteger>& pageIndices)
+    {
+        // After the thumbnail model was reset by the document update: the old selection is gone, the new pages are selected.
+        QTimer::singleShot(0, m_sidebarWidget, [this, pageIndices]() { m_sidebarWidget->selectThumbnailPages(pageIndices); });
+    });
 
     m_advancedFindWidget = new PDFAdvancedFindWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), this);
     m_advancedFindDockWidget = new QDockWidget(tr("Advanced find"), this);

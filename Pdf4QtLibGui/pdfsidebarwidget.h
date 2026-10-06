@@ -110,6 +110,9 @@ public:
     /// Returns pages selected in the thumbnails (zero based, sorted, unique)
     std::vector<pdf::PDFInteger> getSelectedThumbnailPages() const;
 
+    /// Selects exactly these thumbnails (zero based page indices); the last one becomes the current item
+    void selectThumbnailPages(const std::vector<pdf::PDFInteger>& pageIndices);
+
 signals:
     void actionTriggered(const pdf::PDFAction* action);
     void documentModified(pdf::PDFModifiedDocument document);
@@ -118,6 +121,8 @@ signals:
     void exportPagesAsImagesRequested(std::vector<pdf::PDFInteger> pageIndices);
     void deletePagesRequested(std::vector<pdf::PDFInteger> pageIndices);
     void rotatePagesRequested(std::vector<pdf::PDFInteger> pageIndices, int quarterTurns);
+    void insertBlankPageRequested(std::vector<pdf::PDFInteger> anchorPages);
+    void insertPagesFromPdfRequested(std::vector<pdf::PDFInteger> anchorPages);
 
     /// Thumbnails were dragged to a new place. \p newPageOrder lists, for every new
     /// position, the old (zero based) index of the page that goes there.
@@ -159,7 +164,6 @@ private:
 
     bool saveAttachmentToFile(const pdf::PDFFileSpecification* fileSpecification, const QString& fileName);
     void openAttachment(const pdf::PDFFileSpecification* fileSpecification);
-    void selectThumbnailPages(const std::vector<pdf::PDFInteger>& pageIndices);
 
     Ui::PDFSidebarWidget* ui;
     pdf::PDFDrawWidgetProxy* m_proxy;

@@ -1252,6 +1252,21 @@ void PDFSidebarWidget::onThumbnailContextMenuRequested(const QPoint& pos)
             Q_EMIT rotatePagesRequested(selectedPages, -1);
             QTimer::singleShot(0, this, [this, selectedPages]() { selectThumbnailPages(selectedPages); });
         });
+
+        menu.addSeparator();
+        QAction* insertBlankAction = menu.addAction(tr("Insert Blank Page..."));
+        insertBlankAction->setObjectName(QStringLiteral("thumbnailInsertBlankPageAction"));
+        connect(insertBlankAction, &QAction::triggered, this, [this, selectedPages]()
+        {
+            Q_EMIT insertBlankPageRequested(selectedPages);
+        });
+
+        QAction* insertPagesAction = menu.addAction(tr("Insert Pages from PDF..."));
+        insertPagesAction->setObjectName(QStringLiteral("thumbnailInsertPagesFromPdfAction"));
+        connect(insertPagesAction, &QAction::triggered, this, [this, selectedPages]()
+        {
+            Q_EMIT insertPagesFromPdfRequested(selectedPages);
+        });
     }
 
     menu.exec(ui->thumbnailsListView->viewport()->mapToGlobal(pos));

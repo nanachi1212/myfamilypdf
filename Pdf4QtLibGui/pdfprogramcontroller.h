@@ -28,6 +28,7 @@
 #include "pdfannotation.h"
 #include "pdfsignaturehandler.h"
 #include "pdfdocumentreader.h"
+#include "pdfdocumentmerger.h"
 #include "pdfdocumentpropertiesdialog.h"
 #include "pdfplugin.h"
 #include "pdfbookmarkmanager.h"
@@ -353,6 +354,21 @@ public:
     /// was changed; an invalid permutation or an unchanged order leaves the document untouched.
     bool reorderPages(const std::vector<pdf::PDFInteger>& newPageOrder);
 
+    /// Editor only (v11): asks for size and position and inserts one empty page. \p anchorPages are the
+    /// selected thumbnails (sorted); empty means the current page. The Viewer refuses.
+    void insertBlankPage(const std::vector<pdf::PDFInteger>& anchorPages);
+
+    /// Editor only (v11): asks for a PDF, its pages and the position, and inserts the pages.
+    void insertPagesFromPdf(const std::vector<pdf::PDFInteger>& anchorPages);
+
+    /// Inserts one empty page at \p insertIndex as one Undo step. Returns false (document unchanged)
+    /// in the Viewer or when the insertion is refused.
+    bool insertBlankPageAt(pdf::PDFInteger insertIndex, const QRectF& mediaBox, const QRectF& cropBox, pdf::PageRotation rotation);
+
+    /// Inserts \p pages of \p source at \p insertIndex as one Undo step. Warnings (links that lose their
+    /// target, encryption that is not kept) are confirmed by the user first. Returns false if nothing changed.
+    bool insertPagesAt(pdf::PDFInteger insertIndex, const pdf::PDFDocumentMerger::Source& source, const std::vector<pdf::PDFInteger>& pages);
+
     void onActionTriggered(const pdf::PDFAction* action);
     void onDocumentModified(pdf::PDFModifiedDocument document);
     void updateActionsAvailability();
@@ -375,7 +391,11 @@ signals:
     void openDocumentInNewTabRequested(const QString& fileName);
     void documentPathChanged(const QString& fileName);
 
+    /// Pages were inserted (zero based page indices of the new pages).
+    void pagesInserted(std::vector<pdf::PDFInteger> pageIndices);
+
 private:
+    void publishInsertedPages(pdf::PDFDocumentPointer document, pdf::PDFInteger insertIndex, pdf::PDFInteger pageCount);
 
     struct AsyncReadingResult
     {

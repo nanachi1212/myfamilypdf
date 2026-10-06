@@ -49,6 +49,8 @@
 #include "pdfprintdialog.h"
 #include "pdfexportimagesdialog.h"
 #include "pdfmergepdfsdialog.h"
+#include "pdfinsertpagesdialog.h"
+#include "pdfdocumentmerger.h"
 #include "pdfdocumentpropertiesdialog.h"
 #include "pdfsecurityhandler.h"
 #include <QMenuBar>
@@ -85,6 +87,7 @@
 #include <psapi.h>
 #endif
 #include <memory>
+#include <numeric>
 #include <thread>
 
 namespace
@@ -244,6 +247,13 @@ private slots:
     void metadataXMPMismatchHint();
     void metadataViewerIsReadOnly();
     void metadataSignedAndEncryptedDocuments();
+    void insertPagesViewerIsReadOnly();
+    void insertPagesEditorEntries();
+    void insertPagesEditorBlankWorkflow();
+    void insertPagesEditorFromPdfWorkflow();
+    void insertPagesEditorFailureAndWarnings();
+    void insertPagesEditorUndoMemory();
+    void insertPagesEditorTranslations();
 
 private:
     QAction* action(const char* name) const { return m_window->findChild<QAction*>(QLatin1String(name)); }
@@ -297,7 +307,7 @@ void ViewerContextMenuTest::init()
     if (testFunction == "thumbnailSelectionAndPageManagement" || testFunction.startsWith("annotation")
         || testFunction.startsWith("pageReorder") || testFunction == "thumbnailReorderWorkflow"
         || testFunction == "reorderPreservesContentAfterSave" || testFunction == "reorderFlattensNestedPageTree" || testFunction == "nativeThumbnailDragSmoke"
-        || testFunction.startsWith("mergePdfs") || testFunction.startsWith("metadata"))
+        || testFunction.startsWith("mergePdfs") || testFunction.startsWith("metadata") || testFunction.startsWith("insertPagesEditor"))
     {
         return;
     }
@@ -4690,6 +4700,719 @@ void ViewerContextMenuTest::metadataSignedAndEncryptedDocuments()
     }));
     QVERIFY(restrictedReadOnly);
     QVERIFY(!editor.findChild<QAction*>("actionUndo")->isEnabled());
+}
+
+namespace
+{
+
+bool writeRawPdf(const QString& path, const QList<QByteArray>& objects)
+{
+    QByteArray pdfData = "%PDF-1.7\n";
+    QList<qsizetype> offsets;
+    for (qsizetype index = 0; index < objects.size(); ++index)
+    {
+        offsets << pdfData.size();
+        pdfData += QByteArray::number(index + 1) + " 0 obj\n" + objects[index] + "\nendobj\n";
+    }
+    const qsizetype xrefOffset = pdfData.size();
+    pdfData += "xref\n0 " + QByteArray::number(objects.size() + 1) + "\n0000000000 65535 f \n";
+    for (const qsizetype offset : offsets)
+    {
+        pdfData += QByteArray::number(offset).rightJustified(10, '0') + " 00000 n \n";
+    }
+    pdfData += "trailer\n<< /Size " + QByteArray::number(objects.size() + 1) + " /Root 1 0 R >>\nstartxref\n" + QByteArray::number(xrefOffset) + "\n%%EOF\n";
+    QFile file(path);
+    return file.open(QIODevice::WriteOnly | QIODevice::Truncate) && file.write(pdfData) == pdfData.size();
+}
+
+/// Two pages "LINK page 1/2"; page 1 has a link to page 2 and, when \p withForm, page 2 has a form field.
+bool writeInsertSourceFixture(const QString& path, bool withForm)
+{
+    const QList<QByteArray> objects = {
+        withForm ? "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [9 0 R] >> >>" : "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [4 0 R 6 0 R] /Count 2 >>",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R /Annots [8 0 R] >>",
+        "<< /Length 43 >>\nstream\nBT /F1 18 Tf 20 360 Td (LINK page 1) Tj ET\nendstream",
+        withForm ? "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Resources << /Font << /F1 3 0 R >> >> /Contents 7 0 R /Annots [9 0 R] >>"
+                 : "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Resources << /Font << /F1 3 0 R >> >> /Contents 7 0 R >>",
+        "<< /Length 43 >>\nstream\nBT /F1 18 Tf 20 360 Td (LINK page 2) Tj ET\nendstream",
+        "<< /Type /Annot /Subtype /Link /Rect [20 20 120 60] /Border [0 0 0] /Dest [6 0 R /Fit] >>",
+        "<< /Type /Annot /Subtype /Widget /FT /Tx /T (f) /Rect [20 20 120 40] /P 6 0 R >>",
+    };
+    return writeRawPdf(path, objects);
+}
+
+/// Runs \p action; meanwhile every modal widget is passed to \p onModal until it returns true (done).
+/// A modal widget left open after the timeout is rejected, so a failing test does not hang.
+bool runWithModal(QWidget* owner, const std::function<void()>& action, const std::function<bool(QWidget*)>& onModal, int timeoutMs = 15000)
+{
+    bool done = false;
+    bool timedOut = false;
+    QTimer timer;
+    QTimer deadline;
+    deadline.setSingleShot(true);
+    QObject::connect(&deadline, &QTimer::timeout, owner, [&]()
+    {
+        timedOut = true;
+        timer.stop();
+        if (auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget()))
+        {
+            dialog->reject();
+        }
+    });
+    QObject::connect(&timer, &QTimer::timeout, owner, [&]()
+    {
+        if (!done)
+        {
+            if (QWidget* modal = QApplication::activeModalWidget())
+            {
+                done = onModal(modal);
+            }
+        }
+    });
+    timer.start(10);
+    deadline.start(timeoutMs);
+    action();
+    timer.stop();
+    deadline.stop();
+    return done && !timedOut;
+}
+
+/// Accepts a dialog from the event loop (not from inside the timer slot), so message boxes it opens can be driven.
+void acceptLater(QDialog* dialog)
+{
+    QTimer::singleShot(0, dialog, [dialog]() { dialog->accept(); });
+}
+
+qint64 processPrivateBytes()
+{
+#ifdef Q_OS_WIN
+    PROCESS_MEMORY_COUNTERS_EX counters = { };
+    using Query = BOOL (WINAPI*)(HANDLE, PPROCESS_MEMORY_COUNTERS, DWORD);
+    auto query = reinterpret_cast<Query>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "K32GetProcessMemoryInfo"));
+    if (query && query(GetCurrentProcess(), reinterpret_cast<PPROCESS_MEMORY_COUNTERS>(&counters), sizeof(counters)))
+    {
+        return qint64(counters.PrivateUsage);
+    }
+#endif
+    return -1;
+}
+
+void selectThumbnailRows(QListView* view, const std::vector<int>& rows)
+{
+    view->selectionModel()->clearSelection();
+    for (const int row : rows)
+    {
+        view->selectionModel()->select(view->model()->index(row, 0), QItemSelectionModel::Select);
+    }
+}
+
+std::vector<pdf::PDFInteger> selectedThumbnailPages(const QListView* view)
+{
+    const std::vector<int> rows = selectedThumbnailRows(view);
+    return std::vector<pdf::PDFInteger>(rows.cbegin(), rows.cend());
+}
+
+std::vector<pdf::PDFInteger> currentPages(pdfviewer::PDFProgramController* controller)
+{
+    return controller->getPdfWidget()->getDrawWidget()->getCurrentPages();
+}
+
+} // namespace
+
+void ViewerContextMenuTest::insertPagesViewerIsReadOnly()
+{
+    // 39. The Viewer offers no entry and its controller refuses to change the document.
+    QVERIFY(!m_window->findChild<QAction*>("actionInsertBlankPage"));
+    QVERIFY(!m_window->findChild<QAction*>("actionInsertPagesFromPdf"));
+    auto* controller = m_window->getProgramController();
+    const pdf::PDFDocument* document = controller->getDocument();
+    const auto references = reorderPageReferences(document);
+
+    const QString sourcePath = m_temp.filePath("insert-viewer-source.pdf");
+    QVERIFY(writeInsertSourceFixture(sourcePath, false));
+    const auto source = pdf::PDFDocumentMerger::loadSource(sourcePath, {});
+    QVERIFY(source.source.document);
+    bool modalSeen = false;
+    bool blankRefused = false;
+    bool pagesRefused = false;
+    runWithModal(m_window.get(), [&]()
+    {
+        blankRefused = !controller->insertBlankPageAt(0, QRectF(0, 0, 100, 100), QRectF(), pdf::PageRotation::None);
+        pagesRefused = !controller->insertPagesAt(0, source.source, { 0 });
+        controller->insertBlankPage({ 0 });
+        controller->insertPagesFromPdf({ 0 });
+    }, [&](QWidget* modal)
+    {
+        modalSeen = true;
+        if (auto* dialog = qobject_cast<QDialog*>(modal))
+        {
+            dialog->reject();
+        }
+        return true;
+    }, 500);
+    QVERIFY(blankRefused);
+    QVERIFY(pagesRefused);
+    QVERIFY(!modalSeen);
+    QVERIFY(controller->getDocument() == document);
+    QVERIFY(reorderPageReferences(controller->getDocument()) == references);
+
+#ifndef Q_OS_LINUX
+    // The thumbnail menu of the Viewer has no insert entries.
+    auto* thumbnails = m_window->findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(showThumbnailsPage(m_window.get()));
+    QTRY_VERIFY(thumbnails->visualRect(thumbnails->model()->index(0, 0)).isValid());
+    bool menuInspected = false;
+    bool menuWithoutInsert = false;
+    QTimer menuTimer;
+    connect(&menuTimer, &QTimer::timeout, m_window.get(), [&]()
+    {
+        auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+        if (!menu)
+        {
+            return;
+        }
+        menuTimer.stop();
+        menuInspected = menu->findChild<QAction*>("thumbnailExtractPagesAction") != nullptr;
+        menuWithoutInsert = !menu->findChild<QAction*>("thumbnailInsertBlankPageAction") && !menu->findChild<QAction*>("thumbnailInsertPagesFromPdfAction");
+        menu->close();
+    });
+    menuTimer.start(10);
+    const QPoint contextPoint = thumbnails->visualRect(thumbnails->model()->index(0, 0)).center();
+    QContextMenuEvent contextEvent(QContextMenuEvent::Mouse, contextPoint, thumbnails->viewport()->mapToGlobal(contextPoint));
+    QApplication::sendEvent(thumbnails->viewport(), &contextEvent);
+    menuTimer.stop();
+    QVERIFY(menuInspected);
+    QVERIFY(menuWithoutInsert);
+#endif
+}
+
+void ViewerContextMenuTest::insertPagesEditorEntries()
+{
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    QAction* blank = editor.findChild<QAction*>("actionInsertBlankPage");
+    QAction* fromPdf = editor.findChild<QAction*>("actionInsertPagesFromPdf");
+    QVERIFY(blank && fromPdf);
+    bool inEditMenu = false;
+    for (QMenu* menu : editor.menuBar()->findChildren<QMenu*>())
+    {
+        inEditMenu = inEditMenu || (menu->objectName() == "menuEdit" && menu->actions().contains(blank) && menu->actions().contains(fromPdf));
+    }
+    QVERIFY(inEditMenu);
+
+    // Without a document nothing happens.
+    bool modalSeen = false;
+    runWithModal(&editor, [&]() { blank->trigger(); fromPdf->trigger(); }, [&](QWidget* modal)
+    {
+        modalSeen = true;
+        if (auto* dialog = qobject_cast<QDialog*>(modal))
+        {
+            dialog->reject();
+        }
+        return true;
+    }, 500);
+    QVERIFY(!modalSeen);
+
+#ifndef Q_OS_LINUX
+    const QString path = m_temp.filePath("insert-entries.pdf");
+    QVERIFY(writePdfFixture(path, 3));
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    auto* thumbnails = editor.findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(showThumbnailsPage(&editor));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 3);
+    QTRY_VERIFY(thumbnails->visualRect(thumbnails->model()->index(1, 0)).isValid());
+
+    // The thumbnail menu offers both entries; choosing one opens the dialog with the clicked page as anchor.
+    // Two timers: the menu action runs the modal dialog inside the menu timer's slot, so another timer handles the dialog.
+    QString positionText;
+    bool menuUsed = false;
+    QTimer menuTimer;
+    QTimer dialogTimer;
+    connect(&menuTimer, &QTimer::timeout, &editor, [&]()
+    {
+        auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+        QAction* insertBlank = menu ? menu->findChild<QAction*>("thumbnailInsertBlankPageAction") : nullptr;
+        if (insertBlank && menu->findChild<QAction*>("thumbnailInsertPagesFromPdfAction"))
+        {
+            menuTimer.stop();
+            menuUsed = true;
+            menu->close();
+            insertBlank->trigger();
+        }
+    });
+    connect(&dialogTimer, &QTimer::timeout, &editor, [&]()
+    {
+        if (auto* dialog = qobject_cast<pdfviewer::PDFInsertPagesDialog*>(QApplication::activeModalWidget()))
+        {
+            dialogTimer.stop();
+            positionText = dialog->findChild<QComboBox*>("insertPositionComboBox")->itemText(0);
+            dialog->reject();
+        }
+    });
+    menuTimer.start(10);
+    dialogTimer.start(10);
+    const QPoint contextPoint = thumbnails->visualRect(thumbnails->model()->index(1, 0)).center();
+    QContextMenuEvent contextEvent(QContextMenuEvent::Mouse, contextPoint, thumbnails->viewport()->mapToGlobal(contextPoint));
+    QApplication::sendEvent(thumbnails->viewport(), &contextEvent);
+    QTRY_VERIFY_WITH_TIMEOUT(!positionText.isEmpty(), 5000);
+    menuTimer.stop();
+    dialogTimer.stop();
+    QVERIFY(menuUsed);
+    QCOMPARE(positionText, QStringLiteral("Before page 2"));
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(3));      // cancelled: unchanged
+    controller->closeDocument();
+#endif
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::insertPagesEditorBlankWorkflow()
+{
+#ifdef Q_OS_LINUX
+    QSKIP("Editor thumbnail interactions are covered by the Windows runtime job.");
+#endif
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    const QString path = m_temp.filePath("insert-blank.pdf");
+    QVERIFY(writePdfFixture(path, 4));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    controller->getPdfWidget()->getDrawWidgetProxy()->setPageLayout(pdf::PageLayout::OneColumn);
+    auto* thumbnails = editor.findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(thumbnails);
+    QVERIFY(showThumbnailsPage(&editor));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 4);
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+    QAction* redoAction = editor.findChild<QAction*>("actionRedo");
+    QVERIFY(!undoAction->isEnabled());
+    const std::vector<pdf::PDFObjectReference> original = reorderPageReferences(controller->getDocument());
+
+    // Thumbnails 2 and 4 selected: "Before" uses page 2, "After" uses page 4; the dialog says so.
+    selectThumbnailRows(thumbnails, { 1, 3 });
+    QCOMPARE(selectedThumbnailPages(thumbnails), std::vector<pdf::PDFInteger>({ 1, 3 }));
+    QStringList positions;
+    QString sizeText;
+    QString positionLabel;
+    QVERIFY(runWithModal(&editor, [&]() { controller->insertBlankPage(selectedThumbnailPages(thumbnails)); }, [&](QWidget* modal)
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFInsertPagesDialog*>(modal);
+        if (!dialog)
+        {
+            return false;
+        }
+        auto* position = dialog->findChild<QComboBox*>("insertPositionComboBox");
+        for (int i = 0; i < position->count(); ++i)
+        {
+            positions << position->itemText(i);
+        }
+        position->setCurrentIndex(0);       // Before page 2
+        sizeText = dialog->findChild<QComboBox*>("insertSizeComboBox")->itemText(0);
+        positionLabel = dialog->findChild<QLabel*>("insertPositionLabel")->text();
+        acceptLater(dialog);
+        return true;
+    }));
+    QCOMPARE(positions, QStringList({ "Before page 2", "After page 4", "At the beginning of the document", "At the end of the document" }));
+    QVERIFY2(sizeText.startsWith("Same as page 2"), qPrintable(sizeText));
+    QCOMPARE(positionLabel, QStringLiteral("The new page becomes page 2 of 5."));
+
+    const pdf::PDFCatalog* catalog = controller->getDocument()->getCatalog();
+    QCOMPARE(catalog->getPageCount(), size_t(5));
+    QCOMPARE(catalog->getPage(1)->getMediaBox(), catalog->getPage(2)->getMediaBox());
+    QVERIFY(!controller->getDocument()->getStorage().getDictionaryFromObject(controller->getDocument()->getObjectByReference(catalog->getPage(1)->getPageReference()))->hasKey("Contents"));
+    std::vector<pdf::PDFObjectReference> references = reorderPageReferences(controller->getDocument());
+    references.erase(references.begin() + 1);
+    QVERIFY(references == original);
+    // The inserted page is selected and shown; the old selection is gone.
+    QTRY_VERIFY(selectedThumbnailRows(thumbnails) == std::vector<int>({ 1 }));
+    QTRY_VERIFY(!currentPages(controller).empty() && currentPages(controller).front() == 1);
+
+    // One Undo step.
+    QVERIFY(undoAction->isEnabled());
+    undoAction->trigger();
+    QVERIFY(reorderPageReferences(controller->getDocument()) == original);
+    QVERIFY(!undoAction->isEnabled());
+    redoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(5));
+
+    // Edit menu entry: the current page is the anchor; A4 at the end.
+    controller->getPdfWidget()->getDrawWidgetProxy()->goToPage(0);
+    QTRY_VERIFY(!currentPages(controller).empty() && currentPages(controller).front() == 0);
+    QVERIFY(runWithModal(&editor, [&]() { editor.findChild<QAction*>("actionInsertBlankPage")->trigger(); }, [&](QWidget* modal)
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFInsertPagesDialog*>(modal);
+        if (!dialog)
+        {
+            return false;
+        }
+        dialog->findChild<QComboBox*>("insertPositionComboBox")->setCurrentIndex(3);
+        dialog->findChild<QComboBox*>("insertSizeComboBox")->setCurrentIndex(1);
+        acceptLater(dialog);
+        return true;
+    }));
+    catalog = controller->getDocument()->getCatalog();
+    QCOMPARE(catalog->getPageCount(), size_t(6));
+    QVERIFY(qAbs(catalog->getPage(5)->getMediaBox().width() - 595.276) < 0.01);
+    QTRY_VERIFY(selectedThumbnailRows(thumbnails) == std::vector<int>({ 5 }));
+
+    // Cancel changes nothing.
+    const pdf::PDFDocument* beforeCancel = controller->getDocument();
+    QVERIFY(runWithModal(&editor, [&]() { controller->insertBlankPage({}); }, [&](QWidget* modal)
+    {
+        if (auto* dialog = qobject_cast<QDialog*>(modal))
+        {
+            dialog->reject();
+        }
+        return true;
+    }));
+    QVERIFY(controller->getDocument() == beforeCancel);
+
+    // Save As and reopen.
+    const QString savedPath = m_temp.filePath("insert-blank-saved.pdf");
+    QFile::remove(savedPath);
+    QVERIFY(annotationSaveAs(controller, &editor, savedPath));
+    controller->closeDocument();
+    controller->openDocument(savedPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    catalog = controller->getDocument()->getCatalog();
+    QCOMPARE(catalog->getPageCount(), size_t(6));
+    QVERIFY(qAbs(catalog->getPage(5)->getMediaBox().width() - 595.276) < 0.01);
+    auto* compiler = controller->getPdfWidget()->getDrawWidgetProxy()->getTextLayoutCompiler();
+    compiler->makeTextLayout();
+    QTRY_VERIFY_WITH_TIMEOUT(compiler->isTextLayoutReady(), 15000);
+    QVERIFY(pageText(compiler, 0).contains("smoke page 1"));
+    QVERIFY(pageText(compiler, 1).trimmed().isEmpty());
+    QVERIFY(pageText(compiler, 2).contains("smoke page 2"));
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::insertPagesEditorFromPdfWorkflow()
+{
+#ifdef Q_OS_LINUX
+    QSKIP("Editor thumbnail interactions are covered by the Windows runtime job.");
+#endif
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    const QString path = m_temp.filePath("insert-target.pdf");
+    const QString sourcePath = m_temp.filePath("insert-source.pdf");
+    QVERIFY(writePdfFixture(path, 4));
+    QVERIFY(writePdfFixture(sourcePath, 5, 1, true, false, false, "SOURCE page "));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    controller->getPdfWidget()->getDrawWidgetProxy()->setPageLayout(pdf::PageLayout::OneColumn);
+    auto* thumbnails = editor.findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(showThumbnailsPage(&editor));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 4);
+    const std::vector<pdf::PDFObjectReference> original = reorderPageReferences(controller->getDocument());
+    selectThumbnailRows(thumbnails, { 1 });
+
+    // "3,1,3" is refused in the dialog with a message; "3,1" after page 2 is inserted.
+    int stage = 0;
+    QString duplicateMessage;
+    QString sourceLabel;
+    QString positionLabel;
+    pdf::PDFInteger dialogInsertIndex = -1;
+    QVERIFY(runWithModal(&editor, [&]() { controller->insertPagesFromPdf(selectedThumbnailPages(thumbnails)); }, [&](QWidget* modal)
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFInsertPagesDialog*>(modal);
+        if (stage == 0 && dialog)
+        {
+            if (!dialog->loadSourceFile(sourcePath))
+            {
+                return false;
+            }
+            sourceLabel = dialog->findChild<QLabel*>("insertSourceLabel")->text();
+            dialog->findChild<QLineEdit*>("insertPagesEdit")->setText("3,1,3");
+            stage = 1;
+            acceptLater(dialog);
+        }
+        else if (stage == 1)
+        {
+            if (auto* message = qobject_cast<QMessageBox*>(modal))
+            {
+                duplicateMessage = message->text();
+                message->accept();
+                stage = 2;
+            }
+        }
+        else if (stage == 2 && dialog)
+        {
+            dialog->findChild<QLineEdit*>("insertPagesEdit")->setText("3,1");
+            positionLabel = dialog->findChild<QLabel*>("insertPositionLabel")->text();
+            dialogInsertIndex = dialog->getInsertIndex();
+            acceptLater(dialog);
+            return true;
+        }
+        return false;
+    }));
+    QVERIFY2(duplicateMessage.contains("more than once"), qPrintable(duplicateMessage));
+    QVERIFY2(sourceLabel.contains("5 pages"), qPrintable(sourceLabel));
+    QCOMPARE(positionLabel, QString::fromUtf8("The inserted pages become pages 3–4 of 6."));
+    QCOMPARE(dialogInsertIndex, pdf::PDFInteger(2));
+
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(6));
+    const std::vector<pdf::PDFObjectReference> references = reorderPageReferences(controller->getDocument());
+    QVERIFY(references[0] == original[0]);
+    QVERIFY(references[1] == original[1]);
+    QVERIFY(references[4] == original[2]);
+    QVERIFY(references[5] == original[3]);
+    QTRY_VERIFY(selectedThumbnailRows(thumbnails) == std::vector<int>({ 2, 3 }));
+    QTRY_VERIFY(!currentPages(controller).empty() && currentPages(controller).front() == 2);
+
+    // One Undo step; Redo restores the inserted pages.
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+    QAction* redoAction = editor.findChild<QAction*>("actionRedo");
+    undoAction->trigger();
+    QVERIFY(reorderPageReferences(controller->getDocument()) == original);
+    QVERIFY(!undoAction->isEnabled());
+    redoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(6));
+
+    // Save As, reopen: order and text layer.
+    const QString savedPath = m_temp.filePath("insert-from-pdf-saved.pdf");
+    QFile::remove(savedPath);
+    QVERIFY(annotationSaveAs(controller, &editor, savedPath));
+    controller->closeDocument();
+    controller->openDocument(savedPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    auto* compiler = controller->getPdfWidget()->getDrawWidgetProxy()->getTextLayoutCompiler();
+    compiler->makeTextLayout();
+    QTRY_VERIFY_WITH_TIMEOUT(compiler->isTextLayoutReady(), 15000);
+    const QStringList expected = { "smoke page 1", "smoke page 2", "SOURCE page 3", "SOURCE page 1", "smoke page 3", "smoke page 4" };
+    for (int i = 0; i < expected.size(); ++i)
+    {
+        QVERIFY2(pageText(compiler, i).contains(expected[i]), qPrintable(QString("page %1: %2").arg(i + 1).arg(pageText(compiler, i))));
+    }
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::insertPagesEditorFailureAndWarnings()
+{
+#ifdef Q_OS_LINUX
+    QSKIP("Editor thumbnail interactions are covered by the Windows runtime job.");
+#endif
+    const QString path = m_temp.filePath("insert-atomic.pdf");
+    const QString formPath = m_temp.filePath("insert-form-source.pdf");
+    const QString linkPath = m_temp.filePath("insert-link-source.pdf");
+    QVERIFY(writePdfFixture(path, 3));
+    QVERIFY(writeInsertSourceFixture(formPath, true));
+    QVERIFY(writeInsertSourceFixture(linkPath, false));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    controller->getPdfWidget()->getDrawWidgetProxy()->setPageLayout(pdf::PageLayout::OneColumn);
+    auto* thumbnails = editor.findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(showThumbnailsPage(&editor));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 3);
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+
+    // Make one edit first, so "Undo history unchanged" is meaningful.
+    QVERIFY(controller->insertBlankPageAt(3, QRectF(0, 0, 100, 100), QRectF(), pdf::PageRotation::None));
+    QVERIFY(undoAction->isEnabled());
+    QTRY_VERIFY(selectedThumbnailRows(thumbnails) == std::vector<int>({ 3 }));
+    controller->getPdfWidget()->getDrawWidgetProxy()->goToPage(1);
+    QTRY_VERIFY(!currentPages(controller).empty() && currentPages(controller).front() == 1);
+    selectThumbnailRows(thumbnails, { 0, 2 });
+    QTRY_VERIFY(selectedThumbnailRows(thumbnails) == std::vector<int>({ 0, 2 }));
+
+    const pdf::PDFDocument* document = controller->getDocument();
+    auto unchanged = [&]()
+    {
+        return controller->getDocument() == document &&
+               controller->getDocument()->getCatalog()->getPageCount() == 4 &&
+               undoAction->isEnabled() &&
+               selectedThumbnailRows(thumbnails) == std::vector<int>({ 0, 2 }) &&
+               !currentPages(controller).empty() && currentPages(controller).front() == 1;
+    };
+
+    // 38. A source with a form is refused before the document changes.
+    const auto formSource = pdf::PDFDocumentMerger::loadSource(formPath, {});
+    QVERIFY(formSource.source.document);
+    QString errorText;
+    bool inserted = true;
+    QVERIFY(runWithModal(&editor, [&]() { inserted = controller->insertPagesAt(0, formSource.source, { 0 }); }, [&](QWidget* modal)
+    {
+        auto* message = qobject_cast<QMessageBox*>(modal);
+        if (message)
+        {
+            errorText = message->text();
+            message->accept();
+        }
+        return message != nullptr;
+    }));
+    QVERIFY(!inserted);
+    QCOMPARE(errorText, QStringLiteral("The selected pages of this PDF contain form fields and cannot be inserted safely yet."));
+    QVERIFY(unchanged());
+
+    // The form source is refused in the dialog too (OK shows the reason, the dialog stays open).
+    QString dialogMessage;
+    bool loadAccepted = true;
+    int stage = 0;
+    QVERIFY(runWithModal(&editor, [&]() { controller->insertPagesFromPdf({ 1 }); }, [&](QWidget* modal)
+    {
+        auto* dialog = qobject_cast<pdfviewer::PDFInsertPagesDialog*>(modal);
+        if (stage == 0 && dialog)
+        {
+            loadAccepted = dialog->loadSourceFile(formPath);
+            stage = 1;
+            acceptLater(dialog);
+        }
+        else if (stage == 1)
+        {
+            if (auto* message = qobject_cast<QMessageBox*>(modal))
+            {
+                dialogMessage = message->text();
+                message->accept();
+                stage = 2;
+            }
+        }
+        else if (stage == 2 && dialog)
+        {
+            dialog->reject();
+            return true;
+        }
+        return false;
+    }));
+    QVERIFY(!loadAccepted);
+    QVERIFY2(dialogMessage.contains("form fields"), qPrintable(dialogMessage));
+    QVERIFY(unchanged());
+
+    // A link to a page that is not inserted: the warning is shown first; Cancel changes nothing.
+    const auto linkSource = pdf::PDFDocumentMerger::loadSource(linkPath, {});
+    QString warningText;
+    inserted = true;
+    QVERIFY(runWithModal(&editor, [&]() { inserted = controller->insertPagesAt(1, linkSource.source, { 0 }); }, [&](QWidget* modal)
+    {
+        auto* message = qobject_cast<QMessageBox*>(modal);
+        if (message)
+        {
+            warningText = message->text();
+            message->button(QMessageBox::Cancel)->click();
+        }
+        return message != nullptr;
+    }));
+    QVERIFY(!inserted);
+    QVERIFY2(warningText.contains("1 link(s)"), qPrintable(warningText));
+    QVERIFY(unchanged());
+
+    // Yes inserts.
+    QVERIFY(runWithModal(&editor, [&]() { inserted = controller->insertPagesAt(1, linkSource.source, { 0 }); }, [&](QWidget* modal)
+    {
+        auto* message = qobject_cast<QMessageBox*>(modal);
+        if (message)
+        {
+            message->button(QMessageBox::Yes)->click();
+        }
+        return message != nullptr;
+    }));
+    QVERIFY(inserted);
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(5));
+    QTRY_VERIFY(selectedThumbnailRows(thumbnails) == std::vector<int>({ 1 }));
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::insertPagesEditorUndoMemory()
+{
+#ifdef Q_OS_LINUX
+    QSKIP("Measurement runs on Windows.");
+#endif
+    // The Undo history keeps whole document snapshots: measure, do not change.
+    QList<QByteArray> objects = { "<< /Type /Catalog /Pages 2 0 R >>", QByteArray() };
+    QByteArray kids;
+    for (int i = 0; i < 500; ++i)
+    {
+        QByteArray pixels(100 * 100 * 3, char(i % 251));
+        pixels.replace(0, 12, "SCANIMG" + QByteArray::number(1000 + i));
+        const int image = int(objects.size()) + 1;
+        objects << "<< /Type /XObject /Subtype /Image /Width 100 /Height 100 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length 30000 >>\nstream\n" + pixels + "\nendstream";
+        const QByteArray content = "q 400 0 0 400 0 0 cm /Im0 Do Q";
+        objects << "<< /Length " + QByteArray::number(content.size()) + " >>\nstream\n" + content + "\nendstream";
+        objects << "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Resources << /XObject << /Im0 " + QByteArray::number(image) + " 0 R >> >> /Contents "
+                   + QByteArray::number(image + 1) + " 0 R >>";
+        kids += QByteArray::number(image + 2) + " 0 R ";
+    }
+    objects[1] = "<< /Type /Pages /Kids [" + kids + "] /Count 500 >>";
+    const QString scanPath = m_temp.filePath("insert-scan-500.pdf");
+    QVERIFY(writeRawPdf(scanPath, objects));
+    const QString path = m_temp.filePath("insert-memory.pdf");
+    QVERIFY(writePdfFixture(path, 1));
+
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    const auto source = pdf::PDFDocumentMerger::loadSource(scanPath, {});
+    QVERIFY(source.source.document);
+    QCoreApplication::processEvents();
+    const qint64 before = processPrivateBytes();
+
+    std::vector<pdf::PDFInteger> pages(400);
+    std::iota(pages.begin(), pages.end(), 0);
+    QElapsedTimer timer;
+    timer.start();
+    QVERIFY(controller->insertPagesAt(1, source.source, pages));
+    const qint64 elapsed = timer.elapsed();
+    QCoreApplication::processEvents();
+    const qint64 afterInsert = processPrivateBytes();
+    editor.findChild<QAction*>("actionUndo")->trigger();
+    QCoreApplication::processEvents();
+    const qint64 afterUndo = processPrivateBytes();
+    editor.findChild<QAction*>("actionRedo")->trigger();
+    QCoreApplication::processEvents();
+    const qint64 afterRedo = processPrivateBytes();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(401));
+    qInfo().noquote() << QString("INSERT_MEMORY insert 400 of 500 scanned pages: %1 ms; private MB before %2, after insert %3, after undo %4, after redo %5")
+                             .arg(elapsed).arg(before / 1048576.0, 0, 'f', 1).arg(afterInsert / 1048576.0, 0, 'f', 1)
+                             .arg(afterUndo / 1048576.0, 0, 'f', 1).arg(afterRedo / 1048576.0, 0, 'f', 1);
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::insertPagesEditorTranslations()
+{
+    struct Language
+    {
+        pdf::PDFApplicationTranslator::ELanguage language;
+        QString menuText;
+        QString formBlocker;
+        QString encryptionWarning;
+    };
+    const QList<Language> languages = {
+        { pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_TRADITIONAL, QString::fromUtf8("插入空白頁..."),
+          QString::fromUtf8("此 PDF 的選取頁面包含表單欄位，目前無法安全插入。"), QString::fromUtf8("來源頁面插入後將不再保留來源 PDF 的加密保護。") },
+        { pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_SIMPLIFIED, QString::fromUtf8("插入空白页..."),
+          QString::fromUtf8("此 PDF 的选取页面包含表单字段，目前无法安全插入。"), QString::fromUtf8("来源页面插入后将不再保留来源 PDF 的加密保护。") },
+    };
+    for (const Language& language : languages)
+    {
+        pdf::PDFApplicationTranslator translator;
+        translator.setLanguage(language.language);
+        translator.installTranslator();
+        pdfviewer::PDFEditorMainWindow editor;
+        QCOMPARE(editor.findChild<QAction*>("actionInsertBlankPage")->text(), language.menuText);
+        QCOMPARE(QCoreApplication::translate("pdf::PDFPageInserter", "The selected pages of this PDF contain form fields and cannot be inserted safely yet."), language.formBlocker);
+        QCOMPARE(QCoreApplication::translate("pdf::PDFPageInserter", "The inserted pages will no longer have the encryption of the source PDF."), language.encryptionWarning);
+        QVERIFY(QCoreApplication::translate("pdfviewer::PDFInsertPagesDialog", "Before page %1") != QStringLiteral("Before page %1"));
+        QVERIFY(QCoreApplication::translate("pdfviewer::PDFSidebarWidget", "Insert Pages from PDF...") != QStringLiteral("Insert Pages from PDF..."));
+        translator.uninstallTranslator();
+    }
 }
 
 QTEST_MAIN(ViewerContextMenuTest)

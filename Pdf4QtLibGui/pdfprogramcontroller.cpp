@@ -39,9 +39,11 @@
 #include "pdfrendertoimagesdialog.h"
 #include "pdfprintdialog.h"
 #include "pdfexportimagesdialog.h"
+#include "pdfinsertpagesdialog.h"
 #include "pdfmergepdfsdialog.h"
 #include "pdfpageoutput.h"
 #include "pdfpagereorder.h"
+#include "pdfpageinserter.h"
 #include "pdfoptimizedocumentdialog.h"
 #include "pdfoptimizeimagesdialog.h"
 #include "pdfsanitizedocumentdialog.h"
@@ -63,6 +65,7 @@
 
 #include <cstdio>
 #include <algorithm>
+#include <numeric>
 #include <cmath>
 #include <map>
 #include <memory>
@@ -3795,6 +3798,156 @@ bool PDFProgramController::reorderPages(const std::vector<pdf::PDFInteger>& newP
         m_pdfWidget->getDrawWidgetProxy()->goToPage(pdf::PDFInteger(newCurrentPosition - newPageOrder.cbegin()));
     }
     return true;
+}
+
+namespace
+{
+
+/// Anchor pages for an insertion: the selected thumbnails, or the current page when nothing is selected.
+std::vector<pdf::PDFInteger> getInsertAnchorPages(std::vector<pdf::PDFInteger> anchorPages, const std::vector<pdf::PDFInteger>& currentPages, pdf::PDFInteger pageCount)
+{
+    anchorPages.erase(std::remove_if(anchorPages.begin(), anchorPages.end(), [pageCount](pdf::PDFInteger pageIndex)
+    {
+        return pageIndex < 0 || pageIndex >= pageCount;
+    }), anchorPages.end());
+    std::sort(anchorPages.begin(), anchorPages.end());
+    anchorPages.erase(std::unique(anchorPages.begin(), anchorPages.end()), anchorPages.end());
+    if (anchorPages.empty())
+    {
+        anchorPages.push_back(currentPages.empty() || pageCount < 1 ? 0 : std::clamp(currentPages.front(), pdf::PDFInteger(0), pageCount - 1));
+    }
+    return anchorPages;
+}
+
+}   // namespace
+
+void PDFProgramController::insertBlankPage(const std::vector<pdf::PDFInteger>& anchorPages)
+{
+    if (!m_undoRedoManager || !m_pdfDocument)
+    {
+        return;     // the Viewer is read-only
+    }
+
+    const QStringList blockers = pdf::PDFPageInserter::checkTarget(m_pdfDocument.data(), false);
+    if (!blockers.isEmpty())
+    {
+        QMessageBox::warning(m_mainWindow, tr("Insert Blank Page"), blockers.join('\n'));
+        return;
+    }
+
+    const pdf::PDFDocumentPointer document = m_pdfDocument;
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(document->getCatalog()->getPageCount());
+    PDFInsertPagesDialog::Request request;
+    request.mode = PDFInsertPagesDialog::Mode::BlankPage;
+    request.document = document.data();
+    request.anchorPages = getInsertAnchorPages(anchorPages, m_pdfWidget->getDrawWidget()->getCurrentPages(), pageCount);
+    PDFInsertPagesDialog dialog(request, m_mainWindow);
+    if (dialog.exec() != QDialog::Accepted || m_pdfDocument != document)
+    {
+        return;
+    }
+
+    QRectF mediaBox(0, 0, 595.276, 841.89);     // A4 in points
+    QRectF cropBox;
+    pdf::PageRotation rotation = pdf::PageRotation::None;
+    const pdf::PDFInteger sizePage = dialog.getSizePage();
+    if (sizePage >= 0 && sizePage < pageCount)
+    {
+        const pdf::PDFPage* page = document->getCatalog()->getPage(size_t(sizePage));
+        mediaBox = page->getMediaBox();
+        cropBox = page->getCropBox();
+        rotation = page->getPageRotation();
+    }
+    insertBlankPageAt(dialog.getInsertIndex(), mediaBox, cropBox, rotation);
+}
+
+void PDFProgramController::insertPagesFromPdf(const std::vector<pdf::PDFInteger>& anchorPages)
+{
+    if (!m_undoRedoManager || !m_pdfDocument)
+    {
+        return;     // the Viewer is read-only
+    }
+
+    const QStringList blockers = pdf::PDFPageInserter::checkTarget(m_pdfDocument.data(), true);
+    if (!blockers.isEmpty())
+    {
+        QMessageBox::warning(m_mainWindow, tr("Insert Pages from PDF"), blockers.join('\n'));
+        return;
+    }
+
+    const pdf::PDFDocumentPointer document = m_pdfDocument;
+    PDFInsertPagesDialog::Request request;
+    request.mode = PDFInsertPagesDialog::Mode::PagesFromPdf;
+    request.document = document.data();
+    request.anchorPages = getInsertAnchorPages(anchorPages, m_pdfWidget->getDrawWidget()->getCurrentPages(), pdf::PDFInteger(document->getCatalog()->getPageCount()));
+    const QFileInfo sourceInfo(getOriginalFileName());
+    request.directory = sourceInfo.absolutePath().isEmpty() ? m_settings->getDirectory() : sourceInfo.absolutePath();
+    PDFInsertPagesDialog dialog(request, m_mainWindow);
+    if (dialog.exec() != QDialog::Accepted || m_pdfDocument != document)
+    {
+        return;
+    }
+    insertPagesAt(dialog.getInsertIndex(), dialog.getSource(), dialog.getSourcePages());
+}
+
+bool PDFProgramController::insertBlankPageAt(pdf::PDFInteger insertIndex, const QRectF& mediaBox, const QRectF& cropBox, pdf::PageRotation rotation)
+{
+    if (!m_undoRedoManager || !m_pdfDocument)
+    {
+        return false;   // the Viewer is read-only
+    }
+
+    pdf::PDFDocumentPointer document;
+    const pdf::PDFOperationResult result = pdf::PDFPageInserter::insertBlankPage(m_pdfDocument.data(), insertIndex, mediaBox, cropBox, rotation, &document);
+    if (!result)
+    {
+        QMessageBox::critical(m_mainWindow, tr("Insert Blank Page"), result.getErrorMessage());
+        return false;
+    }
+    publishInsertedPages(document, insertIndex, 1);
+    return true;
+}
+
+bool PDFProgramController::insertPagesAt(pdf::PDFInteger insertIndex, const pdf::PDFDocumentMerger::Source& source, const std::vector<pdf::PDFInteger>& pages)
+{
+    if (!m_undoRedoManager || !m_pdfDocument)
+    {
+        return false;   // the Viewer is read-only
+    }
+
+    // The import runs on copies; the open document changes only in publishInsertedPages.
+    pdf::PDFDocumentPointer document;
+    QStringList warnings;
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    const pdf::PDFOperationResult result = pdf::PDFPageInserter::insertPages(m_pdfDocument.data(), insertIndex, source, pages, &document, &warnings);
+    QApplication::restoreOverrideCursor();
+    if (!result)
+    {
+        QMessageBox::critical(m_mainWindow, tr("Insert Pages from PDF"), result.getErrorMessage());
+        return false;
+    }
+    if (!warnings.isEmpty() &&
+        QMessageBox::question(m_mainWindow, tr("Insert Pages from PDF"), warnings.join(QStringLiteral("\n\n")) + QStringLiteral("\n\n") + tr("Insert the pages?"),
+                              QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Yes) != QMessageBox::Yes)
+    {
+        return false;
+    }
+    publishInsertedPages(document, insertIndex, pdf::PDFInteger(pages.size()));
+    return true;
+}
+
+void PDFProgramController::publishInsertedPages(pdf::PDFDocumentPointer document, pdf::PDFInteger insertIndex, pdf::PDFInteger pageCount)
+{
+    // One modification, one Undo step. The view keeps its zoom; Fit modes recompute for the new pages as usual.
+    const pdf::PDFModifiedDocument::ModificationFlags flags(pdf::PDFModifiedDocument::Reset |
+                                                            pdf::PDFModifiedDocument::PreserveUndoRedo |
+                                                            pdf::PDFModifiedDocument::PreserveView);
+    onDocumentModified(pdf::PDFModifiedDocument(document, m_optionalContentActivity, flags));
+    m_pdfWidget->getDrawWidgetProxy()->goToPage(insertIndex);
+
+    std::vector<pdf::PDFInteger> insertedPages(static_cast<size_t>(pageCount));
+    std::iota(insertedPages.begin(), insertedPages.end(), insertIndex);
+    Q_EMIT pagesInserted(insertedPages);
 }
 
 void PDFProgramController::rotatePages(const std::vector<pdf::PDFInteger>& pageIndices, int quarterTurns)
