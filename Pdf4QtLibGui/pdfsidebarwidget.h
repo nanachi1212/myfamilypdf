@@ -123,6 +123,7 @@ signals:
     void rotatePagesRequested(std::vector<pdf::PDFInteger> pageIndices, int quarterTurns);
     void insertBlankPageRequested(std::vector<pdf::PDFInteger> anchorPages);
     void insertPagesFromPdfRequested(std::vector<pdf::PDFInteger> anchorPages);
+    void duplicatePagesRequested(std::vector<pdf::PDFInteger> pageIndices);
 
     /// Thumbnails were dragged to a new place. \p newPageOrder lists, for every new
     /// position, the old (zero based) index of the page that goes there.

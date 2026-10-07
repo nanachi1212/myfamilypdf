@@ -3908,7 +3908,7 @@ bool PDFProgramController::insertBlankPageAt(pdf::PDFInteger insertIndex, const 
     return true;
 }
 
-bool PDFProgramController::insertPagesAt(pdf::PDFInteger insertIndex, const pdf::PDFDocumentMerger::Source& source, const std::vector<pdf::PDFInteger>& pages)
+bool PDFProgramController::insertPagesAt(pdf::PDFInteger insertIndex, const pdf::PDFDocumentMerger::Source& source, const std::vector<pdf::PDFInteger>& pages, const QString& title)
 {
     if (!m_undoRedoManager || !m_pdfDocument)
     {
@@ -3916,6 +3916,7 @@ bool PDFProgramController::insertPagesAt(pdf::PDFInteger insertIndex, const pdf:
     }
 
     // The import runs on copies; the open document changes only in publishInsertedPages.
+    const QString messageTitle = title.isEmpty() ? tr("Insert Pages from PDF") : title;
     pdf::PDFDocumentPointer document;
     QStringList warnings;
     QApplication::setOverrideCursor(Qt::WaitCursor);
@@ -3923,17 +3924,31 @@ bool PDFProgramController::insertPagesAt(pdf::PDFInteger insertIndex, const pdf:
     QApplication::restoreOverrideCursor();
     if (!result)
     {
-        QMessageBox::critical(m_mainWindow, tr("Insert Pages from PDF"), result.getErrorMessage());
+        QMessageBox::critical(m_mainWindow, messageTitle, result.getErrorMessage());
         return false;
     }
     if (!warnings.isEmpty() &&
-        QMessageBox::question(m_mainWindow, tr("Insert Pages from PDF"), warnings.join(QStringLiteral("\n\n")) + QStringLiteral("\n\n") + tr("Insert the pages?"),
+        QMessageBox::question(m_mainWindow, messageTitle, warnings.join(QStringLiteral("\n\n")) + QStringLiteral("\n\n") + tr("Insert the pages?"),
                               QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Yes) != QMessageBox::Yes)
     {
         return false;
     }
     publishInsertedPages(document, insertIndex, pdf::PDFInteger(pages.size()));
     return true;
+}
+
+bool PDFProgramController::duplicatePages(const std::vector<pdf::PDFInteger>& pageIndices)
+{
+    if (!m_undoRedoManager || !m_pdfDocument)
+    {
+        return false;   // the Viewer is read-only
+    }
+
+    // The open document is its own source: the copies go through the same restricted import as pages of another PDF.
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount());
+    const std::vector<pdf::PDFInteger> pages = getInsertAnchorPages(pageIndices, m_pdfWidget->getDrawWidget()->getCurrentPages(), pageCount);
+    const pdf::PDFDocumentMerger::Source source = pdf::PDFDocumentMerger::createSource(QString(), QFileInfo(getOriginalFileName()).fileName(), m_pdfDocument);
+    return insertPagesAt(pages.back() + 1, source, pages, tr("Duplicate Pages"));
 }
 
 void PDFProgramController::publishInsertedPages(pdf::PDFDocumentPointer document, pdf::PDFInteger insertIndex, pdf::PDFInteger pageCount)
