@@ -106,3 +106,22 @@ The other tests send the drag events (enter, move, drop) to the view directly. Q
 delivers drag events only to a widget that accepts drops, and the view accepts them
 only while its own drag runs, so those tests switch `acceptDrops` on for the
 duration of the drop.
+
+## Reverse Page Order
+
+The Editor exposes "Reverse Page Order" in Edit and in the thumbnail context
+menu, next to Duplicate Pages. Both entries use the thumbnail selection: no
+selection or one selected page reverses the whole document; a contiguous range
+of two or more pages reverses only that range. For example, selecting pages 2-4
+of `1 2 3 4 5 6` gives `1 4 3 2 5 6`.
+
+Non-contiguous selections and documents with fewer than two pages disable the
+action. The controller also rejects these requests without changing the document
+or adding an Undo step. The Viewer offers no entry and refuses direct requests.
+`PDFPageReorder::computeReversedPageOrder` computes the permutation, then the
+existing `PDFProgramController::reorderPages` publishes it as one Undo step,
+keeping the original document on failure and preserving the page being read.
+
+`UnitTestsViewer`: `reversePageOrderMath`, `reversePageOrderViewerIsReadOnly`,
+`reversePageOrderEditorWorkflow`, `reversePageOrderTranslations`, and the Viewer
+thumbnail menu check in `insertPagesViewerIsReadOnly`.

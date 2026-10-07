@@ -259,6 +259,11 @@ private slots:
     void duplicatePagesViewerIsReadOnly();
     void duplicatePagesEditorWorkflow();
     void duplicatePagesEditorRefusalAndWarning();
+    void reversePageOrderMath_data();
+    void reversePageOrderMath();
+    void reversePageOrderViewerIsReadOnly();
+    void reversePageOrderEditorWorkflow();
+    void reversePageOrderTranslations();
 
 private:
     QAction* action(const char* name) const { return m_window->findChild<QAction*>(QLatin1String(name)); }
@@ -312,7 +317,8 @@ void ViewerContextMenuTest::init()
     if (testFunction == "thumbnailSelectionAndPageManagement" || testFunction.startsWith("annotation")
         || testFunction.startsWith("pageReorder") || testFunction == "thumbnailReorderWorkflow"
         || testFunction == "reorderPreservesContentAfterSave" || testFunction == "reorderFlattensNestedPageTree" || testFunction == "nativeThumbnailDragSmoke"
-        || testFunction.startsWith("mergePdfs") || testFunction.startsWith("metadata") || testFunction.startsWith("insertPagesEditor"))
+        || testFunction.startsWith("mergePdfs") || testFunction.startsWith("metadata") || testFunction.startsWith("insertPagesEditor")
+        || testFunction == "reversePageOrderMath" || testFunction == "reversePageOrderEditorWorkflow" || testFunction == "reversePageOrderTranslations")
     {
         return;
     }
@@ -4893,7 +4899,7 @@ void ViewerContextMenuTest::insertPagesViewerIsReadOnly()
         menuTimer.stop();
         menuInspected = menu->findChild<QAction*>("thumbnailExtractPagesAction") != nullptr;
         menuWithoutInsert = !menu->findChild<QAction*>("thumbnailInsertBlankPageAction") && !menu->findChild<QAction*>("thumbnailInsertPagesFromPdfAction") &&
-                            !menu->findChild<QAction*>("thumbnailDuplicatePagesAction");
+                            !menu->findChild<QAction*>("thumbnailDuplicatePagesAction") && !menu->findChild<QAction*>("thumbnailReversePageOrderAction");
         menu->close();
     });
     menuTimer.start(10);
@@ -5502,6 +5508,261 @@ void ViewerContextMenuTest::insertPagesEditorTranslations()
         QCOMPARE(editor.findChild<QAction*>("actionDuplicatePage")->text(), language.duplicateMenuText);
         QVERIFY(QCoreApplication::translate("pdfviewer::PDFSidebarWidget", "Duplicate Selected Pages") != QStringLiteral("Duplicate Selected Pages"));
         QVERIFY(QCoreApplication::translate("pdfviewer::PDFProgramController", "Duplicate Pages") != QStringLiteral("Duplicate Pages"));
+        translator.uninstallTranslator();
+    }
+}
+
+void ViewerContextMenuTest::reversePageOrderMath_data()
+{
+    QTest::addColumn<int>("pageCount");
+    QTest::addColumn<QList<int>>("selection");
+    QTest::addColumn<QList<int>>("expected");
+    using Pages = QList<int>;
+    QTest::newRow("whole-no-selection") << 6 << Pages{} << Pages{5, 4, 3, 2, 1, 0};
+    QTest::newRow("whole-single-selection") << 6 << Pages{2} << Pages{5, 4, 3, 2, 1, 0};
+    QTest::newRow("range-2-4") << 6 << Pages{1, 2, 3} << Pages{0, 3, 2, 1, 4, 5};
+    QTest::newRow("two-page-range") << 6 << Pages{3, 4} << Pages{0, 1, 2, 4, 3, 5};
+    QTest::newRow("normalized-range") << 6 << Pages{3, 1, 2, 2} << Pages{0, 3, 2, 1, 4, 5};
+    QTest::newRow("all-selected") << 3 << Pages{0, 1, 2} << Pages{2, 1, 0};
+    QTest::newRow("non-contiguous") << 6 << Pages{1, 3} << Pages{};
+    QTest::newRow("invalid-negative") << 6 << Pages{-1, 0} << Pages{};
+    QTest::newRow("invalid-out-of-range") << 6 << Pages{6} << Pages{};
+    QTest::newRow("empty-document") << 0 << Pages{} << Pages{};
+    QTest::newRow("single-page-document") << 1 << Pages{} << Pages{};
+    QTest::newRow("single-page-selected") << 1 << Pages{0} << Pages{};
+}
+
+void ViewerContextMenuTest::reversePageOrderMath()
+{
+    QFETCH(int, pageCount);
+    QFETCH(QList<int>, selection);
+    QFETCH(QList<int>, expected);
+    const std::vector<pdf::PDFInteger> pages(selection.cbegin(), selection.cend());
+    const auto order = pdfviewer::PDFPageReorder::computeReversedPageOrder(pageCount, pages);
+    QVERIFY(order == std::vector<pdf::PDFInteger>(expected.cbegin(), expected.cend()));
+    if (!order.empty())
+    {
+        QVERIFY(pdfviewer::PDFPageReorder::isPermutation(order, pageCount));
+        QVERIFY(!pdfviewer::PDFPageReorder::isIdentity(order));
+    }
+}
+
+void ViewerContextMenuTest::reversePageOrderViewerIsReadOnly()
+{
+    QVERIFY(!m_window->findChild<QAction*>("actionReversePageOrder"));
+    auto* controller = m_window->getProgramController();
+    const pdf::PDFDocument* document = controller->getDocument();
+    const auto references = reorderPageReferences(document);
+    QVERIFY(!controller->reversePageOrder({}));
+    QVERIFY(!controller->reversePageOrder({0, 1}));
+    QVERIFY(controller->getDocument() == document);
+    QVERIFY(reorderPageReferences(controller->getDocument()) == references);
+}
+
+void ViewerContextMenuTest::reversePageOrderEditorWorkflow()
+{
+#ifdef Q_OS_LINUX
+    QSKIP("Editor thumbnail interactions are covered by the Windows runtime job.");
+#endif
+    const QString path = m_temp.filePath("reverse-pages.pdf");
+    const QString singlePath = m_temp.filePath("reverse-single-page.pdf");
+    QVERIFY(writePdfFixture(path, 6));
+    QVERIFY(writePdfFixture(singlePath, 1));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    QAction* reverseAction = editor.findChild<QAction*>("actionReversePageOrder");
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+    QAction* redoAction = editor.findChild<QAction*>("actionRedo");
+    QVERIFY(reverseAction && undoAction && redoAction);
+    QVERIFY(!reverseAction->isEnabled());
+    bool inEditMenu = false;
+    for (QMenu* menu : editor.menuBar()->findChildren<QMenu*>())
+    {
+        inEditMenu = inEditMenu || (menu->objectName() == "menuEdit" && menu->actions().contains(reverseAction));
+    }
+    QVERIFY(inEditMenu);
+    auto* controller = editor.getProgramController();
+    QVERIFY(!controller->reversePageOrder({})); // No document, no Undo entry.
+    QVERIFY(!undoAction->isEnabled());
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    controller->getPdfWidget()->getDrawWidgetProxy()->setPageLayout(pdf::PageLayout::OneColumn);
+    auto* thumbnails = editor.findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(showThumbnailsPage(&editor));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 6);
+    const auto original = reorderPageReferences(controller->getDocument());
+    const auto verifyOrder = [&](const std::vector<int>& expected)
+    {
+        const auto references = reorderPageReferences(controller->getDocument());
+        QCOMPARE(references.size(), expected.size());
+        for (size_t i = 0; i < expected.size(); ++i)
+        {
+            QVERIFY(references[i] == original[size_t(expected[i])]);
+        }
+    };
+    const auto undoToOriginal = [&]()
+    {
+        QVERIFY(undoAction->isEnabled());
+        undoAction->trigger();
+        QVERIFY(reorderPageReferences(controller->getDocument()) == original);
+        QVERIFY(!undoAction->isEnabled()); // Exactly one Undo step.
+    };
+    const auto useThumbnailMenu = [&](int row, bool enabled, bool trigger)
+    {
+        bool inspected = false;
+        bool correct = false;
+        QTimer menuTimer;
+        connect(&menuTimer, &QTimer::timeout, &editor, [&]()
+        {
+            auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+            if (!menu)
+            {
+                return;
+            }
+            menuTimer.stop();
+            QAction* thumbnailAction = menu->findChild<QAction*>("thumbnailReversePageOrderAction");
+            inspected = thumbnailAction != nullptr;
+            correct = thumbnailAction && thumbnailAction->isEnabled() == enabled &&
+                      menu->findChild<QAction*>("thumbnailDuplicatePagesAction");
+            if (thumbnailAction && trigger)
+            {
+                thumbnailAction->trigger();
+            }
+            menu->close();
+        });
+        menuTimer.start(10);
+        const QPoint point = thumbnails->visualRect(thumbnails->model()->index(row, 0)).center();
+        QContextMenuEvent event(QContextMenuEvent::Mouse, point, thumbnails->viewport()->mapToGlobal(point));
+        QApplication::sendEvent(thumbnails->viewport(), &event);
+        menuTimer.stop();
+        QVERIFY(inspected);
+        QVERIFY(correct);
+    };
+
+    selectThumbnailRows(thumbnails, {});
+    QVERIFY(reverseAction->isEnabled());
+    reverseAction->trigger();
+    verifyOrder({5, 4, 3, 2, 1, 0});
+    undoToOriginal();
+    redoAction->trigger();
+    verifyOrder({5, 4, 3, 2, 1, 0});
+    undoToOriginal();
+
+    selectThumbnailRows(thumbnails, {2});
+    QVERIFY(reverseAction->isEnabled());
+    useThumbnailMenu(2, true, true);
+    verifyOrder({5, 4, 3, 2, 1, 0});
+    QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{3}));
+    undoToOriginal();
+
+    selectThumbnailRows(thumbnails, {1, 2, 3});
+    QVERIFY(reverseAction->isEnabled());
+    reverseAction->trigger(); // Edit menu uses the selected range too.
+    verifyOrder({0, 3, 2, 1, 4, 5});
+    QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2, 3}));
+    reverseAction->trigger(); // The same range reverses back, not the whole document.
+    verifyOrder({0, 1, 2, 3, 4, 5});
+    QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2, 3}));
+    undoAction->trigger();
+    verifyOrder({0, 3, 2, 1, 4, 5});
+    undoToOriginal();
+    selectThumbnailRows(thumbnails, {1, 2, 3});
+    useThumbnailMenu(2, true, true);
+    verifyOrder({0, 3, 2, 1, 4, 5});
+    QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2, 3}));
+    useThumbnailMenu(2, true, true);
+    verifyOrder({0, 1, 2, 3, 4, 5});
+    QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2, 3}));
+    undoAction->trigger();
+    verifyOrder({0, 3, 2, 1, 4, 5});
+    undoToOriginal();
+
+    selectThumbnailRows(thumbnails, {1, 3});
+    QVERIFY(!reverseAction->isEnabled());
+    const pdf::PDFDocument* untouched = controller->getDocument();
+    useThumbnailMenu(1, false, false);
+    QVERIFY(!controller->reversePageOrder(selectedThumbnailPages(thumbnails)));
+    QVERIFY(!controller->reversePageOrder({-1, 0}));
+    QVERIFY(!controller->reversePageOrder({6}));
+    QVERIFY(controller->getDocument() == untouched);
+    verifyOrder({0, 1, 2, 3, 4, 5});
+    QVERIFY(!undoAction->isEnabled());
+    selectThumbnailRows(thumbnails, {});
+    QVERIFY(reverseAction->isEnabled());
+    controller->closeDocument();
+    QVERIFY(!reverseAction->isEnabled());
+    controller->openDocument(singlePath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 1);
+    QVERIFY(!reverseAction->isEnabled());
+    selectThumbnailRows(thumbnails, {0});
+    QVERIFY(!reverseAction->isEnabled());
+    useThumbnailMenu(0, false, false);
+    untouched = controller->getDocument();
+    QVERIFY(!controller->reversePageOrder({}));
+    QVERIFY(!controller->reversePageOrder({0}));
+    QVERIFY(controller->getDocument() == untouched);
+    QVERIFY(!undoAction->isEnabled());
+    controller->closeDocument();
+
+    // Both entry points and direct controller calls respect page-assembly permissions.
+    const QList<uint32_t> permissions = {
+        uint32_t(pdf::PDFSecurityHandler::Permission::PrintLowResolution),
+        uint32_t(pdf::PDFSecurityHandler::Permission::Modify),
+        uint32_t(pdf::PDFSecurityHandler::Permission::Assemble)
+    };
+    for (const uint32_t permission : permissions)
+    {
+        const QString restrictedPath = m_temp.filePath(QStringLiteral("reverse-permission-%1.pdf").arg(permission));
+        QVERIFY(writeEncryptedFixture(restrictedPath, QString(), "owner", permission).isEmpty());
+        controller->openDocument(restrictedPath);
+        QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+        QTRY_COMPARE(thumbnails->model()->rowCount(), 2);
+        const pdf::PDFSecurityHandler* handler = controller->getDocument()->getStorage().getSecurityHandler();
+        const bool allowed = permission != uint32_t(pdf::PDFSecurityHandler::Permission::PrintLowResolution);
+        QCOMPARE(handler->isAllowed(pdf::PDFSecurityHandler::Permission::Modify) ||
+                 handler->isAllowed(pdf::PDFSecurityHandler::Permission::Assemble), allowed);
+        selectThumbnailRows(thumbnails, {0, 1});
+        QCOMPARE(reverseAction->isEnabled(), allowed);
+        useThumbnailMenu(0, allowed, false);
+        untouched = controller->getDocument();
+        const auto before = reorderPageReferences(untouched);
+        QCOMPARE(controller->reversePageOrder({0, 1}), allowed);
+        QCOMPARE(undoAction->isEnabled(), allowed);
+        if (allowed)
+        {
+            const auto after = reorderPageReferences(controller->getDocument());
+            QVERIFY(after == std::vector<pdf::PDFObjectReference>(before.crbegin(), before.crend()));
+            QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{0, 1}));
+            undoAction->trigger();
+            QVERIFY(reorderPageReferences(controller->getDocument()) == before);
+            QVERIFY(!undoAction->isEnabled());
+        }
+        else
+        {
+            QVERIFY(controller->getDocument() == untouched);
+            QVERIFY(reorderPageReferences(controller->getDocument()) == before);
+        }
+        controller->closeDocument();
+    }
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::reversePageOrderTranslations()
+{
+    const QList<QPair<pdf::PDFApplicationTranslator::ELanguage, QString>> languages = {
+        {pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_TRADITIONAL, QString::fromUtf8("反轉頁面順序")},
+        {pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_SIMPLIFIED, QString::fromUtf8("反转页面顺序")}
+    };
+    for (const auto& language : languages)
+    {
+        pdf::PDFApplicationTranslator translator;
+        translator.setLanguage(language.first);
+        translator.installTranslator();
+        pdfviewer::PDFEditorMainWindow editor;
+        QCOMPARE(editor.findChild<QAction*>("actionReversePageOrder")->text(), language.second);
+        QCOMPARE(QCoreApplication::translate("pdfviewer::PDFSidebarWidget", "Reverse Page Order"), language.second);
         translator.uninstallTranslator();
     }
 }

@@ -124,6 +124,8 @@ signals:
     void insertBlankPageRequested(std::vector<pdf::PDFInteger> anchorPages);
     void insertPagesFromPdfRequested(std::vector<pdf::PDFInteger> anchorPages);
     void duplicatePagesRequested(std::vector<pdf::PDFInteger> pageIndices);
+    void reversePageOrderRequested(std::vector<pdf::PDFInteger> pageIndices);
+    void thumbnailSelectionChanged();
 
     /// Thumbnails were dragged to a new place. \p newPageOrder lists, for every new
     /// position, the old (zero based) index of the page that goes there.

@@ -217,6 +217,7 @@ public:
         BookmarkExport,
         BookmarkImport,
         BookmarkGenerateAutomatically,
+        ReversePageOrder,
         LastAction
     };
 
@@ -354,6 +355,10 @@ public:
     /// was changed; an invalid permutation or an unchanged order leaves the document untouched.
     bool reorderPages(const std::vector<pdf::PDFInteger>& newPageOrder);
 
+    /// Editor only: reverses the document (zero or one selected page) or a
+    /// contiguous selection as one Undo step. Invalid selections are a no-op.
+    bool reversePageOrder(const std::vector<pdf::PDFInteger>& pageIndices);
+
     /// Editor only (v11): asks for size and position and inserts one empty page. \p anchorPages are the
     /// selected thumbnails (sorted); empty means the current page. The Viewer refuses.
     void insertBlankPage(const std::vector<pdf::PDFInteger>& anchorPages);
@@ -406,6 +411,9 @@ signals:
 
     /// Pages were inserted (zero based page indices of the new pages).
     void pagesInserted(std::vector<pdf::PDFInteger> pageIndices);
+
+    /// Pages selected before reversal, mapped to their new thumbnail rows.
+    void pagesReversed(std::vector<pdf::PDFInteger> pageIndices);
 
 private:
     void publishInsertedPages(pdf::PDFDocumentPointer document, pdf::PDFInteger insertIndex, pdf::PDFInteger pageCount);
