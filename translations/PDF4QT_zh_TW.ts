@@ -14173,6 +14173,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Insert Blank Page...</source><translation>插入空白頁...</translation></message>
     <message><source>Insert Pages from PDF...</source><translation>從 PDF 插入頁面...</translation></message>
     <message><source>Duplicate Current Page</source><translation>建立目前頁面的副本</translation></message>
+    <message><source>Reverse Page Order</source><translation>反轉頁面順序</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFEncryptionSettingsDialog</name>
@@ -15120,6 +15121,7 @@ Do you want to perform this action?</source>
     <message><source>Insert Blank Page...</source><translation>插入空白頁...</translation></message>
     <message><source>Insert Pages from PDF...</source><translation>從 PDF 插入頁面...</translation></message>
     <message><source>Duplicate Selected Pages</source><translation>建立選取頁面的副本</translation></message>
+    <message><source>Reverse Page Order</source><translation>反轉頁面順序</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFViewerMainWindow</name>

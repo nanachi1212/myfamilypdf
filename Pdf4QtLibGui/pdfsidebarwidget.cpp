@@ -42,6 +42,7 @@
 #include "pdfwidgetannotation.h"
 #include "pdfpagereorder.h"
 #include "pdfthumbnailslistview.h"
+#include "pdfsecurityhandler.h"
 
 #include <QMenu>
 #include <QAction>
@@ -142,6 +143,8 @@ PDFSidebarWidget::PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
     int thumbnailsFontSize = QFontMetrics(ui->thumbnailsListView->font()).lineSpacing();
     m_thumbnailsModel->setExtraItemSizeHint(2 * thumbnailsMargin, thumbnailsMargin + thumbnailsFontSize);
     ui->thumbnailsListView->setModel(m_thumbnailsModel);
+    connect(ui->thumbnailsListView->selectionModel(), &QItemSelectionModel::selectionChanged, this, &PDFSidebarWidget::thumbnailSelectionChanged);
+    connect(m_thumbnailsModel, &QAbstractItemModel::modelReset, this, &PDFSidebarWidget::thumbnailSelectionChanged);
     ui->thumbnailsListView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     ui->thumbnailsListView->setSelectionBehavior(QAbstractItemView::SelectItems);
     ui->thumbnailsListView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -1273,6 +1276,17 @@ void PDFSidebarWidget::onThumbnailContextMenuRequested(const QPoint& pos)
         connect(duplicateAction, &QAction::triggered, this, [this, selectedPages]()
         {
             Q_EMIT duplicatePagesRequested(selectedPages);
+        });
+
+        QAction* reverseAction = menu.addAction(tr("Reverse Page Order"));
+        reverseAction->setObjectName(QStringLiteral("thumbnailReversePageOrderAction"));
+        const pdf::PDFSecurityHandler* securityHandler = m_document->getStorage().getSecurityHandler();
+        const bool canModify = securityHandler->isAllowed(pdf::PDFSecurityHandler::Permission::Modify) ||
+                               securityHandler->isAllowed(pdf::PDFSecurityHandler::Permission::Assemble);
+        reverseAction->setEnabled(canModify && !PDFPageReorder::computeReversedPageOrder(pdf::PDFInteger(m_document->getCatalog()->getPageCount()), selectedPages).empty());
+        connect(reverseAction, &QAction::triggered, this, [this, selectedPages]()
+        {
+            Q_EMIT reversePageOrderRequested(selectedPages);
         });
     }
 

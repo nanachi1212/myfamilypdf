@@ -33,6 +33,12 @@ public:
     /// Returns sorted, unique page indices that are valid for \p pageCount.
     static std::vector<pdf::PDFInteger> normalizePages(const std::vector<pdf::PDFInteger>& pages, pdf::PDFInteger pageCount);
 
+    /// Reverses the whole document for zero or one selected page, otherwise only
+    /// the contiguous selected range. Returns empty for fewer than two document
+    /// pages, invalid indices or a non-contiguous selection (nothing to apply).
+    static std::vector<pdf::PDFInteger> computeReversedPageOrder(pdf::PDFInteger pageCount,
+                                                              const std::vector<pdf::PDFInteger>& selectedPages);
+
     /// Moves \p movedPages (keeping their relative order) so that they are inserted
     /// before original index \p insertionRow (0..pageCount). The insertion index is
     /// translated after the moved pages are taken out, so it works for both
