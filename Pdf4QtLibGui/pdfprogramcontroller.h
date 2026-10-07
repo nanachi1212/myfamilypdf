@@ -405,6 +405,9 @@ signals:
     /// Pages were inserted (zero based page indices of the new pages).
     void pagesInserted(std::vector<pdf::PDFInteger> pageIndices);
 
+    /// Pages selected before reversal, mapped to their new thumbnail rows.
+    void pagesReversed(std::vector<pdf::PDFInteger> pageIndices);
+
 private:
     void publishInsertedPages(pdf::PDFDocumentPointer document, pdf::PDFInteger insertIndex, pdf::PDFInteger pageCount);
 

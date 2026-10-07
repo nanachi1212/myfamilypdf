@@ -42,6 +42,7 @@
 #include "pdfwidgetannotation.h"
 #include "pdfpagereorder.h"
 #include "pdfthumbnailslistview.h"
+#include "pdfsecurityhandler.h"
 
 #include <QMenu>
 #include <QAction>
@@ -1279,7 +1280,10 @@ void PDFSidebarWidget::onThumbnailContextMenuRequested(const QPoint& pos)
 
         QAction* reverseAction = menu.addAction(tr("Reverse Page Order"));
         reverseAction->setObjectName(QStringLiteral("thumbnailReversePageOrderAction"));
-        reverseAction->setEnabled(!PDFPageReorder::computeReversedPageOrder(pdf::PDFInteger(m_document->getCatalog()->getPageCount()), selectedPages).empty());
+        const pdf::PDFSecurityHandler* securityHandler = m_document->getStorage().getSecurityHandler();
+        const bool canModify = securityHandler->isAllowed(pdf::PDFSecurityHandler::Permission::Modify) ||
+                               securityHandler->isAllowed(pdf::PDFSecurityHandler::Permission::Assemble);
+        reverseAction->setEnabled(canModify && !PDFPageReorder::computeReversedPageOrder(pdf::PDFInteger(m_document->getCatalog()->getPageCount()), selectedPages).empty());
         connect(reverseAction, &QAction::triggered, this, [this, selectedPages]()
         {
             Q_EMIT reversePageOrderRequested(selectedPages);

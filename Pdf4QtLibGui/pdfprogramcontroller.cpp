@@ -2593,7 +2593,7 @@ void PDFProgramController::updateActionsAvailability()
     m_actionManager->setEnabled(PDFActionManager::RemoveExternalLinks, hasValidDocument);
     m_actionManager->setEnabled(PDFActionManager::PageGeometry, hasValidDocument && canModify);
     m_actionManager->setEnabled(PDFActionManager::ReversePageOrder,
-                               hasValidDocument && m_undoRedoManager &&
+                               hasValidDocument && canModify && m_undoRedoManager &&
                                !PDFPageReorder::computeReversedPageOrder(pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount()),
                                                                        m_mainWindowInterface->getSelectedPages()).empty());
     m_actionManager->setEnabled(PDFActionManager::CreateBitonalDocument, hasValidDocument);
@@ -3742,8 +3742,20 @@ bool PDFProgramController::reversePageOrder(const std::vector<pdf::PDFInteger>& 
         return false; // The Viewer is read-only.
     }
 
+    const pdf::PDFSecurityHandler* securityHandler = m_pdfDocument->getStorage().getSecurityHandler();
+    if (!securityHandler->isAllowed(pdf::PDFSecurityHandler::Permission::Modify) &&
+        !securityHandler->isAllowed(pdf::PDFSecurityHandler::Permission::Assemble))
+    {
+        return false;
+    }
+
     const auto order = PDFPageReorder::computeReversedPageOrder(pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount()), pageIndices);
-    return !order.empty() && reorderPages(order);
+    if (order.empty() || !reorderPages(order))
+    {
+        return false;
+    }
+    Q_EMIT pagesReversed(PDFPageReorder::mapOldToNew(order, pageIndices));
+    return true;
 }
 
 bool PDFProgramController::reorderPages(const std::vector<pdf::PDFInteger>& newPageOrder)

@@ -5572,15 +5572,28 @@ void ViewerContextMenuTest::reversePageOrderEditorWorkflow()
     QVERIFY(reverseAction->isEnabled());
     useThumbnailMenu(2, true, true);
     verifyOrder({5, 4, 3, 2, 1, 0});
+    QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{3}));
     undoToOriginal();
 
     selectThumbnailRows(thumbnails, {1, 2, 3});
     QVERIFY(reverseAction->isEnabled());
     reverseAction->trigger(); // Edit menu uses the selected range too.
     verifyOrder({0, 3, 2, 1, 4, 5});
+    QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2, 3}));
+    reverseAction->trigger(); // The same range reverses back, not the whole document.
+    verifyOrder({0, 1, 2, 3, 4, 5});
+    QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2, 3}));
+    undoAction->trigger();
+    verifyOrder({0, 3, 2, 1, 4, 5});
     undoToOriginal();
     selectThumbnailRows(thumbnails, {1, 2, 3});
     useThumbnailMenu(2, true, true);
+    verifyOrder({0, 3, 2, 1, 4, 5});
+    QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2, 3}));
+    useThumbnailMenu(2, true, true);
+    verifyOrder({0, 1, 2, 3, 4, 5});
+    QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{1, 2, 3}));
+    undoAction->trigger();
     verifyOrder({0, 3, 2, 1, 4, 5});
     undoToOriginal();
 
@@ -5611,6 +5624,47 @@ void ViewerContextMenuTest::reversePageOrderEditorWorkflow()
     QVERIFY(controller->getDocument() == untouched);
     QVERIFY(!undoAction->isEnabled());
     controller->closeDocument();
+
+    // Both entry points and direct controller calls respect page-assembly permissions.
+    const QList<uint32_t> permissions = {
+        uint32_t(pdf::PDFSecurityHandler::Permission::PrintLowResolution),
+        uint32_t(pdf::PDFSecurityHandler::Permission::Modify),
+        uint32_t(pdf::PDFSecurityHandler::Permission::Assemble)
+    };
+    for (const uint32_t permission : permissions)
+    {
+        const QString restrictedPath = m_temp.filePath(QStringLiteral("reverse-permission-%1.pdf").arg(permission));
+        QVERIFY(writeEncryptedFixture(restrictedPath, QString(), "owner", permission).isEmpty());
+        controller->openDocument(restrictedPath);
+        QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+        QTRY_COMPARE(thumbnails->model()->rowCount(), 2);
+        const pdf::PDFSecurityHandler* handler = controller->getDocument()->getStorage().getSecurityHandler();
+        const bool allowed = permission != uint32_t(pdf::PDFSecurityHandler::Permission::PrintLowResolution);
+        QCOMPARE(handler->isAllowed(pdf::PDFSecurityHandler::Permission::Modify) ||
+                 handler->isAllowed(pdf::PDFSecurityHandler::Permission::Assemble), allowed);
+        selectThumbnailRows(thumbnails, {0, 1});
+        QCOMPARE(reverseAction->isEnabled(), allowed);
+        useThumbnailMenu(0, allowed, false);
+        untouched = controller->getDocument();
+        const auto before = reorderPageReferences(untouched);
+        QCOMPARE(controller->reversePageOrder({0, 1}), allowed);
+        QCOMPARE(undoAction->isEnabled(), allowed);
+        if (allowed)
+        {
+            const auto after = reorderPageReferences(controller->getDocument());
+            QVERIFY(after == std::vector<pdf::PDFObjectReference>(before.crbegin(), before.crend()));
+            QTRY_COMPARE(selectedThumbnailRows(thumbnails), (std::vector<int>{0, 1}));
+            undoAction->trigger();
+            QVERIFY(reorderPageReferences(controller->getDocument()) == before);
+            QVERIFY(!undoAction->isEnabled());
+        }
+        else
+        {
+            QVERIFY(controller->getDocument() == untouched);
+            QVERIFY(reorderPageReferences(controller->getDocument()) == before);
+        }
+        controller->closeDocument();
+    }
     QCoreApplication::processEvents();
 }
 

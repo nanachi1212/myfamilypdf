@@ -397,6 +397,11 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     connect(m_sidebarWidget, &PDFSidebarWidget::reversePageOrderRequested, m_programController,
             [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->reversePageOrder(pages); });
     connect(m_sidebarWidget, &PDFSidebarWidget::thumbnailSelectionChanged, m_programController, &PDFProgramController::updateActionsAvailability);
+    connect(m_programController, &PDFProgramController::pagesReversed, m_sidebarWidget, [this](const std::vector<pdf::PDFInteger>& pageIndices)
+    {
+        // Restore the selection after the model reset and current-page update.
+        QTimer::singleShot(0, m_sidebarWidget, [this, pageIndices]() { m_sidebarWidget->selectThumbnailPages(pageIndices); });
+    });
     connect(m_programController, &PDFProgramController::pagesInserted, m_sidebarWidget, [this](const std::vector<pdf::PDFInteger>& pageIndices)
     {
         // After the thumbnail model was reset by the document update: the old selection is gone, the new pages are selected.
