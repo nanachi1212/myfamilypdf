@@ -3933,7 +3933,8 @@ bool PDFProgramController::insertJpegPageFile(const QString& fileName, const std
         return false;
     }
 
-    const QByteArray bytes = file.readAll();
+    constexpr qint64 maxJpegSize = 64LL * 1024 * 1024;
+    const QByteArray bytes = file.read(maxJpegSize + 1);
     pdf::PDFDocument imageDocument;
     QString errorMessage;
     if (!pdf::PDFJpegImage::createDocument(bytes, &imageDocument, &errorMessage))
@@ -3951,7 +3952,8 @@ bool PDFProgramController::insertJpegPageFile(const QString& fileName, const std
     const pdf::PDFDocumentMerger::Source source = pdf::PDFDocumentMerger::createSource(fileName,
                                                                                          QFileInfo(fileName).fileName(),
                                                                                          sourceDocument);
-    return insertPagesAt(pages.back() + 1, source, { 0 }, tr("Insert Page from JPEG"));
+    const pdf::PDFInteger insertIndex = pageCount == 0 ? 0 : pages.back() + 1;
+    return insertPagesAt(insertIndex, source, { 0 }, tr("Insert Page from JPEG"));
 }
 
 bool PDFProgramController::insertBlankPageAt(pdf::PDFInteger insertIndex, const QRectF& mediaBox, const QRectF& cropBox, pdf::PageRotation rotation)

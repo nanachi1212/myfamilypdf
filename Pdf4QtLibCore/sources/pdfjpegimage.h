@@ -22,7 +22,8 @@ enum class PDFJpegImageReason
     UnsupportedComponents,
     MirroredOrientation,
     PixelLimitExceeded,
-    FileSizeLimitExceeded
+    FileSizeLimitExceeded,
+    UnsupportedICCProfile
 };
 
 struct PDFJpegImageInfo

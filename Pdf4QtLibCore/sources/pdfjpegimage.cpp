@@ -24,13 +24,13 @@ int bigEndian16(const QByteArray& bytes, qsizetype offset)
 int readExifOrientation(const QByteArray& bytes, qsizetype start, qsizetype size)
 {
     if (size < 14 || bytes.mid(start, 6) != QByteArray("Exif\0\0", 6))
-        return 1;
+        return 0;
 
     const qsizetype tiff = start + 6;
     const qsizetype tiffSize = size - 6;
     const bool littleEndian = bytes.mid(tiff, 2) == "II";
     if (!littleEndian && bytes.mid(tiff, 2) != "MM")
-        return 1;
+        return 0;
 
     auto read16 = [&](qsizetype offset) -> quint32
     {
@@ -45,14 +45,14 @@ int readExifOrientation(const QByteArray& bytes, qsizetype start, qsizetype size
     };
 
     if (read16(2) != 42)
-        return 1;
+        return 0;
     const quint32 ifd = read32(4);
     if (ifd < 8 || ifd > quint64(tiffSize - 2))
-        return 1;
+        return 0;
     const quint32 count = read16(ifd);
     const qsizetype entries = qsizetype(ifd) + 2;
     if (count > quint64((tiffSize - entries) / 12))
-        return 1;
+        return 0;
 
     for (quint32 index = 0; index < count; ++index)
     {
@@ -60,10 +60,10 @@ int readExifOrientation(const QByteArray& bytes, qsizetype start, qsizetype size
         if (read16(entry) == 0x0112 && read16(entry + 2) == 3 && read32(entry + 4) == 1)
         {
             const int orientation = int(read16(entry + 8));
-            return orientation >= 1 && orientation <= 8 ? orientation : 1;
+            return orientation >= 1 && orientation <= 8 ? orientation : 0;
         }
     }
-    return 1;
+    return 0;
 }
 
 PDFObject dictionaryObject(PDFDictionary dictionary)
@@ -114,6 +114,7 @@ PDFJpegImageInfo PDFJpegImage::parseHeader(const QByteArray& bytes)
 
     int sof = -1;
     bool headerEnded = false;
+    bool hasICCProfile = false;
     qsizetype offset = 2;
     while (offset < bytes.size())
     {
@@ -154,7 +155,13 @@ PDFJpegImageInfo PDFJpegImage::parseHeader(const QByteArray& bytes)
             info.isProgressive = marker == 0xC2 || marker == 0xC6 || marker == 0xCA || marker == 0xCE;
         }
         else if (marker == 0xE1 && payloadSize >= 6 && bytes.mid(payload, 6) == QByteArray("Exif\0\0", 6))
-            info.exifOrientation = readExifOrientation(bytes, payload, payloadSize);
+        {
+            const int orientation = readExifOrientation(bytes, payload, payloadSize);
+            if (orientation != 0)
+                info.exifOrientation = orientation;
+        }
+        else if (marker == 0xE2 && payloadSize >= 12 && bytes.mid(payload, 12) == QByteArray("ICC_PROFILE\0", 12))
+            hasICCProfile = true;
         else if (marker == 0xEE && payloadSize >= 12 && bytes.mid(payload, 5) == "Adobe")
         {
             info.hasAdobeMarker = true;
@@ -176,6 +183,8 @@ PDFJpegImageInfo PDFJpegImage::parseHeader(const QByteArray& bytes)
         return reject(PDFJpegImageReason::InvalidSegment, "Truncated JPEG header before SOS or EOI.");
     if (info.width == 0 || info.height == 0)
         return reject(PDFJpegImageReason::InvalidDimensions, "JPEG width and height must be nonzero.");
+    if (hasICCProfile)
+        return reject(PDFJpegImageReason::UnsupportedICCProfile, "JPEGs with embedded ICC profiles are not supported for direct insertion.");
 
     info.valid = true;
     if (bytes.size() > 64LL * 1024 * 1024)

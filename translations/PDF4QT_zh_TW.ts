@@ -12057,6 +12057,11 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <source>Mirrored Exif orientations (2, 4, 5, 7) require decoding.</source>
         <translation>鏡像 Exif 方向（2、4、5、7）需要解碼。</translation>
     </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="187"/>
+        <source>JPEGs with embedded ICC profiles are not supported for direct insertion.</source>
+        <translation>不支援直接插入含有內嵌 ICC 色彩描述檔的 JPEG。</translation>
+    </message>
 </context>
 <context>
     <name>pdf::PDFWidgetAnnotationManager</name>
