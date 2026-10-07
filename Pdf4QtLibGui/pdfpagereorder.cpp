@@ -4,6 +4,7 @@
 #include "pdfpagereorder.h"
 
 #include <algorithm>
+#include <numeric>
 
 namespace pdfviewer
 {
@@ -22,6 +23,29 @@ std::vector<pdf::PDFInteger> PDFPageReorder::normalizePages(const std::vector<pd
     std::sort(result.begin(), result.end());
     result.erase(std::unique(result.begin(), result.end()), result.end());
     return result;
+}
+
+std::vector<pdf::PDFInteger> PDFPageReorder::computeReversedPageOrder(pdf::PDFInteger pageCount,
+                                                                  const std::vector<pdf::PDFInteger>& selectedPages)
+{
+    if (pageCount <= 1 || std::any_of(selectedPages.cbegin(), selectedPages.cend(), [pageCount](pdf::PDFInteger page)
+        { return page < 0 || page >= pageCount; }))
+    {
+        return {};
+    }
+
+    const std::vector<pdf::PDFInteger> pages = normalizePages(selectedPages, pageCount);
+    if (pages.size() >= 2 && pages.back() - pages.front() + 1 != pdf::PDFInteger(pages.size()))
+    {
+        return {};
+    }
+
+    std::vector<pdf::PDFInteger> order(size_t(pageCount), 0);
+    std::iota(order.begin(), order.end(), pdf::PDFInteger(0));
+    const pdf::PDFInteger first = pages.size() >= 2 ? pages.front() : 0;
+    const pdf::PDFInteger end = pages.size() >= 2 ? pages.back() + 1 : pageCount;
+    std::reverse(order.begin() + first, order.begin() + end);
+    return order;
 }
 
 std::vector<pdf::PDFInteger> PDFPageReorder::computeNewPageOrder(pdf::PDFInteger pageCount,

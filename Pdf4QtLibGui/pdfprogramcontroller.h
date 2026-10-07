@@ -217,6 +217,7 @@ public:
         BookmarkExport,
         BookmarkImport,
         BookmarkGenerateAutomatically,
+        ReversePageOrder,
         LastAction
     };
 
@@ -353,6 +354,10 @@ public:
     /// Only the page references of the page tree are rearranged. Returns true if the document
     /// was changed; an invalid permutation or an unchanged order leaves the document untouched.
     bool reorderPages(const std::vector<pdf::PDFInteger>& newPageOrder);
+
+    /// Editor only: reverses the document (zero or one selected page) or a
+    /// contiguous selection as one Undo step. Invalid selections are a no-op.
+    bool reversePageOrder(const std::vector<pdf::PDFInteger>& pageIndices);
 
     /// Editor only (v11): asks for size and position and inserts one empty page. \p anchorPages are the
     /// selected thumbnails (sorted); empty means the current page. The Viewer refuses.
