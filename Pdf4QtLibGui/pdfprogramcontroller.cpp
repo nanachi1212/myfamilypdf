@@ -44,6 +44,7 @@
 #include "pdfpageoutput.h"
 #include "pdfpagereorder.h"
 #include "pdfpageinserter.h"
+#include "pdfjpegimage.h"
 #include "pdfoptimizedocumentdialog.h"
 #include "pdfoptimizeimagesdialog.h"
 #include "pdfsanitizedocumentdialog.h"
@@ -3888,6 +3889,69 @@ void PDFProgramController::insertPagesFromPdf(const std::vector<pdf::PDFInteger>
         return;
     }
     insertPagesAt(dialog.getInsertIndex(), dialog.getSource(), dialog.getSourcePages());
+}
+
+void PDFProgramController::insertJpegPage(const std::vector<pdf::PDFInteger>& anchorPages)
+{
+    if (!m_undoRedoManager || !m_pdfDocument)
+    {
+        return;     // the Viewer is read-only
+    }
+
+    const QFileInfo sourceInfo(getOriginalFileName());
+    const QString directory = sourceInfo.absolutePath().isEmpty() ? m_settings->getDirectory() : sourceInfo.absolutePath();
+    const QString fileName = QFileDialog::getOpenFileName(m_mainWindow,
+                                                          tr("Insert Page from JPEG"),
+                                                          directory,
+                                                          tr("JPEG image (*.jpg *.jpeg)"));
+    if (!fileName.isEmpty())
+    {
+        insertJpegPageFile(fileName, anchorPages);
+    }
+}
+
+bool PDFProgramController::insertJpegPageFile(const QString& fileName, const std::vector<pdf::PDFInteger>& anchorPages)
+{
+    if (!m_undoRedoManager || !m_pdfDocument)
+    {
+        return false;   // the Viewer is read-only
+    }
+
+    const QStringList blockers = pdf::PDFPageInserter::checkTarget(m_pdfDocument.data(), true);
+    if (!blockers.isEmpty())
+    {
+        QMessageBox::warning(m_mainWindow, tr("Insert Page from JPEG"), blockers.join('\n'));
+        return false;
+    }
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        QMessageBox::critical(m_mainWindow,
+                              tr("Insert Page from JPEG"),
+                              tr("Cannot open JPEG file '%1'.").arg(QFileInfo(fileName).fileName()));
+        return false;
+    }
+
+    const QByteArray bytes = file.readAll();
+    pdf::PDFDocument imageDocument;
+    QString errorMessage;
+    if (!pdf::PDFJpegImage::createDocument(bytes, &imageDocument, &errorMessage))
+    {
+        QMessageBox::critical(m_mainWindow, tr("Insert Page from JPEG"), errorMessage);
+        return false;
+    }
+
+    const pdf::PDFDocumentPointer target = m_pdfDocument;
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(target->getCatalog()->getPageCount());
+    const std::vector<pdf::PDFInteger> pages = getInsertAnchorPages(anchorPages,
+                                                                      m_pdfWidget->getDrawWidget()->getCurrentPages(),
+                                                                      pageCount);
+    const pdf::PDFDocumentPointer sourceDocument(new pdf::PDFDocument(std::move(imageDocument)));
+    const pdf::PDFDocumentMerger::Source source = pdf::PDFDocumentMerger::createSource(fileName,
+                                                                                         QFileInfo(fileName).fileName(),
+                                                                                         sourceDocument);
+    return insertPagesAt(pages.back() + 1, source, { 0 }, tr("Insert Page from JPEG"));
 }
 
 bool PDFProgramController::insertBlankPageAt(pdf::PDFInteger insertIndex, const QRectF& mediaBox, const QRectF& cropBox, pdf::PageRotation rotation)

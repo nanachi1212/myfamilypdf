@@ -346,6 +346,10 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     insertPagesFromPdfAction->setObjectName(QStringLiteral("actionInsertPagesFromPdf"));
     ui->menuEdit->insertAction(ui->actionPageGeometry, insertPagesFromPdfAction);
     connect(insertPagesFromPdfAction, &QAction::triggered, m_programController, [this]() { m_programController->insertPagesFromPdf({}); });
+    QAction* insertJpegPageAction = new QAction(tr("Insert Page from JPEG..."), this);
+    insertJpegPageAction->setObjectName(QStringLiteral("actionInsertJpegPage"));
+    ui->menuEdit->insertAction(ui->actionPageGeometry, insertJpegPageAction);
+    connect(insertJpegPageAction, &QAction::triggered, m_programController, [this]() { m_programController->insertJpegPage({}); });
     QAction* duplicatePageAction = new QAction(tr("Duplicate Current Page"), this);
     duplicatePageAction->setObjectName(QStringLiteral("actionDuplicatePage"));
     ui->menuEdit->insertAction(ui->actionPageGeometry, duplicatePageAction);
