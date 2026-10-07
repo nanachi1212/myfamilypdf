@@ -34,6 +34,7 @@
 
 #include <QtTest>
 #include <QColor>
+#include <QColorSpace>
 #include <QImage>
 #include <QBuffer>
 
@@ -792,6 +793,20 @@ void ImageOptimizerTest::test_png_page_creation()
             QVERIFY(mask.isStream());
             QCOMPARE(mask.getStream()->getDictionary()->get("ColorSpace").getString(), QByteArray("DeviceGray"));
         }
+        const pdf::PDFObject& contents = document.getObject(page->getContents());
+        QVERIFY(contents.isStream());
+        QVERIFY(contents.getStream()->getDictionary()->get("Length").isInt());
+        QVERIFY(contents.getStream()->getDictionary()->get("Length").getInteger() > 0);
+
+        QByteArray pdfBytes;
+        QBuffer output(&pdfBytes);
+        QVERIFY(output.open(QIODevice::WriteOnly));
+        pdf::PDFDocumentWriter writer(nullptr);
+        QVERIFY(writer.write(&output, &document));
+        output.close();
+        pdf::PDFDocumentReader reader(nullptr, [](bool*) { return QString(); }, false, false);
+        const pdf::PDFDocument reopened = reader.readFromBuffer(pdfBytes);
+        QCOMPARE(reader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
     };
 
     QImage opaque(3, 2, QImage::Format_RGB32);
@@ -801,6 +816,11 @@ void ImageOptimizerTest::test_png_page_creation()
     QImage alpha(3, 2, QImage::Format_RGBA8888);
     alpha.fill(QColor(20, 40, 60, 96));
     checkDocument(encodePng(alpha), true);
+
+    QImage profiled(3, 2, QImage::Format_RGB32);
+    profiled.setColorSpace(QColorSpace(QColorSpace::NamedColorSpace::AdobeRgb));
+    profiled.fill(QColor(20, 40, 60));
+    checkDocument(encodePng(profiled), false);
 
     // Qt decodes 16-bit and palette PNGs to a supported 8-bit RGB/alpha representation.
     QImage sixteenBit(3, 2, QImage::Format_RGBA64);

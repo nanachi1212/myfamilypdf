@@ -4,6 +4,7 @@
 #include "pdfpngimage.h"
 #include "pdfdocumentbuilder.h"
 
+#include <QColorSpace>
 #include <QImage>
 #include <QImageReader>
 #include <QBuffer>
@@ -25,6 +26,12 @@ PDFObject dictionaryObject(PDFDictionary dictionary)
     return PDFObject::createDictionary(std::make_shared<PDFDictionary>(std::move(dictionary)));
 }
 
+PDFObject streamObject(PDFDictionary dictionary, QByteArray bytes)
+{
+    setEntry(dictionary, "Length", PDFObject::createInteger(bytes.size()));
+    return PDFObject::createStream(std::make_shared<PDFStream>(std::move(dictionary), std::move(bytes)));
+}
+
 PDFObject imageStream(QByteArray data, int width, int height, bool mask, PDFObject softMask = PDFObject())
 {
     PDFDictionary dictionary;
@@ -35,10 +42,9 @@ PDFObject imageStream(QByteArray data, int width, int height, bool mask, PDFObje
     setEntry(dictionary, "BitsPerComponent", PDFObject::createInteger(8));
     setEntry(dictionary, "ColorSpace", PDFObject::createName(mask ? "DeviceGray" : "DeviceRGB"));
     setEntry(dictionary, "Filter", PDFObject::createName("FlateDecode"));
-    setEntry(dictionary, "Length", PDFObject::createInteger(data.size()));
     if (!softMask.isNull())
         setEntry(dictionary, "SMask", std::move(softMask));
-    return PDFObject::createStream(std::make_shared<PDFStream>(std::move(dictionary), std::move(data)));
+    return streamObject(std::move(dictionary), std::move(data));
 }
 
 } // namespace
@@ -79,6 +85,8 @@ bool PDFPngImage::createDocument(const QByteArray& bytes, PDFDocument* document,
     image = image.convertToFormat(QImage::Format_RGBA8888);
     if (image.isNull())
         return reject(PDFTranslationContext::tr("The PNG image could not be decoded."));
+    if (image.colorSpace().isValid())
+        image.convertToColorSpace(QColorSpace(QColorSpace::NamedColorSpace::SRgb));
     const int width = image.width();
     const int height = image.height();
     QByteArray rgb;
@@ -128,7 +136,7 @@ bool PDFPngImage::createDocument(const QByteArray& bytes, PDFDocument* document,
     setEntry(resources, "XObject", dictionaryObject(std::move(xObjects)));
     PDFDictionary pageUpdate;
     setEntry(pageUpdate, "Resources", dictionaryObject(std::move(resources)));
-    const PDFObjectReference contents = builder.addObject(PDFObject::createStream(std::make_shared<PDFStream>(PDFDictionary(), std::move(content))));
+    const PDFObjectReference contents = builder.addObject(streamObject(PDFDictionary(), std::move(content)));
     setEntry(pageUpdate, "Contents", PDFObject::createReference(contents));
     builder.mergeTo(page, dictionaryObject(std::move(pageUpdate)));
     *document = builder.build();
