@@ -26,6 +26,7 @@
 #include "pdfimageconversion.h"
 #include "pdfimageoptimizer.h"
 #include "pdfjpegimage.h"
+#include "pdfpngimage.h"
 #include "pdfcatalog.h"
 #include "pdfdocumentreader.h"
 #include "pdfdocumentwriter.h"
@@ -57,6 +58,7 @@ private slots:
     void test_jpeg_header_rejections();
     void test_jpeg_icc_profile_rejected();
     void test_jpeg_header_metadata();
+    void test_png_page_creation();
 
 private:
     static QImage createLineArtImage(int size);
@@ -752,6 +754,68 @@ void ImageOptimizerTest::test_jpeg_header_metadata()
         QVERIFY(info.canWriteDirectly);
         QCOMPARE(info.exifOrientation, 1);
     }
+}
+
+void ImageOptimizerTest::test_png_page_creation()
+{
+    auto encodePng = [](QImage image)
+    {
+        QByteArray bytes;
+        QBuffer buffer(&bytes);
+        if (!buffer.open(QIODevice::WriteOnly) || !image.save(&buffer, "PNG"))
+            return QByteArray();
+        return bytes;
+    };
+    auto checkDocument = [](const QByteArray& png, bool expectAlpha)
+    {
+        pdf::PDFDocument document;
+        QString error;
+        QVERIFY2(pdf::PDFPngImage::createDocument(png, &document, &error), qPrintable(error));
+        QCOMPARE(document.getCatalog()->getPageCount(), size_t(1));
+        const pdf::PDFPage* page = document.getCatalog()->getPage(0);
+        const auto& storage = document.getStorage();
+        const pdf::PDFDictionary* resources = storage.getDictionaryFromObject(page->getResources());
+        QVERIFY(resources);
+        const pdf::PDFDictionary* xObjects = storage.getDictionaryFromObject(resources->get("XObject"));
+        QVERIFY(xObjects);
+        const pdf::PDFObject& image = document.getObject(xObjects->get("Im1"));
+        QVERIFY(image.isStream());
+        const pdf::PDFDictionary* dictionary = image.getStream()->getDictionary();
+        QCOMPARE(dictionary->get("Width").getInteger(), pdf::PDFInteger(3));
+        QCOMPARE(dictionary->get("Height").getInteger(), pdf::PDFInteger(2));
+        QCOMPARE(dictionary->get("ColorSpace").getString(), QByteArray("DeviceRGB"));
+        QCOMPARE(dictionary->get("Filter").getString(), QByteArray("FlateDecode"));
+        QCOMPARE(dictionary->get("SMask").isReference(), expectAlpha);
+        if (expectAlpha)
+        {
+            const pdf::PDFObject& mask = document.getObject(dictionary->get("SMask"));
+            QVERIFY(mask.isStream());
+            QCOMPARE(mask.getStream()->getDictionary()->get("ColorSpace").getString(), QByteArray("DeviceGray"));
+        }
+    };
+
+    QImage opaque(3, 2, QImage::Format_RGB32);
+    opaque.fill(QColor(20, 40, 60));
+    checkDocument(encodePng(opaque), false);
+
+    QImage alpha(3, 2, QImage::Format_RGBA8888);
+    alpha.fill(QColor(20, 40, 60, 96));
+    checkDocument(encodePng(alpha), true);
+
+    // Qt decodes 16-bit and palette PNGs to a supported 8-bit RGB/alpha representation.
+    QImage sixteenBit(3, 2, QImage::Format_RGBA64);
+    sixteenBit.fill(QColor::fromRgba64(0x1234, 0x5678, 0x9abc, 0xdef0));
+    checkDocument(encodePng(sixteenBit), true);
+    QImage palette(3, 2, QImage::Format_Indexed8);
+    palette.setColorTable({ qRgba(255, 0, 0, 0), qRgba(0, 0, 255, 255) });
+    palette.fill(1);
+    checkDocument(encodePng(palette), true);
+
+    pdf::PDFDocument invalidDocument;
+    QString error;
+    QVERIFY(!pdf::PDFPngImage::createDocument(QByteArray::fromHex("89504e470d0a1a0a00"), &invalidDocument, &error));
+    QVERIFY(invalidDocument.getCatalog()->getPageCount() == size_t(0));
+    QVERIFY(!error.isEmpty());
 }
 
 QTEST_GUILESS_MAIN(ImageOptimizerTest)
