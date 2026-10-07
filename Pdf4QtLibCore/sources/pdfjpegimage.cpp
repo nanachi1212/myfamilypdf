@@ -103,7 +103,7 @@ PDFJpegImageInfo PDFJpegImage::parseHeader(const QByteArray& bytes)
     auto reject = [&](PDFJpegImageReason reason, const char* message)
     {
         info.reason = reason;
-        info.errorMessage = QString::fromLatin1(message);
+        info.errorMessage = PDFTranslationContext::tr(message);
         return info;
     };
 
