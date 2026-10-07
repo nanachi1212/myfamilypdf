@@ -3917,10 +3917,11 @@ bool PDFProgramController::insertPagesAt(pdf::PDFInteger insertIndex, const pdf:
 
     // The import runs on copies; the open document changes only in publishInsertedPages.
     const QString messageTitle = title.isEmpty() ? tr("Insert Pages from PDF") : title;
+    const pdf::PDFDocumentPointer target = m_pdfDocument;
     pdf::PDFDocumentPointer document;
     QStringList warnings;
     QApplication::setOverrideCursor(Qt::WaitCursor);
-    const pdf::PDFOperationResult result = pdf::PDFPageInserter::insertPages(m_pdfDocument.data(), insertIndex, source, pages, &document, &warnings);
+    const pdf::PDFOperationResult result = pdf::PDFPageInserter::insertPages(target.data(), insertIndex, source, pages, &document, &warnings);
     QApplication::restoreOverrideCursor();
     if (!result)
     {
@@ -3932,6 +3933,10 @@ bool PDFProgramController::insertPagesAt(pdf::PDFInteger insertIndex, const pdf:
                               QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Yes) != QMessageBox::Yes)
     {
         return false;
+    }
+    if (m_pdfDocument != target)
+    {
+        return false;   // the document was reloaded or closed while the warning was open
     }
     publishInsertedPages(document, insertIndex, pdf::PDFInteger(pages.size()));
     return true;
