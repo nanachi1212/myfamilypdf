@@ -17,6 +17,7 @@
 #include <QContextMenuEvent>
 #include <QDockWidget>
 #include <QFile>
+#include <QImage>
 #include <QItemSelectionModel>
 #include <QListView>
 #include <QMenu>
@@ -251,6 +252,7 @@ private slots:
     void insertPagesEditorEntries();
     void insertPagesEditorBlankWorkflow();
     void insertPagesEditorFromPdfWorkflow();
+    void insertPagesEditorFromJpegWorkflow();
     void insertPagesEditorFailureAndWarnings();
     void insertPagesEditorUndoMemory();
     void insertPagesEditorTranslations();
@@ -4752,6 +4754,18 @@ bool writeInsertSourceFixture(const QString& path, bool withForm)
     return writeRawPdf(path, objects);
 }
 
+bool writeJpegFixture(const QString& path)
+{
+    QImage image(40, 20, QImage::Format_RGB888);
+    image.fill(QColor(30, 120, 200));
+    return image.save(path, "JPG");
+}
+
+QByteArray unsupportedJpegFixture()
+{
+    return QByteArray::fromHex("ffd8ffc00014080014002804011100021100031100041100ffd9");
+}
+
 /// Runs \p action; meanwhile every modal widget is passed to \p onModal until it returns true (done).
 /// A modal widget left open after the timeout is rejected, so a failing test does not hang.
 bool runWithModal(QWidget* owner, const std::function<void()>& action, const std::function<bool(QWidget*)>& onModal, int timeoutMs = 15000)
@@ -4905,17 +4919,19 @@ void ViewerContextMenuTest::insertPagesEditorEntries()
     editor.show();
     QAction* blank = editor.findChild<QAction*>("actionInsertBlankPage");
     QAction* fromPdf = editor.findChild<QAction*>("actionInsertPagesFromPdf");
-    QVERIFY(blank && fromPdf);
+    QAction* fromJpeg = editor.findChild<QAction*>("actionInsertJpegPage");
+    QVERIFY(blank && fromPdf && fromJpeg);
     bool inEditMenu = false;
     for (QMenu* menu : editor.menuBar()->findChildren<QMenu*>())
     {
-        inEditMenu = inEditMenu || (menu->objectName() == "menuEdit" && menu->actions().contains(blank) && menu->actions().contains(fromPdf));
+        inEditMenu = inEditMenu || (menu->objectName() == "menuEdit" && menu->actions().contains(blank)
+                                    && menu->actions().contains(fromPdf) && menu->actions().contains(fromJpeg));
     }
     QVERIFY(inEditMenu);
 
     // Without a document nothing happens.
     bool modalSeen = false;
-    runWithModal(&editor, [&]() { blank->trigger(); fromPdf->trigger(); }, [&](QWidget* modal)
+    runWithModal(&editor, [&]() { blank->trigger(); fromPdf->trigger(); fromJpeg->trigger(); }, [&](QWidget* modal)
     {
         modalSeen = true;
         if (auto* dialog = qobject_cast<QDialog*>(modal))
@@ -5203,6 +5219,71 @@ void ViewerContextMenuTest::insertPagesEditorFromPdfWorkflow()
     {
         QVERIFY2(pageText(compiler, i).contains(expected[i]), qPrintable(QString("page %1: %2").arg(i + 1).arg(pageText(compiler, i))));
     }
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::insertPagesEditorFromJpegWorkflow()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    const QString path = m_temp.filePath("insert-jpeg-target.pdf");
+    const QString jpegPath = m_temp.filePath("insert-page.jpg");
+    const QString unsupportedPath = m_temp.filePath("unsupported-page.jpg");
+    QVERIFY(writePdfFixture(path, 3));
+    QVERIFY(writeJpegFixture(jpegPath));
+    QFile unsupportedFile(unsupportedPath);
+    QVERIFY(unsupportedFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    const QByteArray unsupported = unsupportedJpegFixture();
+    QCOMPARE(unsupportedFile.write(unsupported), unsupported.size());
+    unsupportedFile.close();
+
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    controller->getPdfWidget()->getDrawWidgetProxy()->goToPage(1);
+    QTRY_VERIFY(!currentPages(controller).empty() && currentPages(controller).front() == 1);
+
+    const std::vector<pdf::PDFObjectReference> original = reorderPageReferences(controller->getDocument());
+    QVERIFY(controller->insertJpegPageFile(jpegPath));
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(4));
+    const std::vector<pdf::PDFObjectReference> inserted = reorderPageReferences(controller->getDocument());
+    QCOMPARE(inserted[0], original[0]);
+    QCOMPARE(inserted[1], original[1]);
+    QCOMPARE(inserted[3], original[2]);
+    QVERIFY(inserted[2] != original[0] && inserted[2] != original[1] && inserted[2] != original[2]);
+
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+    QAction* redoAction = editor.findChild<QAction*>("actionRedo");
+    QVERIFY(undoAction && redoAction && undoAction->isEnabled());
+    undoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(3));
+    QCOMPARE(reorderPageReferences(controller->getDocument()), original);
+    redoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(4));
+
+    const pdf::PDFDocument* beforeRejectedInsert = controller->getDocument();
+    const std::vector<pdf::PDFObjectReference> beforeRejectedReferences = reorderPageReferences(beforeRejectedInsert);
+    bool rejectedInsert = true;
+    QString rejectionMessage;
+    QVERIFY(runWithModal(&editor, [&]() { rejectedInsert = controller->insertJpegPageFile(unsupportedPath); }, [&](QWidget* modal)
+    {
+        auto* message = qobject_cast<QMessageBox*>(modal);
+        if (!message)
+        {
+            return false;
+        }
+        rejectionMessage = message->text();
+        message->accept();
+        return true;
+    }));
+    QVERIFY(!rejectedInsert);
+    QVERIFY(rejectionMessage.contains("JPEG components"));
+    QCOMPARE(controller->getDocument(), beforeRejectedInsert);
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(4));
+    QCOMPARE(reorderPageReferences(controller->getDocument()), beforeRejectedReferences);
     controller->closeDocument();
     QCoreApplication::processEvents();
 }

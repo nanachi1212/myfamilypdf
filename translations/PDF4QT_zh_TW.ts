@@ -11967,6 +11967,101 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Loading page %1...</source><translation>正在載入第 %1 頁…</translation></message>
     <message><source>Loading...</source><translation>載入中…</translation></message>
     <message><source>Unable to render this page.</source><translation>無法顯示此頁面。</translation></message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="111"/>
+        <source>JPEG data is empty.</source>
+        <translation>JPEG 資料是空的。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="113"/>
+        <source>JPEG must start with the SOI marker.</source>
+        <translation>JPEG 必須以 SOI 標記開頭。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="121"/>
+        <source>Invalid JPEG marker prefix.</source>
+        <translation>無效的 JPEG 標記前綴。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="125"/>
+        <source>Truncated JPEG marker.</source>
+        <translation>JPEG 標記已截斷。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="133"/>
+        <source>Unexpected marker in JPEG header.</source>
+        <translation>JPEG 標頭中出現非預期的標記。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="137"/>
+        <source>Truncated JPEG segment length.</source>
+        <translation>JPEG 區段長度已截斷。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="140"/>
+        <source>JPEG segment length is invalid or truncated.</source>
+        <translation>JPEG 區段長度無效或已截斷。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="148"/>
+        <source>Invalid JPEG frame header.</source>
+        <translation>無效的 JPEG 幀標頭。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="166"/>
+        <source>Invalid JPEG scan header.</source>
+        <translation>無效的 JPEG 掃描標頭。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="174"/>
+        <source>JPEG frame header (SOF) was not found.</source>
+        <translation>找不到 JPEG 幀標頭（SOF）。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="176"/>
+        <source>Truncated JPEG header before SOS or EOI.</source>
+        <translation>SOS 或 EOI 前的 JPEG 標頭已截斷。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="178"/>
+        <source>JPEG width and height must be nonzero.</source>
+        <translation>JPEG 寬度和高度必須非零。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="182"/>
+        <source>JPEG exceeds the 64 MiB passthrough limit.</source>
+        <translation>JPEG 超過 64 MiB 的直通限制。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="184"/>
+        <source>JPEG exceeds the 48 megapixel passthrough limit.</source>
+        <translation>JPEG 超過 48 百萬像素的直通限制。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="186"/>
+        <source>Only 1 or 3 JPEG components are supported; CMYK/YCCK requires decoding.</source>
+        <translation>僅支援 1 或 3 個 JPEG 元件；CMYK/YCCK 需要解碼。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="188"/>
+        <source>Only baseline or extended sequential Huffman JPEG is supported; other SOF types require decoding.</source>
+        <translation>僅支援基線或延伸循序霍夫曼 JPEG；其他 SOF 類型需要解碼。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="190"/>
+        <source>Only 8-bit JPEG components are supported.</source>
+        <translation>僅支援 8 位元 JPEG 元件。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="192"/>
+        <source>Mirrored Exif orientations (2, 4, 5, 7) require decoding.</source>
+        <translation>鏡像 Exif 方向（2、4、5、7）需要解碼。</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="187"/>
+        <source>JPEGs with embedded ICC profiles are not supported for direct insertion.</source>
+        <translation>不支援直接插入含有內嵌 ICC 色彩描述檔的 JPEG。</translation>
+    </message>
 </context>
 <context>
     <name>pdf::PDFWidgetAnnotationManager</name>
@@ -14172,6 +14267,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Export Selection as Image...</source><translation>將選取範圍匯出為圖片...</translation></message>
     <message><source>Insert Blank Page...</source><translation>插入空白頁...</translation></message>
     <message><source>Insert Pages from PDF...</source><translation>從 PDF 插入頁面...</translation></message>
+    <message><source>Insert Page from JPEG...</source><translation>從 JPEG 插入頁面...</translation></message>
     <message><source>Duplicate Current Page</source><translation>建立目前頁面的副本</translation></message>
     <message><source>Reverse Page Order</source><translation>反轉頁面順序</translation></message>
 </context>
@@ -14543,6 +14639,9 @@ Save the incomplete form anyway?</source>
     <message><source>Insert Blank Page</source><translation>插入空白頁</translation></message>
     <message><source>Insert Pages from PDF</source><translation>從 PDF 插入頁面</translation></message>
     <message><source>Insert the pages?</source><translation>要插入這些頁面嗎？</translation></message>
+    <message><source>Insert Page from JPEG</source><translation>從 JPEG 插入頁面</translation></message>
+    <message><source>JPEG image (*.jpg *.jpeg)</source><translation>JPEG 圖片 (*.jpg *.jpeg)</translation></message>
+    <message><source>Cannot open JPEG file &apos;%1&apos;.</source><translation>無法開啟 JPEG 檔案 &apos;%1&apos;。</translation></message>
     <message><source>Duplicate Pages</source><translation>建立頁面副本</translation></message>
 </context>
 <context>
