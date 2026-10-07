@@ -55,6 +55,7 @@ private slots:
     void test_jpeg_passthrough_roundtrip_data();
     void test_jpeg_passthrough_roundtrip();
     void test_jpeg_header_rejections();
+    void test_jpeg_icc_profile_rejected();
     void test_jpeg_header_metadata();
 
 private:
@@ -694,6 +695,29 @@ void ImageOptimizerTest::test_jpeg_header_rejections()
         QVERIFY(!info.canWriteDirectly);
         QVERIFY(!info.errorMessage.isEmpty());
     }
+}
+
+void ImageOptimizerTest::test_jpeg_icc_profile_rejected()
+{
+    const QByteArray plainJpeg = jpegHeader();
+    const auto plainInfo = pdf::PDFJpegImage::parseHeader(plainJpeg);
+    QVERIFY2(plainInfo.canWriteDirectly, qPrintable(plainInfo.errorMessage));
+
+    QByteArray iccPayload("ICC_PROFILE\0", 12);
+    iccPayload += char(1); // ICC chunk sequence number.
+    iccPayload += char(1); // Total ICC chunk count.
+    iccPayload += char(0x42);
+    const int segmentLength = int(iccPayload.size()) + 2;
+    QByteArray iccSegment = QByteArray::fromHex("ffe2");
+    iccSegment += char(segmentLength >> 8);
+    iccSegment += char(segmentLength & 255);
+    iccSegment += iccPayload;
+    const QByteArray iccJpeg = QByteArray::fromHex("ffd8") + iccSegment + plainJpeg.mid(2);
+
+    const pdf::PDFJpegImageInfo info = pdf::PDFJpegImage::parseHeader(iccJpeg);
+    QVERIFY(!info.canWriteDirectly);
+    QCOMPARE(info.reason, pdf::PDFJpegImageReason::UnsupportedICCProfile);
+    QCOMPARE(info.errorMessage, QStringLiteral("JPEGs with embedded ICC profiles are not supported for direct insertion."));
 }
 
 void ImageOptimizerTest::test_jpeg_header_metadata()
