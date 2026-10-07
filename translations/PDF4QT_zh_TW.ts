@@ -14172,6 +14172,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Export Selection as Image...</source><translation>將選取範圍匯出為圖片...</translation></message>
     <message><source>Insert Blank Page...</source><translation>插入空白頁...</translation></message>
     <message><source>Insert Pages from PDF...</source><translation>從 PDF 插入頁面...</translation></message>
+    <message><source>Insert Page from JPEG...</source><translation>從 JPEG 插入頁面...</translation></message>
     <message><source>Duplicate Current Page</source><translation>建立目前頁面的副本</translation></message>
 </context>
 <context>
@@ -14542,6 +14543,9 @@ Save the incomplete form anyway?</source>
     <message><source>Insert Blank Page</source><translation>插入空白頁</translation></message>
     <message><source>Insert Pages from PDF</source><translation>從 PDF 插入頁面</translation></message>
     <message><source>Insert the pages?</source><translation>要插入這些頁面嗎？</translation></message>
+    <message><source>Insert Page from JPEG</source><translation>從 JPEG 插入頁面</translation></message>
+    <message><source>JPEG image (*.jpg *.jpeg)</source><translation>JPEG 圖片 (*.jpg *.jpeg)</translation></message>
+    <message><source>Cannot open JPEG file &apos;%1&apos;.</source><translation>無法開啟 JPEG 檔案 &apos;%1&apos;。</translation></message>
     <message><source>Duplicate Pages</source><translation>建立頁面副本</translation></message>
 </context>
 <context>

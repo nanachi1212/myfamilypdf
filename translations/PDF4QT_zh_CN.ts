@@ -14169,6 +14169,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Export Selection as Image...</source><translation>将选中范围导出为图片...</translation></message>
     <message><source>Insert Blank Page...</source><translation>插入空白页...</translation></message>
     <message><source>Insert Pages from PDF...</source><translation>从 PDF 插入页面...</translation></message>
+    <message><source>Insert Page from JPEG...</source><translation>从 JPEG 插入页面...</translation></message>
     <message><source>Duplicate Current Page</source><translation>创建当前页面的副本</translation></message>
 </context>
 <context>
@@ -14523,6 +14524,9 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Insert Blank Page</source><translation>插入空白页</translation></message>
     <message><source>Insert Pages from PDF</source><translation>从 PDF 插入页面</translation></message>
     <message><source>Insert the pages?</source><translation>要插入这些页面吗？</translation></message>
+    <message><source>Insert Page from JPEG</source><translation>从 JPEG 插入页面</translation></message>
+    <message><source>JPEG image (*.jpg *.jpeg)</source><translation>JPEG 图片 (*.jpg *.jpeg)</translation></message>
+    <message><source>Cannot open JPEG file &apos;%1&apos;.</source><translation>无法打开 JPEG 文件 &apos;%1&apos;。</translation></message>
     <message><source>Duplicate Pages</source><translation>创建页面副本</translation></message>
 </context>
 <context>
