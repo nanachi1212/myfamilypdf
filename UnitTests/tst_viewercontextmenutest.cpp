@@ -253,6 +253,7 @@ private slots:
     void insertPagesEditorBlankWorkflow();
     void insertPagesEditorFromPdfWorkflow();
     void insertPagesEditorFromJpegWorkflow();
+    void insertPngPageEditorWorkflow();
     void insertPagesEditorFailureAndWarnings();
     void insertPagesEditorUndoMemory();
     void insertPagesEditorTranslations();
@@ -5284,6 +5285,43 @@ void ViewerContextMenuTest::insertPagesEditorFromJpegWorkflow()
     QCOMPARE(controller->getDocument(), beforeRejectedInsert);
     QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(4));
     QCOMPARE(reorderPageReferences(controller->getDocument()), beforeRejectedReferences);
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::insertPngPageEditorWorkflow()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    const QString path = m_temp.filePath("insert-png-target.pdf");
+    const QString pngPath = m_temp.filePath("insert-page.png");
+    QVERIFY(writePdfFixture(path, 2));
+    QImage image(8, 4, QImage::Format_RGBA8888);
+    image.fill(QColor(30, 80, 120, 96));
+    QVERIFY(image.save(pngPath, "PNG"));
+
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    const std::vector<pdf::PDFObjectReference> original = reorderPageReferences(controller->getDocument());
+    QVERIFY(controller->insertPngPageFile(pngPath));
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(3));
+    const std::vector<pdf::PDFObjectReference> inserted = reorderPageReferences(controller->getDocument());
+    QCOMPARE(inserted[0], original[0]);
+    QCOMPARE(inserted[2], original[1]);
+    QVERIFY(inserted[1] != original[0] && inserted[1] != original[1]);
+
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+    QAction* redoAction = editor.findChild<QAction*>("actionRedo");
+    QVERIFY(undoAction && redoAction && undoAction->isEnabled());
+    undoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(2));
+    QCOMPARE(reorderPageReferences(controller->getDocument()), original);
+    redoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(3));
+
     controller->closeDocument();
     QCoreApplication::processEvents();
 }

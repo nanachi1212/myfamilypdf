@@ -11967,6 +11967,10 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Loading page %1...</source><translation>正在載入第 %1 頁…</translation></message>
     <message><source>Loading...</source><translation>載入中…</translation></message>
     <message><source>Unable to render this page.</source><translation>無法顯示此頁面。</translation></message>
+    <message><source>PNG must be nonempty and no larger than 64 MiB.</source><translation>PNG 不可為空，且檔案大小不得超過 64 MiB。</translation></message>
+    <message><source>The PNG file is invalid or damaged.</source><translation>PNG 檔案無效或已損毀。</translation></message>
+    <message><source>PNG exceeds the 48 megapixel limit.</source><translation>PNG 超過 4,800 萬像素限制。</translation></message>
+    <message><source>The PNG image could not be decoded.</source><translation>無法解碼 PNG 圖片。</translation></message>
     <message>
         <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="111"/>
         <source>JPEG data is empty.</source>
@@ -14268,6 +14272,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Insert Blank Page...</source><translation>插入空白頁...</translation></message>
     <message><source>Insert Pages from PDF...</source><translation>從 PDF 插入頁面...</translation></message>
     <message><source>Insert Page from JPEG...</source><translation>從 JPEG 插入頁面...</translation></message>
+    <message><source>Insert Page from PNG...</source><translation>從 PNG 插入頁面...</translation></message>
     <message><source>Duplicate Current Page</source><translation>建立目前頁面的副本</translation></message>
     <message><source>Reverse Page Order</source><translation>反轉頁面順序</translation></message>
 </context>
@@ -14642,6 +14647,9 @@ Save the incomplete form anyway?</source>
     <message><source>Insert Page from JPEG</source><translation>從 JPEG 插入頁面</translation></message>
     <message><source>JPEG image (*.jpg *.jpeg)</source><translation>JPEG 圖片 (*.jpg *.jpeg)</translation></message>
     <message><source>Cannot open JPEG file &apos;%1&apos;.</source><translation>無法開啟 JPEG 檔案 &apos;%1&apos;。</translation></message>
+    <message><source>Insert Page from PNG</source><translation>從 PNG 插入頁面</translation></message>
+    <message><source>PNG image (*.png)</source><translation>PNG 圖片 (*.png)</translation></message>
+    <message><source>Cannot open PNG file &apos;%1&apos;.</source><translation>無法開啟 PNG 檔案 &apos;%1&apos;。</translation></message>
     <message><source>Duplicate Pages</source><translation>建立頁面副本</translation></message>
 </context>
 <context>

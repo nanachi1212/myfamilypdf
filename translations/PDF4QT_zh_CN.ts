@@ -11965,6 +11965,10 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <source>Precompiled page size is too high (%1 kB). Cache size is %2 kB. Increase the cache size!</source>
         <translation>预编译页面大小过高（%1 kB）。缓存大小为 %2 kB。请增加缓存大小！</translation>
     </message>
+    <message><source>PNG must be nonempty and no larger than 64 MiB.</source><translation>PNG 不能为空，且文件大小不得超过 64 MiB。</translation></message>
+    <message><source>The PNG file is invalid or damaged.</source><translation>PNG 文件无效或已损坏。</translation></message>
+    <message><source>PNG exceeds the 48 megapixel limit.</source><translation>PNG 超过 4800 万像素限制。</translation></message>
+    <message><source>The PNG image could not be decoded.</source><translation>无法解码 PNG 图片。</translation></message>
     <message>
         <location filename="../Pdf4QtLibCore/sources/pdfjpegimage.cpp" line="111"/>
         <source>JPEG data is empty.</source>
@@ -14265,6 +14269,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Insert Blank Page...</source><translation>插入空白页...</translation></message>
     <message><source>Insert Pages from PDF...</source><translation>从 PDF 插入页面...</translation></message>
     <message><source>Insert Page from JPEG...</source><translation>从 JPEG 插入页面...</translation></message>
+    <message><source>Insert Page from PNG...</source><translation>从 PNG 插入页面...</translation></message>
     <message><source>Duplicate Current Page</source><translation>创建当前页面的副本</translation></message>
     <message><source>Reverse Page Order</source><translation>反转页面顺序</translation></message>
 </context>
@@ -14623,6 +14628,9 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Insert Page from JPEG</source><translation>从 JPEG 插入页面</translation></message>
     <message><source>JPEG image (*.jpg *.jpeg)</source><translation>JPEG 图片 (*.jpg *.jpeg)</translation></message>
     <message><source>Cannot open JPEG file &apos;%1&apos;.</source><translation>无法打开 JPEG 文件 &apos;%1&apos;。</translation></message>
+    <message><source>Insert Page from PNG</source><translation>从 PNG 插入页面</translation></message>
+    <message><source>PNG image (*.png)</source><translation>PNG 图片 (*.png)</translation></message>
+    <message><source>Cannot open PNG file &apos;%1&apos;.</source><translation>无法打开 PNG 文件 &apos;%1&apos;。</translation></message>
     <message><source>Duplicate Pages</source><translation>创建页面副本</translation></message>
 </context>
 <context>

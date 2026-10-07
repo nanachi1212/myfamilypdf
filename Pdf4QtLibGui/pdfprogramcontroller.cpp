@@ -45,6 +45,7 @@
 #include "pdfpagereorder.h"
 #include "pdfpageinserter.h"
 #include "pdfjpegimage.h"
+#include "pdfpngimage.h"
 #include "pdfoptimizedocumentdialog.h"
 #include "pdfoptimizeimagesdialog.h"
 #include "pdfsanitizedocumentdialog.h"
@@ -3981,6 +3982,60 @@ bool PDFProgramController::insertJpegPageFile(const QString& fileName, const std
                                                                                          sourceDocument);
     const pdf::PDFInteger insertIndex = pageCount == 0 ? 0 : pages.back() + 1;
     return insertPagesAt(insertIndex, source, { 0 }, tr("Insert Page from JPEG"));
+}
+
+void PDFProgramController::insertPngPage(const std::vector<pdf::PDFInteger>& anchorPages)
+{
+    if (!m_undoRedoManager || !m_pdfDocument)
+        return;
+    const QFileInfo sourceInfo(getOriginalFileName());
+    const QString directory = sourceInfo.absolutePath().isEmpty() ? m_settings->getDirectory() : sourceInfo.absolutePath();
+    const QString fileName = QFileDialog::getOpenFileName(m_mainWindow,
+                                                          tr("Insert Page from PNG"),
+                                                          directory,
+                                                          tr("PNG image (*.png)"));
+    if (!fileName.isEmpty())
+        insertPngPageFile(fileName, anchorPages);
+}
+
+bool PDFProgramController::insertPngPageFile(const QString& fileName, const std::vector<pdf::PDFInteger>& anchorPages)
+{
+    if (!m_undoRedoManager || !m_pdfDocument)
+        return false;
+
+    // Recheck the target immediately before creating and publishing the inserted page.
+    const QStringList blockers = pdf::PDFPageInserter::checkTarget(m_pdfDocument.data(), true);
+    if (!blockers.isEmpty())
+    {
+        QMessageBox::warning(m_mainWindow, tr("Insert Page from PNG"), blockers.join('\n'));
+        return false;
+    }
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        QMessageBox::critical(m_mainWindow, tr("Insert Page from PNG"),
+                              tr("Cannot open PNG file '%1'.").arg(QFileInfo(fileName).fileName()));
+        return false;
+    }
+    const QByteArray bytes = file.read(64LL * 1024 * 1024 + 1);
+    pdf::PDFDocument imageDocument;
+    QString errorMessage;
+    if (!pdf::PDFPngImage::createDocument(bytes, &imageDocument, &errorMessage))
+    {
+        QMessageBox::critical(m_mainWindow, tr("Insert Page from PNG"), errorMessage);
+        return false;
+    }
+    const pdf::PDFDocumentPointer target = m_pdfDocument;
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(target->getCatalog()->getPageCount());
+    const std::vector<pdf::PDFInteger> pages = getInsertAnchorPages(anchorPages,
+                                                                      m_pdfWidget->getDrawWidget()->getCurrentPages(),
+                                                                      pageCount);
+    const pdf::PDFDocumentPointer sourceDocument(new pdf::PDFDocument(std::move(imageDocument)));
+    const pdf::PDFDocumentMerger::Source source = pdf::PDFDocumentMerger::createSource(fileName,
+                                                                                         QFileInfo(fileName).fileName(),
+                                                                                         sourceDocument);
+    const pdf::PDFInteger insertIndex = pageCount == 0 ? 0 : pages.back() + 1;
+    return insertPagesAt(insertIndex, source, { 0 }, tr("Insert Page from PNG"));
 }
 
 bool PDFProgramController::insertBlankPageAt(pdf::PDFInteger insertIndex, const QRectF& mediaBox, const QRectF& cropBox, pdf::PageRotation rotation)

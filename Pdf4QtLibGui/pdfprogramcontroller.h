@@ -368,10 +368,14 @@ public:
 
     /// Editor only: asks for a JPEG and inserts it as one page after the current page.
     void insertJpegPage(const std::vector<pdf::PDFInteger>& anchorPages);
+    /// Editor only: asks for a PNG and inserts it as one page after the current page.
+    void insertPngPage(const std::vector<pdf::PDFInteger>& anchorPages);
 
     /// Inserts one JPEG page from the fileName path. This is also used by the Editor action
     /// after its file dialog has selected a path.
     bool insertJpegPageFile(const QString& fileName, const std::vector<pdf::PDFInteger>& anchorPages = {});
+    /// Inserts one PNG page through the same checked page publishing flow.
+    bool insertPngPageFile(const QString& fileName, const std::vector<pdf::PDFInteger>& anchorPages = {});
 
     /// Inserts one empty page at \p insertIndex as one Undo step. Returns false (document unchanged)
     /// in the Viewer or when the insertion is refused.
