@@ -50,3 +50,15 @@ The engine always works on copies. Failure, refusal, cancel or wrong password le
 
 - `UnitTestsInsertPages` (Core, 32 functions, written and read back): positions, geometry, nested tree, flat root attributes, page order and duplicates, inherited Rotate/CropBox, graph isolation (one page of 5 brings no other page, content, bead or thread), JPEG 2000 bytes, embedded font program, annotations with appearance, links, form / rogue widget / XFA, signed, tagged, optional content, active content, encrypted source, wrong password / cancel, CopyContent / Assemble denied, encrypted target roundtrip, target form, outline, XFA / tagged target, page labels, failure atomicity, source lifetime, measurements.
 - `UnitTestsViewer`: `insertPagesViewerIsReadOnly`, `insertPagesEditorEntries`, `insertPagesEditorBlankWorkflow`, `insertPagesEditorFromPdfWorkflow`, `insertPagesEditorFailureAndWarnings`, `insertPagesEditorUndoMemory`, `insertPagesEditorTranslations`.
+
+## Duplicate pages (v12)
+
+Editor only, the same as insertion. Viewer has no entry, and `duplicatePages` returns false when there is no Undo manager.
+
+- Thumbnail menu → Duplicate Selected Pages: copies of the selected pages, in page order, go after the last selected page.
+- Edit → Duplicate Current Page: a copy of the current page goes right after it.
+- Flow: `PDFProgramController::duplicatePages` → `insertPagesAt` with the open document as source (`PDFDocumentMerger::createSource`). It is the same restricted import as Insert Pages from PDF, so it has the same policies and refusals. Message boxes use the title "Duplicate Pages". One Undo step; the view goes to the first copy, and the copies are selected.
+- Refused, document unchanged: a document with form fields, a signed document, a tagged document, pages that depend on optional content or active content, and every check of `checkTarget`.
+- A link on a copied page to a page that is not copied loses its target (the warning comes first, with Cancel). A link between two copied pages leads to the copy.
+
+Tests (`UnitTestsViewer`): `duplicatePagesViewerIsReadOnly`, `duplicatePagesEditorWorkflow`, `duplicatePagesEditorRefusalAndWarning`, and the translation and thumbnail menu checks in `insertPagesEditorTranslations`, `insertPagesEditorEntries` and `insertPagesViewerIsReadOnly`.

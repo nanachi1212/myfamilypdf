@@ -14169,6 +14169,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Export Selection as Image...</source><translation>将选中范围导出为图片...</translation></message>
     <message><source>Insert Blank Page...</source><translation>插入空白页...</translation></message>
     <message><source>Insert Pages from PDF...</source><translation>从 PDF 插入页面...</translation></message>
+    <message><source>Duplicate Current Page</source><translation>创建当前页面的副本</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFEncryptionSettingsDialog</name>
@@ -14522,6 +14523,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>Insert Blank Page</source><translation>插入空白页</translation></message>
     <message><source>Insert Pages from PDF</source><translation>从 PDF 插入页面</translation></message>
     <message><source>Insert the pages?</source><translation>要插入这些页面吗？</translation></message>
+    <message><source>Duplicate Pages</source><translation>创建页面副本</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFRecentFileManager</name>
@@ -15050,6 +15052,7 @@ Do you want to perform this action?</source>
     <message><source>Export Selected Pages as Images...</source><translation>将选中的页面导出为图片...</translation></message>
     <message><source>Insert Blank Page...</source><translation>插入空白页...</translation></message>
     <message><source>Insert Pages from PDF...</source><translation>从 PDF 插入页面...</translation></message>
+    <message><source>Duplicate Selected Pages</source><translation>创建选中页面的副本</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFViewerMainWindow</name>

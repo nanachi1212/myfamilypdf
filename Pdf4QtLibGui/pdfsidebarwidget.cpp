@@ -1267,6 +1267,13 @@ void PDFSidebarWidget::onThumbnailContextMenuRequested(const QPoint& pos)
         {
             Q_EMIT insertPagesFromPdfRequested(selectedPages);
         });
+
+        QAction* duplicateAction = menu.addAction(tr("Duplicate Selected Pages"));
+        duplicateAction->setObjectName(QStringLiteral("thumbnailDuplicatePagesAction"));
+        connect(duplicateAction, &QAction::triggered, this, [this, selectedPages]()
+        {
+            Q_EMIT duplicatePagesRequested(selectedPages);
+        });
     }
 
     menu.exec(ui->thumbnailsListView->viewport()->mapToGlobal(pos));

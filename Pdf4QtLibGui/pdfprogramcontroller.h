@@ -367,7 +367,13 @@ public:
 
     /// Inserts \p pages of \p source at \p insertIndex as one Undo step. Warnings (links that lose their
     /// target, encryption that is not kept) are confirmed by the user first. Returns false if nothing changed.
-    bool insertPagesAt(pdf::PDFInteger insertIndex, const pdf::PDFDocumentMerger::Source& source, const std::vector<pdf::PDFInteger>& pages);
+    /// \param title Title of the message boxes; empty means "Insert Pages from PDF"
+    bool insertPagesAt(pdf::PDFInteger insertIndex, const pdf::PDFDocumentMerger::Source& source, const std::vector<pdf::PDFInteger>& pages, const QString& title = QString());
+
+    /// Editor only (v12): inserts copies of \p pageIndices (sorted; empty means the current page) after the
+    /// last of them, as one Undo step. Uses the v11 restricted import with the open document as source,
+    /// so the same refusals apply. Returns false (document unchanged) in the Viewer or when refused.
+    bool duplicatePages(const std::vector<pdf::PDFInteger>& pageIndices);
 
     void onActionTriggered(const pdf::PDFAction* action);
     void onDocumentModified(pdf::PDFModifiedDocument document);

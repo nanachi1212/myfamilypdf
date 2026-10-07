@@ -254,6 +254,9 @@ private slots:
     void insertPagesEditorFailureAndWarnings();
     void insertPagesEditorUndoMemory();
     void insertPagesEditorTranslations();
+    void duplicatePagesViewerIsReadOnly();
+    void duplicatePagesEditorWorkflow();
+    void duplicatePagesEditorRefusalAndWarning();
 
 private:
     QAction* action(const char* name) const { return m_window->findChild<QAction*>(QLatin1String(name)); }
@@ -4875,7 +4878,8 @@ void ViewerContextMenuTest::insertPagesViewerIsReadOnly()
         }
         menuTimer.stop();
         menuInspected = menu->findChild<QAction*>("thumbnailExtractPagesAction") != nullptr;
-        menuWithoutInsert = !menu->findChild<QAction*>("thumbnailInsertBlankPageAction") && !menu->findChild<QAction*>("thumbnailInsertPagesFromPdfAction");
+        menuWithoutInsert = !menu->findChild<QAction*>("thumbnailInsertBlankPageAction") && !menu->findChild<QAction*>("thumbnailInsertPagesFromPdfAction") &&
+                            !menu->findChild<QAction*>("thumbnailDuplicatePagesAction");
         menu->close();
     });
     menuTimer.start(10);
@@ -4937,7 +4941,7 @@ void ViewerContextMenuTest::insertPagesEditorEntries()
     {
         auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
         QAction* insertBlank = menu ? menu->findChild<QAction*>("thumbnailInsertBlankPageAction") : nullptr;
-        if (insertBlank && menu->findChild<QAction*>("thumbnailInsertPagesFromPdfAction"))
+        if (insertBlank && menu->findChild<QAction*>("thumbnailInsertPagesFromPdfAction") && menu->findChild<QAction*>("thumbnailDuplicatePagesAction"))
         {
             menuTimer.stop();
             menuUsed = true;
@@ -5393,12 +5397,15 @@ void ViewerContextMenuTest::insertPagesEditorTranslations()
         QString menuText;
         QString formBlocker;
         QString encryptionWarning;
+        QString duplicateMenuText;
     };
     const QList<Language> languages = {
         { pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_TRADITIONAL, QString::fromUtf8("插入空白頁..."),
-          QString::fromUtf8("此 PDF 的選取頁面包含表單欄位，目前無法安全插入。"), QString::fromUtf8("來源頁面插入後將不再保留來源 PDF 的加密保護。") },
+          QString::fromUtf8("此 PDF 的選取頁面包含表單欄位，目前無法安全插入。"), QString::fromUtf8("來源頁面插入後將不再保留來源 PDF 的加密保護。"),
+          QString::fromUtf8("建立目前頁面的副本") },
         { pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_SIMPLIFIED, QString::fromUtf8("插入空白页..."),
-          QString::fromUtf8("此 PDF 的选取页面包含表单字段，目前无法安全插入。"), QString::fromUtf8("来源页面插入后将不再保留来源 PDF 的加密保护。") },
+          QString::fromUtf8("此 PDF 的选取页面包含表单字段，目前无法安全插入。"), QString::fromUtf8("来源页面插入后将不再保留来源 PDF 的加密保护。"),
+          QString::fromUtf8("创建当前页面的副本") },
     };
     for (const Language& language : languages)
     {
@@ -5411,8 +5418,186 @@ void ViewerContextMenuTest::insertPagesEditorTranslations()
         QCOMPARE(QCoreApplication::translate("pdf::PDFPageInserter", "The inserted pages will no longer have the encryption of the source PDF."), language.encryptionWarning);
         QVERIFY(QCoreApplication::translate("pdfviewer::PDFInsertPagesDialog", "Before page %1") != QStringLiteral("Before page %1"));
         QVERIFY(QCoreApplication::translate("pdfviewer::PDFSidebarWidget", "Insert Pages from PDF...") != QStringLiteral("Insert Pages from PDF..."));
+        QCOMPARE(editor.findChild<QAction*>("actionDuplicatePage")->text(), language.duplicateMenuText);
+        QVERIFY(QCoreApplication::translate("pdfviewer::PDFSidebarWidget", "Duplicate Selected Pages") != QStringLiteral("Duplicate Selected Pages"));
+        QVERIFY(QCoreApplication::translate("pdfviewer::PDFProgramController", "Duplicate Pages") != QStringLiteral("Duplicate Pages"));
         translator.uninstallTranslator();
     }
+}
+
+void ViewerContextMenuTest::duplicatePagesViewerIsReadOnly()
+{
+    // The Viewer offers no entry and its controller refuses to change the document.
+    QVERIFY(!m_window->findChild<QAction*>("actionDuplicatePage"));
+    auto* controller = m_window->getProgramController();
+    const pdf::PDFDocument* document = controller->getDocument();
+    const auto references = reorderPageReferences(document);
+    bool modalSeen = false;
+    bool refused = false;
+    runWithModal(m_window.get(), [&]() { refused = !controller->duplicatePages({ 0 }); }, [&](QWidget* modal)
+    {
+        modalSeen = true;
+        if (auto* dialog = qobject_cast<QDialog*>(modal))
+        {
+            dialog->reject();
+        }
+        return true;
+    }, 500);
+    QVERIFY(refused);
+    QVERIFY(!modalSeen);
+    QVERIFY(controller->getDocument() == document);
+    QVERIFY(reorderPageReferences(controller->getDocument()) == references);
+}
+
+void ViewerContextMenuTest::duplicatePagesEditorWorkflow()
+{
+#ifdef Q_OS_LINUX
+    QSKIP("Editor thumbnail interactions are covered by the Windows runtime job.");
+#endif
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    const QString path = m_temp.filePath("duplicate-pages.pdf");
+    QVERIFY(writePdfFixture(path, 4));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    QAction* duplicateAction = editor.findChild<QAction*>("actionDuplicatePage");
+    QVERIFY(duplicateAction);
+    bool inEditMenu = false;
+    for (QMenu* menu : editor.menuBar()->findChildren<QMenu*>())
+    {
+        inEditMenu = inEditMenu || (menu->objectName() == "menuEdit" && menu->actions().contains(duplicateAction));
+    }
+    QVERIFY(inEditMenu);
+    auto* controller = editor.getProgramController();
+    QVERIFY(!controller->duplicatePages({ 0 }));    // no document
+
+    controller->openDocument(path);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    controller->getPdfWidget()->getDrawWidgetProxy()->setPageLayout(pdf::PageLayout::OneColumn);
+    auto* thumbnails = editor.findChild<pdfviewer::PDFThumbnailsListView*>("thumbnailsListView");
+    QVERIFY(showThumbnailsPage(&editor));
+    QTRY_COMPARE(thumbnails->model()->rowCount(), 4);
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+    QAction* redoAction = editor.findChild<QAction*>("actionRedo");
+    QVERIFY(!undoAction->isEnabled());
+    const std::vector<pdf::PDFObjectReference> original = reorderPageReferences(controller->getDocument());
+
+    // Thumbnails 2 and 4: the copies follow page 4, in page order, as new page objects.
+    selectThumbnailRows(thumbnails, { 1, 3 });
+    QVERIFY(controller->duplicatePages(selectedThumbnailPages(thumbnails)));
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(6));
+    const std::vector<pdf::PDFObjectReference> references = reorderPageReferences(controller->getDocument());
+    QVERIFY(std::vector<pdf::PDFObjectReference>(references.cbegin(), references.cbegin() + 4) == original);
+    QVERIFY(std::find(original.cbegin(), original.cend(), references[4]) == original.cend());
+    QVERIFY(std::find(original.cbegin(), original.cend(), references[5]) == original.cend());
+    QTRY_VERIFY(selectedThumbnailRows(thumbnails) == std::vector<int>({ 4, 5 }));
+    QTRY_VERIFY(!currentPages(controller).empty() && currentPages(controller).front() == 4);
+
+    // One Undo step; Redo restores the copies.
+    QVERIFY(undoAction->isEnabled());
+    undoAction->trigger();
+    QVERIFY(reorderPageReferences(controller->getDocument()) == original);
+    QVERIFY(!undoAction->isEnabled());
+    redoAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(6));
+
+    // Edit menu entry: the current page is copied right after itself.
+    controller->getPdfWidget()->getDrawWidgetProxy()->goToPage(0);
+    QTRY_VERIFY(!currentPages(controller).empty() && currentPages(controller).front() == 0);
+    duplicateAction->trigger();
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(7));
+    QTRY_VERIFY(selectedThumbnailRows(thumbnails) == std::vector<int>({ 1 }));
+
+    // Save As, reopen: order and text layer.
+    const QString savedPath = m_temp.filePath("duplicate-pages-saved.pdf");
+    QFile::remove(savedPath);
+    QVERIFY(annotationSaveAs(controller, &editor, savedPath));
+    controller->closeDocument();
+    controller->openDocument(savedPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    auto* compiler = controller->getPdfWidget()->getDrawWidgetProxy()->getTextLayoutCompiler();
+    compiler->makeTextLayout();
+    QTRY_VERIFY_WITH_TIMEOUT(compiler->isTextLayoutReady(), 15000);
+    const QStringList expected = { "smoke page 1", "smoke page 1", "smoke page 2", "smoke page 3", "smoke page 4", "smoke page 2", "smoke page 4" };
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(expected.size()));
+    for (int i = 0; i < expected.size(); ++i)
+    {
+        QVERIFY2(pageText(compiler, i).contains(expected[i]), qPrintable(QString("page %1: %2").arg(i + 1).arg(pageText(compiler, i))));
+    }
+    controller->closeDocument();
+    QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::duplicatePagesEditorRefusalAndWarning()
+{
+#ifdef Q_OS_LINUX
+    QSKIP("Editor interactions are covered by the Windows runtime job.");
+#endif
+    const QString formPath = m_temp.filePath("duplicate-form.pdf");
+    const QString linkPath = m_temp.filePath("duplicate-link.pdf");
+    QVERIFY(writeInsertSourceFixture(formPath, true));
+    QVERIFY(writeInsertSourceFixture(linkPath, false));
+    pdfviewer::PDFEditorMainWindow editor;
+    editor.resize(1100, 900);
+    editor.show();
+    auto* controller = editor.getProgramController();
+    QAction* undoAction = editor.findChild<QAction*>("actionUndo");
+
+    auto runDuplicate = [&](const std::vector<pdf::PDFInteger>& pages, QMessageBox::StandardButton answer, QString* title, QString* text)
+    {
+        bool duplicated = false;
+        runWithModal(&editor, [&]() { duplicated = controller->duplicatePages(pages); }, [&](QWidget* modal)
+        {
+            auto* message = qobject_cast<QMessageBox*>(modal);
+            if (message)
+            {
+                *title = message->windowTitle();
+                *text = message->text();
+                message->button(answer)->click();
+            }
+            return message != nullptr;
+        }, 2000);
+        return duplicated;
+    };
+
+    // A document with form fields is refused with the v11 reason; nothing changes.
+    controller->openDocument(formPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    const pdf::PDFDocument* document = controller->getDocument();
+    QString title;
+    QString text;
+    QVERIFY(!runDuplicate({ 0 }, QMessageBox::Ok, &title, &text));
+    QCOMPARE(title, QStringLiteral("Duplicate Pages"));
+    QVERIFY2(text.contains("form fields"), qPrintable(text));
+    QVERIFY(controller->getDocument() == document);
+    QVERIFY(!undoAction->isEnabled());
+    controller->closeDocument();
+    QTRY_VERIFY(controller->getDocument() == nullptr);
+
+    // Page 1 links to page 2, which is not copied: the warning comes first; Cancel changes nothing.
+    controller->openDocument(linkPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument() != nullptr, 15000);
+    document = controller->getDocument();
+    title.clear();
+    text.clear();
+    QVERIFY(!runDuplicate({ 0 }, QMessageBox::Cancel, &title, &text));
+    QCOMPARE(title, QStringLiteral("Duplicate Pages"));
+    QVERIFY2(text.contains("1 link(s)"), qPrintable(text));
+    QVERIFY(controller->getDocument() == document);
+    QVERIFY(!undoAction->isEnabled());
+
+    // Yes duplicates page 1 (its copy keeps the link rectangle, without a target).
+    QVERIFY(runDuplicate({ 0 }, QMessageBox::Yes, &title, &text));
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(3));
+    QVERIFY(undoAction->isEnabled());
+
+    // Both ends of the link copied together: no warning.
+    title.clear();
+    QVERIFY(runDuplicate({ 0, 2 }, QMessageBox::Yes, &title, &text));
+    QVERIFY(title.isEmpty());
+    QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(5));
+    controller->closeDocument();
+    QCoreApplication::processEvents();
 }
 
 QTEST_MAIN(ViewerContextMenuTest)

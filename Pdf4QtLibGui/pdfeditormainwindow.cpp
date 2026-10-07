@@ -346,6 +346,10 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     insertPagesFromPdfAction->setObjectName(QStringLiteral("actionInsertPagesFromPdf"));
     ui->menuEdit->insertAction(ui->actionPageGeometry, insertPagesFromPdfAction);
     connect(insertPagesFromPdfAction, &QAction::triggered, m_programController, [this]() { m_programController->insertPagesFromPdf({}); });
+    QAction* duplicatePageAction = new QAction(tr("Duplicate Current Page"), this);
+    duplicatePageAction->setObjectName(QStringLiteral("actionDuplicatePage"));
+    ui->menuEdit->insertAction(ui->actionPageGeometry, duplicatePageAction);
+    connect(duplicatePageAction, &QAction::triggered, m_programController, [this]() { m_programController->duplicatePages({}); });
 
     // Special tools
     QToolButton* insertStickyNoteButton = m_actionManager->createToolButtonForActionGroup(PDFActionManager::CreateStickyNoteGroup, ui->mainToolBar);
@@ -383,6 +387,8 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
             [this](const std::vector<pdf::PDFInteger>& anchorPages) { m_programController->insertBlankPage(anchorPages); });
     connect(m_sidebarWidget, &PDFSidebarWidget::insertPagesFromPdfRequested, m_programController,
             [this](const std::vector<pdf::PDFInteger>& anchorPages) { m_programController->insertPagesFromPdf(anchorPages); });
+    connect(m_sidebarWidget, &PDFSidebarWidget::duplicatePagesRequested, m_programController,
+            [this](const std::vector<pdf::PDFInteger>& pages) { m_programController->duplicatePages(pages); });
     connect(m_programController, &PDFProgramController::pagesInserted, m_sidebarWidget, [this](const std::vector<pdf::PDFInteger>& pageIndices)
     {
         // After the thumbnail model was reset by the document update: the old selection is gone, the new pages are selected.
