@@ -306,6 +306,9 @@ public:
     Q_DECLARE_FLAGS(Features, Feature)
 
     void openDocument(const QString& fileName);
+
+    /// Converts a .chm file to a PDF in the cache; returns its path, or an empty string on failure or cancel.
+    QString convertChmToPdf(const QString& chmFileName);
     void openRecoveryDocument(const QString& snapshotPath, const QString& originalSourcePath);
     void setDocument(pdf::PDFModifiedDocument document, std::vector<pdf::PDFSignatureVerificationResult> signatureVerificationResult, bool isCurrentSaved);
     void closeDocument();

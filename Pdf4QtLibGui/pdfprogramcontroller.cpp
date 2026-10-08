@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdfprogramcontroller.h"
+#include "pdfchmconverter.h"
 #include "pdfdrawwidget.h"
 #include "pdfannotation.h"
 #include "pdfcompiler.h"
@@ -2816,6 +2817,17 @@ void PDFProgramController::startRecoverySnapshot()
 
 void PDFProgramController::openDocument(const QString& fileName)
 {
+    // A compiled HTML help file is opened as a PDF converted from it, so search, bookmarks and printing work.
+    if (fileName.endsWith(QLatin1String(".chm"), Qt::CaseInsensitive))
+    {
+        const QString pdfFileName = convertChmToPdf(fileName);
+        if (!pdfFileName.isEmpty())
+        {
+            openDocument(pdfFileName);
+        }
+        return;
+    }
+
     if (m_pdfDocument &&
         QFileInfo(fileName).absoluteFilePath().compare(
             m_fileInfo.absoluteFilePath, Qt::CaseInsensitive) != 0)
@@ -3502,11 +3514,45 @@ void PDFProgramController::onPageLayoutChanged()
 
 void PDFProgramController::onActionOpenTriggered()
 {
-    QString fileName = QFileDialog::getOpenFileName(m_mainWindow, tr("Select PDF document"), m_settings->getDirectory(), tr("PDF document (*.pdf)"));
+    QString fileName = QFileDialog::getOpenFileName(m_mainWindow, tr("Select PDF document"), m_settings->getDirectory(), tr("PDF or help file (*.pdf *.chm);;PDF document (*.pdf);;Compiled HTML help (*.chm)"));
     if (!fileName.isEmpty())
     {
         openDocument(fileName);
     }
+}
+
+QString PDFProgramController::convertChmToPdf(const QString& chmFileName)
+{
+    // The converted PDF is kept, so the next opening of the same help file is immediate.
+    const QString pdfFileName = PDFChmConverter::cachedPdfPath(chmFileName);
+    if (QFileInfo::exists(pdfFileName))
+    {
+        return pdfFileName;
+    }
+
+    QProgressDialog dialog(tr("Converting the help file to PDF..."), tr("Cancel"), 0, 0, m_mainWindow);
+    dialog.setObjectName(QStringLiteral("chmProgressDialog"));
+    dialog.setWindowTitle(tr("Open Help File"));
+    dialog.setWindowModality(Qt::WindowModal);
+    dialog.setMinimumDuration(0);
+    const QString errorMessage = PDFChmConverter::convertToPdf(chmFileName, pdfFileName, [&dialog](int done, int total)
+    {
+        dialog.setMaximum(total);
+        dialog.setValue(done);
+        return !dialog.wasCanceled();
+    });
+    const bool canceled = dialog.wasCanceled();
+    dialog.close();
+
+    if (!errorMessage.isEmpty())
+    {
+        if (!canceled)
+        {
+            QMessageBox::critical(m_mainWindow, tr("Open Help File"), tr("Cannot open '%1'. %2").arg(QDir::toNativeSeparators(chmFileName), errorMessage));
+        }
+        return QString();
+    }
+    return pdfFileName;
 }
 
 void PDFProgramController::extractPages()
