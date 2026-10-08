@@ -15,15 +15,17 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QStandardItemModel>
 
 #include <algorithm>
 
 namespace pdfviewer
 {
 
-PDFSplitDocumentDialog::PDFSplitDocumentDialog(pdf::PDFInteger pageCount, const QString& directory, const QString& baseName, QWidget* parent) :
+PDFSplitDocumentDialog::PDFSplitDocumentDialog(pdf::PDFInteger pageCount, const QString& directory, const QString& baseName, const std::vector<pdf::PDFInteger>& bookmarkStarts, QWidget* parent) :
     QDialog(parent),
     m_pageCount(pageCount),
+    m_bookmarkStarts(bookmarkStarts),
     m_modeCombo(new QComboBox(this)),
     m_everyNSpin(new QSpinBox(this)),
     m_pagesEdit(new QLineEdit(this)),
@@ -38,6 +40,12 @@ PDFSplitDocumentDialog::PDFSplitDocumentDialog(pdf::PDFInteger pageCount, const 
     m_modeCombo->addItem(tr("Every page"), int(Mode::EveryPage));
     m_modeCombo->addItem(tr("Every N pages"), int(Mode::EveryNPages));
     m_modeCombo->addItem(tr("New file starts at pages"), int(Mode::AtPages));
+    m_modeCombo->addItem(tr("New file starts at each top-level bookmark"), int(Mode::AtBookmarks));
+    if (m_bookmarkStarts.empty())
+    {
+        // No top-level bookmark with a page destination: the entry stays visible but cannot be chosen.
+        qobject_cast<QStandardItemModel*>(m_modeCombo->model())->item(m_modeCombo->count() - 1)->setEnabled(false);
+    }
     layout->addRow(tr("Split"), m_modeCombo);
 
     m_everyNSpin->setObjectName(QStringLiteral("splitEveryNSpin"));
@@ -171,6 +179,10 @@ void PDFSplitDocumentDialog::accept()
             plan.parts = splitAtPages(m_pageCount, starts);
             break;
         }
+
+        case Mode::AtBookmarks:
+            plan.parts = splitAtPages(m_pageCount, m_bookmarkStarts);
+            break;
     }
 
     if (plan.parts.size() < 2)

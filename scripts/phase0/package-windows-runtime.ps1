@@ -37,9 +37,7 @@ $runtimeDirectory = Join-Path $BuildDirectory 'usr\bin'
 $vcpkgBin = Join-Path $BuildDirectory 'vcpkg_installed\x64-windows\bin'
 $targets = @(
     'PdfTool',
-    'Pdf4QtViewer',
     'Pdf4QtEditor',
-    'Pdf4QtPageMaster',
     'Pdf4QtDiff'
 )
 # SkipOcr is retained for compatibility with older build commands. OCR is now
@@ -117,7 +115,10 @@ $baseNotice | Set-Content `
 # Start from a clean staging directory, then copy application, third-party and
 # explicitly verified release Qt runtime files. Developer-only tools built next to
 # the applications (code generator, example generator, JBIG2 viewer) are not shipped.
-$developerTools = @('CodeGenerator.exe', 'JBIG2_VIEWER.exe', 'PdfExampleGenerator.exe')
+# The Editor contains everything the Viewer and PageMaster do, so only the Editor, the document
+# comparison tool and the command line tool are shipped. The other applications are still built.
+$developerTools = @('CodeGenerator.exe', 'JBIG2_VIEWER.exe', 'PdfExampleGenerator.exe',
+    'Pdf4QtViewer.exe', 'Pdf4QtPageMaster.exe', 'Pdf4QtLaunchPad.exe')
 Get-ChildItem -LiteralPath $runtimeDirectory -File |
     Where-Object {
         $_.Name -notlike 'Qt6*.dll' -and
@@ -130,7 +131,7 @@ Get-ChildItem -LiteralPath $runtimeDirectory -File |
 foreach ($developerTool in $developerTools) {
     $shipped = Join-Path $packageRoot $developerTool
     if (Test-Path -LiteralPath $shipped -PathType Leaf) {
-        throw "Developer tool must not be packaged: $shipped"
+        throw "Application that is not shipped must not be packaged: $shipped"
     }
 }
 foreach ($applicationDirectory in @('pdfplugins', 'translations')) {

@@ -70,8 +70,8 @@ try {
     if ([IO.File]::ReadAllText($sentinelPath) -ne 'preserve-across-upgrade') {
         throw 'Upgrade did not preserve an existing installation-side file.'
     }
-    if (-not (Test-Path -LiteralPath (Join-Path $installRoot 'Pdf4QtViewer.exe') -PathType Leaf)) {
-        throw 'Upgraded installation is missing Pdf4QtViewer.exe.'
+    if (-not (Test-Path -LiteralPath (Join-Path $installRoot 'Pdf4QtEditor.exe') -PathType Leaf)) {
+        throw 'Upgraded installation is missing Pdf4QtEditor.exe.'
     }
 
     Write-Host "Installer upgrade smoke passed: 0.2.2 -> $currentVersion in $installRoot"
