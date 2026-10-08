@@ -51,6 +51,7 @@
 #include "pdfexportimagesdialog.h"
 #include "pdfmergepdfsdialog.h"
 #include "pdfinsertpagesdialog.h"
+#include "pdfsplitdocumentdialog.h"
 #include "pdfdocumentmerger.h"
 #include "pdfdocumentpropertiesdialog.h"
 #include "pdfsecurityhandler.h"
@@ -242,6 +243,7 @@ private slots:
     void mergePdfsBlocksAndWarns();
     void mergePdfsCancelLeavesNoPartialFile();
     void mergePdfsTranslations();
+    void splitDocumentWorkflow();
     void metadataEditSaveUndoRedo();
     void metadataEmptyFieldRemovesEntry();
     void metadataCancelAndUnchangedAreNoOps();
@@ -5978,6 +5980,93 @@ void ViewerContextMenuTest::duplicatePagesEditorRefusalAndWarning()
     QCOMPARE(controller->getDocument()->getCatalog()->getPageCount(), size_t(5));
     controller->closeDocument();
     QCoreApplication::processEvents();
+}
+
+void ViewerContextMenuTest::splitDocumentWorkflow()
+{
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+    auto* controller = m_window->getProgramController();
+    QVERIFY(action("actionSplitDocument"));
+    const auto pageCount = [controller]() { return controller->getDocument()->getCatalog()->getPageCount(); };
+    QCOMPARE(pageCount(), size_t(3));
+    const QString splitDirectory = m_temp.filePath("split-out");
+    QVERIFY(QDir().mkpath(splitDirectory));
+
+    // Every 2 pages: two files; the open document is unchanged.
+    int stage = 0;
+    QTimer timer;
+    connect(&timer, &QTimer::timeout, m_window.get(), [&]()
+    {
+        QWidget* modal = QApplication::activeModalWidget();
+        if (auto* dialog = qobject_cast<pdfviewer::PDFSplitDocumentDialog*>(modal); dialog && stage == 0)
+        {
+            ++stage;
+            dialog->findChild<QComboBox*>("splitModeCombo")->setCurrentIndex(1);        // every N pages
+            dialog->findChild<QSpinBox*>("splitEveryNSpin")->setValue(2);
+            dialog->findChild<QLineEdit*>("splitDirectoryEdit")->setText(splitDirectory);
+            dialog->findChild<QLineEdit*>("splitBaseNameEdit")->setText("part");
+            dialog->accept();
+        }
+        else if (auto* message = qobject_cast<QMessageBox*>(modal); message && stage == 1)
+        {
+            ++stage;
+            QVERIFY2(message->text().contains("2"), qPrintable(message->text()));
+            message->accept();
+        }
+    });
+    timer.start(10);
+    controller->splitDocument();
+    timer.stop();
+    QCOMPARE(stage, 2);
+    QCOMPARE(pageCount(), size_t(3));
+    const QList<QPair<QString, size_t>> parts = { { "part_p1-2.pdf", size_t(2) }, { "part_p3.pdf", size_t(1) } };
+    for (const auto& part : parts)
+    {
+        const QString file = QDir(splitDirectory).filePath(part.first);
+        QVERIFY2(QFile::exists(file), qPrintable(file));
+        pdf::PDFDocumentReader reader(nullptr, nullptr, false, false);
+        const pdf::PDFDocument document = reader.readFromFile(file);
+        QCOMPARE(reader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
+        QCOMPARE(document.getCatalog()->getPageCount(), part.second);
+    }
+
+    // Existing output: the question defaults to No and nothing is replaced.
+    const QByteArray before = fileBytes(QDir(splitDirectory).filePath("part_p1-2.pdf"));
+    stage = 0;
+    QTimer retryTimer;
+    connect(&retryTimer, &QTimer::timeout, m_window.get(), [&]()
+    {
+        QWidget* modal = QApplication::activeModalWidget();
+        if (auto* dialog = qobject_cast<pdfviewer::PDFSplitDocumentDialog*>(modal); dialog && stage == 0)
+        {
+            ++stage;
+            dialog->findChild<QComboBox*>("splitModeCombo")->setCurrentIndex(1);
+            dialog->findChild<QSpinBox*>("splitEveryNSpin")->setValue(2);
+            dialog->findChild<QLineEdit*>("splitDirectoryEdit")->setText(splitDirectory);
+            dialog->findChild<QLineEdit*>("splitBaseNameEdit")->setText("part");
+            dialog->accept();
+        }
+        else if (auto* message = qobject_cast<QMessageBox*>(modal); message && stage == 1)
+        {
+            ++stage;
+            QVERIFY(message->button(QMessageBox::No));
+            message->button(QMessageBox::No)->click();
+        }
+    });
+    retryTimer.start(10);
+    controller->splitDocument();
+    retryTimer.stop();
+    QCOMPARE(stage, 2);
+    QCOMPARE(fileBytes(QDir(splitDirectory).filePath("part_p1-2.pdf")), before);
+
+    // Split math.
+    using Parts = std::vector<std::vector<pdf::PDFInteger>>;
+    using Dialog = pdfviewer::PDFSplitDocumentDialog;
+    QVERIFY(Dialog::splitEveryN(5, 2) == Parts({ { 0, 1 }, { 2, 3 }, { 4 } }));
+    QVERIFY(Dialog::splitEveryN(3, 1) == Parts({ { 0 }, { 1 }, { 2 } }));
+    QVERIFY(Dialog::splitAtPages(5, { 2, 2, 0 }) == Parts({ { 0, 1 }, { 2, 3, 4 } }));
+    QVERIFY(Dialog::splitAtPages(4, { 3, 1 }) == Parts({ { 0 }, { 1, 2 }, { 3 } }));
+    QVERIFY(Dialog::splitAtPages(4, {}) == Parts({ { 0, 1, 2, 3 } }));
 }
 
 QTEST_MAIN(ViewerContextMenuTest)

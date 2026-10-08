@@ -14269,6 +14269,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <translation>註解</translation>
     </message>
     <message><source>Export Selection as Image...</source><translation>將選取範圍匯出為圖片...</translation></message>
+    <message><source>Split Document...</source><translation>拆分文件...</translation></message>
     <message><source>Insert Blank Page...</source><translation>插入空白頁...</translation></message>
     <message><source>Insert Pages from PDF...</source><translation>從 PDF 插入頁面...</translation></message>
     <message><source>Insert Page from JPEG...</source><translation>從 JPEG 插入頁面...</translation></message>
@@ -14641,6 +14642,13 @@ Save the incomplete form anyway?</source>
     <message><source>%1 page(s) were sent to the printer.</source><translation>已將 %1 頁送到印表機。</translation></message>
     <message><source>Select some text first, then export the selection as an image.</source><translation>請先選取文字，再將選取範圍匯出為圖片。</translation></message>
     <message><source>The selection has no visible area to export.</source><translation>選取範圍沒有可匯出的可見區域。</translation></message>
+    <message><source>Missing page (%1) in a document.</source><translation>文件中缺少頁面（%1）。</translation></message>
+    <message><source>Split Document</source><translation>拆分文件</translation></message>
+    <message><source>The document has only one page; there is nothing to split.</source><translation>文件只有一頁，沒有可拆分的內容。</translation></message>
+    <message><source>The output file %1 would overwrite the open document. Choose another folder or base name.</source><translation>輸出檔 %1 會覆蓋目前開啟的文件。請改用其他資料夾或基本檔名。</translation></message>
+    <message><source>%1 file(s) already exist and will be replaced. Continue?</source><translation>%1 個檔案已存在，將被取代。要繼續嗎？</translation></message>
+    <message><source>Saved %1 of %2 files. %3 failed: %4</source><translation>已儲存 %1 / %2 個檔案。%3 失敗：%4</translation></message>
+    <message><source>Saved %1 files to %2.</source><translation>已將 %1 個檔案儲存到 %2。</translation></message>
     <message><source>Insert Blank Page</source><translation>插入空白頁</translation></message>
     <message><source>Insert Pages from PDF</source><translation>從 PDF 插入頁面</translation></message>
     <message><source>Insert the pages?</source><translation>要插入這些頁面嗎？</translation></message>
@@ -15254,6 +15262,7 @@ Do you want to perform this action?</source>
     </message>
     <message><source>Extract Pages...</source><translation>提取頁面(另存新文件)...</translation></message>
     <message><source>Export Selection as Image...</source><translation>將選取範圍匯出為圖片...</translation></message>
+    <message><source>Split Document...</source><translation>拆分文件...</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFViewerSettingsDialog</name>
@@ -15893,5 +15902,25 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>將使用最�
     <message><source>The inserted pages start at page %1.</source><translation>插入的頁面從第 %1 頁開始。</translation></message>
     <message><source>The inserted pages become pages %1–%2 of %3.</source><translation>插入的頁面將成為第 %1–%2 頁（共 %3 頁）。</translation></message>
     <message><source>PDF document (*.pdf)</source><translation>PDF 文件 (*.pdf)</translation></message>
+</context>
+<context>
+    <name>pdfviewer::PDFSplitDocumentDialog</name>
+    <message><source>Split Document</source><translation>拆分文件</translation></message>
+    <message><source>Each part is saved as a new PDF named &lt;base name&gt;_p&lt;pages&gt;.pdf. The open document is not changed.</source><translation>每個部分會另存為新的 PDF，檔名為「基本檔名_p頁碼.pdf」。目前開啟的文件不會被更動。</translation></message>
+    <message><source>Every page</source><translation>每一頁一個檔案</translation></message>
+    <message><source>Every N pages</source><translation>每 N 頁一個檔案</translation></message>
+    <message><source>New file starts at pages</source><translation>在指定頁碼開始新檔案</translation></message>
+    <message><source>Split</source><translation>拆分</translation></message>
+    <message><source>Pages per file</source><translation>每個檔案的頁數</translation></message>
+    <message><source>for example 5,12 (parts 1-4, 5-11, 12-%1)</source><translation>例如 5,12（分成 1-4、5-11、12-%1）</translation></message>
+    <message><source>Start pages</source><translation>起始頁碼</translation></message>
+    <message><source>Browse...</source><translation>瀏覽...</translation></message>
+    <message><source>Select Output Folder</source><translation>選擇輸出資料夾</translation></message>
+    <message><source>Output folder</source><translation>輸出資料夾</translation></message>
+    <message><source>Base name</source><translation>基本檔名</translation></message>
+    <message><source>Select an existing output folder.</source><translation>請選擇一個已存在的輸出資料夾。</translation></message>
+    <message><source>Enter a base name without folder separators.</source><translation>請輸入不含資料夾分隔符號的基本檔名。</translation></message>
+    <message><source>Enter the page numbers where a new file starts.</source><translation>請輸入新檔案開始的頁碼。</translation></message>
+    <message><source>This split would produce a single file. Choose different settings.</source><translation>這樣拆分只會產生一個檔案，請改用其他設定。</translation></message>
 </context>
 </TS>
