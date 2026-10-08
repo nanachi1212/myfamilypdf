@@ -40,7 +40,7 @@ WizardStyle=modern
 SetupLogging=yes
 CloseApplications=yes
 RestartApplications=no
-UninstallDisplayIcon={app}\Pdf4QtViewer.exe
+UninstallDisplayIcon={app}\Pdf4QtEditor.exe
 
 [Languages]
 Name: "chinesetraditional"; MessagesFile: "compiler:Languages\ChineseTraditional.isl"
@@ -98,27 +98,19 @@ Source: "{#OcrPackageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubd
 
 #ifndef VerificationBuild
 [Registry]
-Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtViewer.exe"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "FamilyPDF Reader"; Flags: uninsdeletekey; Tasks: pdfshell
-Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtViewer.exe\SupportedTypes"; ValueType: none; ValueName: ".pdf"; Tasks: pdfshell
-Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtViewer.exe\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtViewer.exe"" ""%1"""; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtEditor.exe"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "FamilyPDF Editor"; Flags: uninsdeletekey; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtEditor.exe\SupportedTypes"; ValueType: none; ValueName: ".pdf"; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtEditor.exe\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open"; ValueType: string; ValueName: ""; ValueData: "{cm:OpenWithFamilyPDF}"; Flags: uninsdeletekey; Tasks: pdfshell
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\Pdf4QtViewer.exe"; Tasks: pdfshell
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtViewer.exe"" ""%1"""; Tasks: pdfshell
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit"; ValueType: string; ValueName: ""; ValueData: "{cm:EditWithFamilyPDF}"; Flags: uninsdeletekey; Tasks: pdfshell
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\Pdf4QtEditor.exe"; Tasks: pdfshell
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\Pdf4QtEditor.exe"; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""; Tasks: pdfshell
 
 [Icons]
-Name: "{group}\FamilyPDF 閱讀器"; Filename: "{app}\Pdf4QtViewer.exe"; WorkingDir: "{app}"
 Name: "{group}\FamilyPDF 編輯器"; Filename: "{app}\Pdf4QtEditor.exe"; WorkingDir: "{app}"
-Name: "{group}\FamilyPDF 頁面合併與拆分"; Filename: "{app}\Pdf4QtPageMaster.exe"; WorkingDir: "{app}"
 Name: "{group}\{cm:CompareShortcut}"; Filename: "{app}\Pdf4QtDiff.exe"; WorkingDir: "{app}"
 Name: "{group}\FamilyPDF OCR Language Repair"; Filename: "{app}\Install-FamilyPDF-OCR-Languages.cmd"; WorkingDir: "{app}"; Components: ocr
-Name: "{autodesktop}\FamilyPDF"; Filename: "{app}\Pdf4QtViewer.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\FamilyPDF"; Filename: "{app}\Pdf4QtEditor.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Pdf4QtViewer.exe"; Description: "{cm:LaunchProgram,FamilyPDF}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Pdf4QtEditor.exe"; Description: "{cm:LaunchProgram,FamilyPDF}"; Flags: nowait postinstall skipifsilent
 #endif

@@ -47,6 +47,12 @@ public:
                                                             const std::vector<pdf::PDFInteger>& movedPages,
                                                             pdf::PDFInteger insertionRow);
 
+    /// Zero based indices of the odd numbered pages (1, 3, 5, ...: indices 0, 2, 4) or of the even numbered pages.
+    static std::vector<pdf::PDFInteger> selectByParity(pdf::PDFInteger pageCount, bool oddNumbered);
+
+    /// Every page of 0..pageCount-1 that is not in \p selectedPages.
+    static std::vector<pdf::PDFInteger> invertSelection(pdf::PDFInteger pageCount, const std::vector<pdf::PDFInteger>& selectedPages);
+
     /// True if \p order is a complete permutation of 0..pageCount-1.
     static bool isPermutation(const std::vector<pdf::PDFInteger>& order, pdf::PDFInteger pageCount);
 

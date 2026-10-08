@@ -70,7 +70,7 @@ function Start-ResponsiveSmoke {
 }
 
 foreach ($required in @(
-    (Join-Path $PackageDirectory 'Pdf4QtViewer.exe'),
+    (Join-Path $PackageDirectory 'Pdf4QtEditor.exe'),
     (Join-Path $PackageDirectory 'Pdf4QtEditor.exe'),
     (Join-Path $PackageDirectory 'Pdf4QtDiff.exe'),
     (Join-Path $PackageDirectory 'PdfTool.exe'),
@@ -234,7 +234,7 @@ function Test-MultiDocumentSession {
 }
 
 $viewerMultiFile = Test-MultiDocumentSession -Executable (
-    Join-Path $qaPackage 'Pdf4QtViewer.exe'
+    Join-Path $qaPackage 'Pdf4QtEditor.exe'
 )
 $editorMultiFile = Test-MultiDocumentSession -Executable $editor
 

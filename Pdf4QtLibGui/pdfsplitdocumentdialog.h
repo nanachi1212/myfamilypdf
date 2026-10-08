@@ -28,7 +28,8 @@ public:
     {
         EveryPage,
         EveryNPages,
-        AtPages     ///< A new file starts at each listed page number
+        AtPages,    ///< A new file starts at each listed page number
+        AtBookmarks ///< A new file starts at each top-level bookmark
     };
 
     struct Plan
@@ -38,7 +39,8 @@ public:
         std::vector<std::vector<pdf::PDFInteger>> parts;    ///< Zero based pages of each output file, document order
     };
 
-    PDFSplitDocumentDialog(pdf::PDFInteger pageCount, const QString& directory, const QString& baseName, QWidget* parent);
+    /// \param bookmarkStarts Zero based pages of the top-level bookmarks; empty disables the bookmark mode
+    PDFSplitDocumentDialog(pdf::PDFInteger pageCount, const QString& directory, const QString& baseName, const std::vector<pdf::PDFInteger>& bookmarkStarts, QWidget* parent);
 
     /// Valid after accept().
     const Plan& getPlan() const { return m_plan; }
@@ -53,6 +55,7 @@ private:
     void updateModeWidgets();
 
     pdf::PDFInteger m_pageCount;
+    std::vector<pdf::PDFInteger> m_bookmarkStarts;
     QComboBox* m_modeCombo;
     QSpinBox* m_everyNSpin;
     QLineEdit* m_pagesEdit;

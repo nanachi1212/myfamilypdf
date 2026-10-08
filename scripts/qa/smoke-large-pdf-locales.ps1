@@ -24,7 +24,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 $PackageDirectory = [IO.Path]::GetFullPath($PackageDirectory)
 $LargePdf = [IO.Path]::GetFullPath($LargePdf)
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
-$viewer = Join-Path $PackageDirectory 'Pdf4QtViewer.exe'
+$viewer = Join-Path $PackageDirectory 'Pdf4QtEditor.exe'
 foreach ($required in @($viewer, $LargePdf)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
         throw "Required file was not found: $required"

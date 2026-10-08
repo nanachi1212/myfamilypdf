@@ -108,9 +108,8 @@ Install-Isolated -Target $fullRoot -Components 'core,ocr'
 Install-Isolated -Target $coreRoot -Components 'core'
 
 $fullRequired = @(
-    'Pdf4QtViewer.exe',
     'Pdf4QtEditor.exe',
-    'Pdf4QtPageMaster.exe',
+    'Pdf4QtEditor.exe',
     'Pdf4QtDiff.exe',
     'PdfTool.exe',
     'LICENSE-PDF4QT.txt',
@@ -138,9 +137,8 @@ foreach ($relativePath in $fullRequired) {
 }
 
 foreach ($relativePath in @(
-    'Pdf4QtViewer.exe',
     'Pdf4QtEditor.exe',
-    'Pdf4QtPageMaster.exe',
+    'Pdf4QtEditor.exe',
     'Pdf4QtDiff.exe',
     'PdfTool.exe'
 )) {
@@ -210,7 +208,7 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Installed core-only PDF security verification failed.'
 }
 
-$viewer = Start-Process -FilePath (Join-Path $fullRoot 'Pdf4QtViewer.exe') -PassThru
+$viewer = Start-Process -FilePath (Join-Path $fullRoot 'Pdf4QtEditor.exe') -PassThru
 try {
     Start-Sleep -Seconds 5
     $viewer.Refresh()

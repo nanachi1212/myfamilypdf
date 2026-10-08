@@ -107,7 +107,7 @@ foreach ($sourceFile in $coreFiles) {
     }
 }
 
-$viewer = Start-Process -FilePath (Join-Path $installRoot 'Pdf4QtViewer.exe') `
+$viewer = Start-Process -FilePath (Join-Path $installRoot 'Pdf4QtEditor.exe') `
     -PassThru
 try {
     Start-Sleep -Seconds 5

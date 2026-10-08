@@ -68,7 +68,7 @@ if (-not $SkipPackage) {
 }
 
 $packageRoot = Join-Path $repositoryRoot 'dist\FamilyPDF-windows-x64'
-foreach ($requiredExecutable in @('Pdf4QtViewer.exe', 'Pdf4QtDiff.exe')) {
+foreach ($requiredExecutable in @('Pdf4QtEditor.exe', 'Pdf4QtDiff.exe')) {
     $requiredPath = Join-Path $packageRoot $requiredExecutable
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
         throw "FamilyPDF package file was not found: $requiredPath"
