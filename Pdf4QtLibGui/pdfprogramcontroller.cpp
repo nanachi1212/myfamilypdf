@@ -76,6 +76,8 @@
 #include <QMenu>
 #include <QPrinter>
 #include <QProgressDialog>
+#include <QEventLoop>
+#include <QRegularExpression>
 #include <QScopeGuard>
 #include <QMessageBox>
 #include <QProcess>
@@ -4285,30 +4287,134 @@ void PDFProgramController::launchOcrPlugin()
         return;
     }
 
+    // The .cmd is the user-facing launcher; the app runs the script directly so the console
+    // output drives the progress dialog instead of opening a console window.
+    runOcr(inputFile, outputFile, QDir(QCoreApplication::applicationDirPath()).filePath("FamilyPDF-OCR.ps1"));
+}
+
+bool PDFProgramController::runOcr(const QString& inputFile, const QString& outputFile, const QString& scriptPath)
+{
+    const QString title = tr("FamilyPDF OCR");
+    if (!QFileInfo::exists(scriptPath))
+    {
+        QMessageBox::information(m_mainWindow, title, tr("The optional FamilyPDF OCR plugin is not installed."));
+        return false;
+    }
+
 #ifdef Q_OS_WIN
-    const QString parameters = QString("\"%1\" \"%2\"").arg(QDir::toNativeSeparators(inputFile),
-                                                              QDir::toNativeSeparators(outputFile));
-    const auto result = reinterpret_cast<qintptr>(
-        ShellExecuteW(nullptr,
-                      L"open",
-                      reinterpret_cast<LPCWSTR>(launcher.utf16()),
-                      reinterpret_cast<LPCWSTR>(parameters.utf16()),
-                      reinterpret_cast<LPCWSTR>(QCoreApplication::applicationDirPath().utf16()),
-                      SW_SHOWNORMAL));
-    if (result <= 32)
-    {
-        QMessageBox::critical(m_mainWindow,
-                              tr("FamilyPDF OCR"),
-                              tr("Could not start the FamilyPDF OCR plugin."));
-    }
+    const QString shell = QStringLiteral("powershell.exe");
 #else
-    if (!QProcess::startDetached(launcher, {inputFile, outputFile}, QCoreApplication::applicationDirPath()))
-    {
-        QMessageBox::critical(m_mainWindow,
-                              tr("FamilyPDF OCR"),
-                              tr("Could not start the FamilyPDF OCR plugin."));
-    }
+    const QString shell = QStringLiteral("pwsh");
 #endif
+
+    QProgressDialog progress(tr("Preparing OCR..."), tr("Cancel"), 0, 0, m_mainWindow);
+    progress.setWindowTitle(title);
+    progress.setObjectName(QStringLiteral("ocrProgressDialog"));
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setMinimumDuration(0);
+    progress.setAutoClose(false);
+    progress.setAutoReset(false);
+
+    QProcess process;
+    process.setProcessChannelMode(QProcess::MergedChannels);
+    process.setWorkingDirectory(QFileInfo(scriptPath).absolutePath());
+    QStringList output;
+    // "OCR page 7 (3/120)..." lines of FamilyPDF-OCR.ps1 drive the progress bar.
+    static const QRegularExpression pageLine(QStringLiteral("^OCR page (\\d+) \\((\\d+)/(\\d+)\\)"));
+    connect(&process, &QProcess::readyReadStandardOutput, &progress, [&]()
+    {
+        while (process.canReadLine())
+        {
+            const QString line = QString::fromLocal8Bit(process.readLine()).trimmed();
+            if (line.isEmpty())
+            {
+                continue;
+            }
+            output << line;
+            const QRegularExpressionMatch match = pageLine.match(line);
+            if (match.hasMatch())
+            {
+                const int current = match.captured(2).toInt();
+                const int total = match.captured(3).toInt();
+                progress.setMaximum(total);
+                progress.setValue(std::max(current - 1, 0));
+                progress.setLabelText(tr("OCR page %1 of %2...").arg(current).arg(total));
+            }
+            else if (line.startsWith(QLatin1String("Rendering")))
+            {
+                progress.setLabelText(tr("Rendering pages..."));
+            }
+        }
+    });
+
+    bool cancelled = false;
+    connect(&progress, &QProgressDialog::canceled, &process, [&]()
+    {
+        // close() of the dialog also emits canceled(); only a running script counts as cancelled.
+        if (process.state() != QProcess::NotRunning)
+        {
+            cancelled = true;
+            process.kill();
+        }
+    });
+
+    QEventLoop loop;
+    connect(&process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), &loop, &QEventLoop::quit);
+    connect(&process, &QProcess::errorOccurred, &loop, [&loop](QProcess::ProcessError error)
+    {
+        if (error == QProcess::FailedToStart)
+        {
+            loop.quit();
+        }
+    });
+
+    process.start(shell, { QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"), QStringLiteral("-ExecutionPolicy"), QStringLiteral("Bypass"),
+                           QStringLiteral("-File"), QDir::toNativeSeparators(scriptPath),
+                           QStringLiteral("-InputPdf"), QDir::toNativeSeparators(inputFile),
+                           QStringLiteral("-OutputPdf"), QDir::toNativeSeparators(outputFile) });
+    if (!process.waitForStarted(10000))
+    {
+        QMessageBox::critical(m_mainWindow, title, tr("Could not start the FamilyPDF OCR plugin."));
+        return false;
+    }
+    progress.show();
+    if (process.state() != QProcess::NotRunning)
+    {
+        loop.exec();
+    }
+    process.waitForFinished(5000);
+    if (process.state() != QProcess::NotRunning)
+    {
+        process.kill();
+        process.waitForFinished(5000);
+    }
+    progress.close();
+
+    if (cancelled)
+    {
+        // The script writes its outputs through a staging step, so a kill leaves no partial PDF.
+        QMessageBox::information(m_mainWindow, title, tr("OCR was cancelled. No file was written."));
+        return false;
+    }
+    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0 || !QFileInfo::exists(outputFile))
+    {
+        QStringList tail = output;
+        while (tail.size() > 12)
+        {
+            tail.removeFirst();
+        }
+        QMessageBox::critical(m_mainWindow, title, tr("OCR failed.") + QLatin1String("\n\n") + tail.join(QLatin1Char('\n')));
+        return false;
+    }
+
+    const auto answer = QMessageBox::question(m_mainWindow, title,
+                                              tr("Searchable PDF saved to %1. Open it now?").arg(QDir::toNativeSeparators(outputFile)),
+                                              QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (answer == QMessageBox::Yes)
+    {
+        openDocument(outputFile);
+    }
+    return true;
 }
 
 void PDFProgramController::onActionCloseTriggered()

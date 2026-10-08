@@ -15553,6 +15553,13 @@ Do you want to perform this action?</source>
     <message><source>The optional FamilyPDF OCR plugin is not installed.</source><translation>尚未安装可选的 FamilyPDF OCR 插件。</translation></message>
     <message><source>Save searchable OCR PDF</source><translation>保存可搜索的 OCR PDF</translation></message>
     <message><source>Could not start the FamilyPDF OCR plugin.</source><translation>无法启动 FamilyPDF OCR 插件。</translation></message>
+    <message><source>Preparing OCR...</source><translation>正在准备 OCR...</translation></message>
+    <message><source>Cancel</source><translation>取消</translation></message>
+    <message><source>OCR page %1 of %2...</source><translation>OCR 第 %1 / %2 页...</translation></message>
+    <message><source>Rendering pages...</source><translation>正在转换页面图像...</translation></message>
+    <message><source>OCR was cancelled. No file was written.</source><translation>已取消 OCR，未写入任何文件。</translation></message>
+    <message><source>OCR failed.</source><translation>OCR 失败。</translation></message>
+    <message><source>Searchable PDF saved to %1. Open it now?</source><translation>可搜索的 PDF 已保存到 %1。要现在打开吗？</translation></message>
     <message><source>Safe save</source><translation>安全保存</translation></message>
     <message><source>Safe save failed</source><translation>安全保存失败</translation></message>
     <message><source>FamilyPDF is still establishing the safe-save baseline. Please use Save As or try again after the document finishes loading.</source><translation>FamilyPDF 正在建立安全保存基准。请使用“另存为”，或等待文档加载完成后再试。</translation></message>

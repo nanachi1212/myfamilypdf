@@ -343,6 +343,9 @@ public:
     void performSave();
     void performSaveAs();
     void launchOcrPlugin();
+    /// Runs the OCR script (FamilyPDF-OCR.ps1) on \p inputFile in-process with a progress dialog and
+    /// Cancel, then offers to open \p outputFile. Returns true if the output was produced.
+    bool runOcr(const QString& inputFile, const QString& outputFile, const QString& scriptPath);
     void extractPages();
     void mergePdfs();
     void extractPages(const std::vector<pdf::PDFInteger>& pageIndices);
