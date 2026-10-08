@@ -15170,6 +15170,14 @@ Do you want to perform this action?</source>
     <message><source>Insert Pages from PDF...</source><translation>从 PDF 插入页面...</translation></message>
     <message><source>Duplicate Selected Pages</source><translation>创建选中页面的副本</translation></message>
     <message><source>Reverse Page Order</source><translation>反转页面顺序</translation></message>
+    <message><source>Select</source><translation>选择</translation></message>
+    <message><source>All Pages</source><translation>全部页面</translation></message>
+    <message><source>Odd Pages</source><translation>单数页</translation></message>
+    <message><source>Even Pages</source><translation>双数页</translation></message>
+    <message><source>Invert Selection</source><translation>反向选择</translation></message>
+    <message><source>Page Range...</source><translation>页码范围...</translation></message>
+    <message><source>Select Page Range</source><translation>选择页码范围</translation></message>
+    <message><source>Pages (for example 1-3,8,10-12):</source><translation>页码（例如 1-3,8,10-12）：</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFViewerMainWindow</name>
@@ -15867,5 +15875,6 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>将使用最�
     <message><source>Enter a base name without folder separators.</source><translation>请输入不含文件夹分隔符的基本文件名。</translation></message>
     <message><source>Enter the page numbers where a new file starts.</source><translation>请输入新文件开始的页码。</translation></message>
     <message><source>This split would produce a single file. Choose different settings.</source><translation>这样拆分只会产生一个文件，请改用其他设置。</translation></message>
+    <message><source>New file starts at each top-level bookmark</source><translation>在每个顶层书签开始新文件</translation></message>
 </context>
 </TS>

@@ -217,6 +217,7 @@ private slots:
     void pageReorderOrderMath_data();
     void pageReorderOrderMath();
     void pageReorderInsertionGeometry();
+    void pageSelectionHelpers();
     void thumbnailReorderWorkflow();
     void reorderPreservesContentAfterSave();
     void reorderFlattensNestedPageTree();
@@ -3066,6 +3067,25 @@ void ViewerContextMenuTest::pageReorderOrderMath_data()
     QTest::newRow("self: single page before") << 6 << QList<int>{2} << 2 << QList<int>{0, 1, 2, 3, 4, 5};
     QTest::newRow("self: single page after") << 6 << QList<int>{2} << 3 << QList<int>{0, 1, 2, 3, 4, 5};
     QTest::newRow("self: everything") << 4 << QList<int>{0, 1, 2, 3} << 2 << QList<int>{0, 1, 2, 3};
+}
+
+void ViewerContextMenuTest::pageSelectionHelpers()
+{
+    using R = pdfviewer::PDFPageReorder;
+    using Pages = std::vector<pdf::PDFInteger>;
+    QVERIFY(R::selectByParity(5, true) == Pages({ 0, 2, 4 }));
+    QVERIFY(R::selectByParity(5, false) == Pages({ 1, 3 }));
+    QVERIFY(R::selectByParity(1, false).empty());
+    QVERIFY(R::selectByParity(0, true).empty());
+    QVERIFY(R::invertSelection(5, { 1, 3 }) == Pages({ 0, 2, 4 }));
+    QVERIFY(R::invertSelection(4, {}) == Pages({ 0, 1, 2, 3 }));
+    QVERIFY(R::invertSelection(3, { 0, 1, 2, 9, -1 }).empty());
+    QVERIFY(R::invertSelection(3, { 2, 2 }) == Pages({ 0, 1 }));
+
+    // Split at top-level bookmark pages: starts 3 and 0 (duplicate of the first page) on 6 pages.
+    using Dialog = pdfviewer::PDFSplitDocumentDialog;
+    using Parts = std::vector<std::vector<pdf::PDFInteger>>;
+    QVERIFY(Dialog::splitAtPages(6, { 0, 3 }) == Parts({ { 0, 1, 2 }, { 3, 4, 5 } }));
 }
 
 void ViewerContextMenuTest::pageReorderOrderMath()

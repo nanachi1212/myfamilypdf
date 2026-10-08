@@ -40,6 +40,7 @@
 #include "pdfbookmarkui.h"
 #include "pdfwidgetannotation.h"
 #include "pdfpagereorder.h"
+#include "pdfdocumentmerger.h"
 #include "pdfthumbnailslistview.h"
 #include "pdfsecurityhandler.h"
 
@@ -1180,6 +1181,40 @@ void PDFSidebarWidget::onThumbnailContextMenuRequested(const QPoint& pos)
     }
 
     QMenu menu(this);
+    const pdf::PDFInteger documentPageCount = pdf::PDFInteger(m_document->getCatalog()->getPageCount());
+    QMenu* selectMenu = menu.addMenu(tr("Select"));
+    selectMenu->menuAction()->setObjectName(QStringLiteral("thumbnailSelectMenu"));
+    const auto addSelection = [this, selectMenu](const QString& text, const QString& name, const std::function<std::vector<pdf::PDFInteger>()>& pages)
+    {
+        QAction* action = selectMenu->addAction(text);
+        action->setObjectName(name);
+        connect(action, &QAction::triggered, this, [this, pages]() { selectThumbnailPages(pages()); });
+    };
+    addSelection(tr("All Pages"), QStringLiteral("thumbnailSelectAllAction"), [documentPageCount]() { return PDFPageReorder::invertSelection(documentPageCount, {}); });
+    addSelection(tr("Odd Pages"), QStringLiteral("thumbnailSelectOddAction"), [documentPageCount]() { return PDFPageReorder::selectByParity(documentPageCount, true); });
+    addSelection(tr("Even Pages"), QStringLiteral("thumbnailSelectEvenAction"), [documentPageCount]() { return PDFPageReorder::selectByParity(documentPageCount, false); });
+    addSelection(tr("Invert Selection"), QStringLiteral("thumbnailSelectInvertAction"), [documentPageCount, selectedPages]() { return PDFPageReorder::invertSelection(documentPageCount, selectedPages); });
+    QAction* rangeAction = selectMenu->addAction(tr("Page Range..."));
+    rangeAction->setObjectName(QStringLiteral("thumbnailSelectRangeAction"));
+    connect(rangeAction, &QAction::triggered, this, [this, documentPageCount]()
+    {
+        bool ok = false;
+        const QString text = QInputDialog::getText(this, tr("Select Page Range"), tr("Pages (for example 1-3,8,10-12):"), QLineEdit::Normal, QString(), &ok);
+        if (!ok || text.trimmed().isEmpty())
+        {
+            return;
+        }
+        QString errorMessage;
+        const std::vector<pdf::PDFInteger> pages = pdf::PDFDocumentMerger::parsePageList(documentPageCount, text, &errorMessage);
+        if (!errorMessage.isEmpty())
+        {
+            QMessageBox::warning(this, tr("Select Page Range"), errorMessage);
+            return;
+        }
+        selectThumbnailPages(pages);
+    });
+    menu.addSeparator();
+
     QAction* extractAction = menu.addAction(tr("Extract Selected Pages to New PDF..."));
     extractAction->setObjectName(QStringLiteral("thumbnailExtractPagesAction"));
     connect(extractAction, &QAction::triggered, this, [this, selectedPages]()

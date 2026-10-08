@@ -9,6 +9,30 @@
 namespace pdfviewer
 {
 
+std::vector<pdf::PDFInteger> PDFPageReorder::selectByParity(pdf::PDFInteger pageCount, bool oddNumbered)
+{
+    std::vector<pdf::PDFInteger> pages;
+    for (pdf::PDFInteger page = oddNumbered ? 0 : 1; page < pageCount; page += 2)
+    {
+        pages.push_back(page);
+    }
+    return pages;
+}
+
+std::vector<pdf::PDFInteger> PDFPageReorder::invertSelection(pdf::PDFInteger pageCount, const std::vector<pdf::PDFInteger>& selectedPages)
+{
+    const std::vector<pdf::PDFInteger> selected = normalizePages(selectedPages, pageCount);
+    std::vector<pdf::PDFInteger> pages;
+    for (pdf::PDFInteger page = 0; page < pageCount; ++page)
+    {
+        if (!std::binary_search(selected.cbegin(), selected.cend(), page))
+        {
+            pages.push_back(page);
+        }
+    }
+    return pages;
+}
+
 std::vector<pdf::PDFInteger> PDFPageReorder::normalizePages(const std::vector<pdf::PDFInteger>& pages, pdf::PDFInteger pageCount)
 {
     std::vector<pdf::PDFInteger> result;

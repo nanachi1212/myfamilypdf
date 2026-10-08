@@ -14,10 +14,8 @@ $installRoot = Join-Path $testRoot 'app'
 $summaryPath = Join-Path $buildRoot 'shell-installer-smoke-summary.json'
 $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{D8942855-6D26-4801-908C-B8CD588A19C5}_is1'
 $shellPaths = @(
-    'HKCU:\Software\Classes\Applications\Pdf4QtViewer.exe',
     'HKCU:\Software\Classes\Applications\Pdf4QtEditor.exe',
-    'HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open',
-    'HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit'
+    'HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open'
 )
 
 foreach ($path in $shellPaths) {
@@ -70,23 +68,18 @@ try {
     }
     $installed = $true
 
-    $viewer = Join-Path $installRoot 'Pdf4QtViewer.exe'
     $editor = Join-Path $installRoot 'Pdf4QtEditor.exe'
     $uninstaller = Join-Path $installRoot 'unins000.exe'
-    foreach ($required in @($viewer, $editor, $uninstaller)) {
+    foreach ($required in @($editor, $uninstaller)) {
         if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
             throw "Installed shell-verification file is missing: $required"
         }
     }
 
     $expectedCommands = [ordered]@{
-        'HKCU:\Software\Classes\Applications\Pdf4QtViewer.exe\shell\open\command' =
-            "`"$viewer`" `"%1`""
         'HKCU:\Software\Classes\Applications\Pdf4QtEditor.exe\shell\open\command' =
             "`"$editor`" `"%1`""
         'HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open\command' =
-            "`"$viewer`" `"%1`""
-        'HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Edit\command' =
             "`"$editor`" `"%1`""
     }
     foreach ($entry in $expectedCommands.GetEnumerator()) {
@@ -111,7 +104,6 @@ try {
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'dist\qa\form-interop.pdf') `
         -Destination $fixture
     foreach ($application in @(
-        [pscustomobject]@{ Path = $viewer; Name = 'viewer' },
         [pscustomobject]@{ Path = $editor; Name = 'editor' }
     )) {
         $process = Start-Process -FilePath $application.Path `

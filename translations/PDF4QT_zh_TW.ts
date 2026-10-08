@@ -15244,6 +15244,14 @@ Do you want to perform this action?</source>
     <message><source>Insert Pages from PDF...</source><translation>從 PDF 插入頁面...</translation></message>
     <message><source>Duplicate Selected Pages</source><translation>建立選取頁面的副本</translation></message>
     <message><source>Reverse Page Order</source><translation>反轉頁面順序</translation></message>
+    <message><source>Select</source><translation>選取</translation></message>
+    <message><source>All Pages</source><translation>全部頁面</translation></message>
+    <message><source>Odd Pages</source><translation>單數頁</translation></message>
+    <message><source>Even Pages</source><translation>雙數頁</translation></message>
+    <message><source>Invert Selection</source><translation>反向選取</translation></message>
+    <message><source>Page Range...</source><translation>頁碼範圍...</translation></message>
+    <message><source>Select Page Range</source><translation>選取頁碼範圍</translation></message>
+    <message><source>Pages (for example 1-3,8,10-12):</source><translation>頁碼（例如 1-3,8,10-12）：</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFViewerMainWindow</name>
@@ -15929,5 +15937,6 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>將使用最�
     <message><source>Enter a base name without folder separators.</source><translation>請輸入不含資料夾分隔符號的基本檔名。</translation></message>
     <message><source>Enter the page numbers where a new file starts.</source><translation>請輸入新檔案開始的頁碼。</translation></message>
     <message><source>This split would produce a single file. Choose different settings.</source><translation>這樣拆分只會產生一個檔案，請改用其他設定。</translation></message>
+    <message><source>New file starts at each top-level bookmark</source><translation>在每個最上層書籤開始新檔案</translation></message>
 </context>
 </TS>

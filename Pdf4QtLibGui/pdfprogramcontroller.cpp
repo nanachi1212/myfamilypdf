@@ -3589,6 +3589,54 @@ void PDFProgramController::extractPages(const std::vector<pdf::PDFInteger>& page
     QMessageBox::information(m_mainWindow, tr("Extract Pages"), tr("Saved %1 pages to %2.").arg(selectedPages.size()).arg(QDir::toNativeSeparators(fileName)));
 }
 
+namespace
+{
+
+/// Zero based first pages of the top-level bookmarks that point to a page (named destinations are resolved).
+std::vector<pdf::PDFInteger> getTopLevelBookmarkStarts(const pdf::PDFDocument* document)
+{
+    std::vector<pdf::PDFInteger> starts;
+    QSharedPointer<pdf::PDFOutlineItem> outlineRoot = document->getCatalog()->getOutlineRootPtr();
+    if (!outlineRoot)
+    {
+        return starts;
+    }
+
+    for (size_t i = 0; i < outlineRoot->getChildCount(); ++i)
+    {
+        const pdf::PDFActionGoTo* actionGoTo = dynamic_cast<const pdf::PDFActionGoTo*>(outlineRoot->getChild(i)->getAction());
+        if (!actionGoTo)
+        {
+            continue;
+        }
+        pdf::PDFDestination destination = actionGoTo->getDestination();
+        if (destination.getDestinationType() == pdf::DestinationType::Named)
+        {
+            const pdf::PDFDestination* target = document->getCatalog()->getNamedDestination(destination.getName());
+            if (!target)
+            {
+                continue;
+            }
+            destination = *target;
+        }
+        if (!destination.isValid())
+        {
+            continue;
+        }
+        const size_t pageIndex = document->getCatalog()->getPageIndexFromPageReference(destination.getPageReference());
+        if (pageIndex != pdf::PDFCatalog::INVALID_PAGE_INDEX)
+        {
+            starts.push_back(pdf::PDFInteger(pageIndex));
+        }
+    }
+
+    std::sort(starts.begin(), starts.end());
+    starts.erase(std::unique(starts.begin(), starts.end()), starts.end());
+    return starts;
+}
+
+}   // namespace
+
 pdf::PDFOperationResult PDFProgramController::writePagesToFile(const pdf::PDFDocument* document, const std::vector<pdf::PDFInteger>& pageIndices, const QString& fileName)
 {
     pdf::PDFDocumentManipulator::AssembledPages assembledPages;
@@ -3648,7 +3696,7 @@ void PDFProgramController::splitDocument()
     const QFileInfo sourceInfo(getOriginalFileName());
     const QString baseName = sourceInfo.completeBaseName().isEmpty() ? tr("document") : sourceInfo.completeBaseName();
     const QString directory = sourceInfo.absolutePath().isEmpty() ? m_settings->getDirectory() : sourceInfo.absolutePath();
-    PDFSplitDocumentDialog dialog(pageCount, QDir::toNativeSeparators(directory), baseName, m_mainWindow);
+    PDFSplitDocumentDialog dialog(pageCount, QDir::toNativeSeparators(directory), baseName, getTopLevelBookmarkStarts(document), m_mainWindow);
     if (dialog.exec() != QDialog::Accepted)
     {
         return;
