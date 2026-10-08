@@ -57,6 +57,7 @@
 #include "pdfsecurityhandler.h"
 #include <QMenuBar>
 #include <QProgressBar>
+#include <QProgressDialog>
 #include "pdfpageoutput.h"
 #include "pdfcms.h"
 #include "pdffont.h"
@@ -244,6 +245,7 @@ private slots:
     void mergePdfsCancelLeavesNoPartialFile();
     void mergePdfsTranslations();
     void splitDocumentWorkflow();
+    void ocrRunsInApp();
     void metadataEditSaveUndoRedo();
     void metadataEmptyFieldRemovesEntry();
     void metadataCancelAndUnchangedAreNoOps();
@@ -6067,6 +6069,133 @@ void ViewerContextMenuTest::splitDocumentWorkflow()
     QVERIFY(Dialog::splitAtPages(5, { 2, 2, 0 }) == Parts({ { 0, 1 }, { 2, 3, 4 } }));
     QVERIFY(Dialog::splitAtPages(4, { 3, 1 }) == Parts({ { 0 }, { 1, 2 }, { 3 } }));
     QVERIFY(Dialog::splitAtPages(4, {}) == Parts({ { 0, 1, 2, 3 } }));
+}
+
+void ViewerContextMenuTest::ocrRunsInApp()
+{
+#ifndef Q_OS_WIN
+    QSKIP("Runs FamilyPDF-OCR.ps1 with Windows PowerShell.");
+#endif
+    auto* controller = m_window->getProgramController();
+    const QString outputPath = m_temp.filePath("ocr-out.pdf");
+    QFile::remove(outputPath);
+
+    // A stand-in for FamilyPDF-OCR.ps1: same progress lines, copies the input to the output.
+    const auto writeScript = [this](const QString& name, const QString& body)
+    {
+        const QString path = m_temp.filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) return QString();
+        file.write(body.toUtf8());
+        return path;
+    };
+    const QString okScript = writeScript("fake-ocr.ps1",
+        "param([string]$InputPdf, [string]$OutputPdf)\r\n"
+        "Write-Host 'Rendering PDF pages at 300 DPI...'\r\n"
+        "Write-Host 'OCR page 1 (1/2)...'\r\n"
+        "Write-Host 'OCR page 2 (2/2)...'\r\n"
+        "Copy-Item -LiteralPath $InputPdf -Destination $OutputPdf -Force\r\n"
+        "Write-Host \"Searchable OCR PDF saved: $OutputPdf\"\r\n"
+        "exit 0\r\n");
+    const QString failScript = writeScript("fake-ocr-fail.ps1",
+        "param([string]$InputPdf, [string]$OutputPdf)\r\n"
+        "Write-Host 'tesseract.exe was not found. Install the FamilyPDF OCR plugin.'\r\n"
+        "exit 1\r\n");
+    const QString slowScript = writeScript("fake-ocr-slow.ps1",
+        "param([string]$InputPdf, [string]$OutputPdf)\r\n"
+        "Write-Host 'OCR page 1 (1/50)...'\r\n"
+        "Start-Sleep -Seconds 60\r\n"
+        "Copy-Item -LiteralPath $InputPdf -Destination $OutputPdf -Force\r\n"
+        "exit 0\r\n");
+    QVERIFY(!okScript.isEmpty() && !failScript.isEmpty() && !slowScript.isEmpty());
+
+    // Success: the progress dialog follows the page lines; the final question is answered "No".
+    QStringList labels;
+    int maximumSeen = 0;
+    QString question;
+    QTimer timer;
+    connect(&timer, &QTimer::timeout, m_window.get(), [&]()
+    {
+        if (auto* progress = m_window->findChild<QProgressDialog*>("ocrProgressDialog"))
+        {
+            if (!labels.contains(progress->labelText())) labels << progress->labelText();
+            maximumSeen = std::max(maximumSeen, progress->maximum());
+        }
+        if (auto* box = qobject_cast<QMessageBox*>(QApplication::activeModalWidget()); box && question.isEmpty())
+        {
+            question = box->text();
+            box->button(QMessageBox::No)->click();
+        }
+    });
+    timer.start(5);
+    QVERIFY(controller->runOcr(m_pdfPath, outputPath, okScript));
+    timer.stop();
+    QVERIFY(QFile::exists(outputPath));
+    QCOMPARE(maximumSeen, 2);
+    QVERIFY2(labels.join("|").contains("OCR page 2 of 2"), qPrintable(labels.join("|")));
+    QVERIFY2(question.contains(QDir::toNativeSeparators(outputPath)), qPrintable(question));
+
+    // Failure: exit code 1 and no output; the script's last lines are shown.
+    QFile::remove(outputPath);
+    QString error;
+    QTimer failTimer;
+    connect(&failTimer, &QTimer::timeout, m_window.get(), [&]()
+    {
+        if (auto* box = qobject_cast<QMessageBox*>(QApplication::activeModalWidget()); box && error.isEmpty())
+        {
+            error = box->text();
+            box->accept();
+        }
+    });
+    failTimer.start(5);
+    QVERIFY(!controller->runOcr(m_pdfPath, outputPath, failScript));
+    failTimer.stop();
+    QVERIFY(!QFile::exists(outputPath));
+    QVERIFY2(error.contains("tesseract.exe was not found"), qPrintable(error));
+
+    // Cancel: the dialog's Cancel kills the script well before it finishes.
+    QString cancelMessage;
+    QElapsedTimer elapsed;
+    elapsed.start();
+    QTimer cancelTimer;
+    connect(&cancelTimer, &QTimer::timeout, m_window.get(), [&]()
+    {
+        if (auto* progress = m_window->findChild<QProgressDialog*>("ocrProgressDialog"); progress && progress->maximum() == 50)
+        {
+            // The user's click: QProgressDialog::cancel() alone does not emit canceled().
+            for (QPushButton* button : progress->findChildren<QPushButton*>())
+            {
+                button->click();
+            }
+        }
+        if (auto* box = qobject_cast<QMessageBox*>(QApplication::activeModalWidget()); box && cancelMessage.isEmpty())
+        {
+            cancelMessage = box->text();
+            box->accept();
+        }
+    });
+    cancelTimer.start(5);
+    QVERIFY(!controller->runOcr(m_pdfPath, outputPath, slowScript));
+    cancelTimer.stop();
+    QVERIFY(elapsed.elapsed() < 30000);
+    QVERIFY(!QFile::exists(outputPath));
+    QVERIFY2(cancelMessage.contains("cancelled"), qPrintable(cancelMessage));
+
+    // Missing script: the "not installed" message, nothing runs.
+    QString missing;
+    QTimer missingTimer;
+    connect(&missingTimer, &QTimer::timeout, m_window.get(), [&]()
+    {
+        if (auto* box = qobject_cast<QMessageBox*>(QApplication::activeModalWidget()); box && missing.isEmpty())
+        {
+            missing = box->text();
+            box->accept();
+        }
+    });
+    missingTimer.start(5);
+    QVERIFY(!controller->runOcr(m_pdfPath, outputPath, m_temp.filePath("no-such-script.ps1")));
+    missingTimer.stop();
+    QVERIFY2(missing.contains("not installed"), qPrintable(missing));
 }
 
 QTEST_MAIN(ViewerContextMenuTest)

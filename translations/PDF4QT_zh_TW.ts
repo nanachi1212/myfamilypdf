@@ -14622,6 +14622,13 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>The optional FamilyPDF OCR plugin is not installed.</source><translation>尚未安裝選用的 FamilyPDF OCR 外掛。</translation></message>
     <message><source>Save searchable OCR PDF</source><translation>儲存可搜尋的 OCR PDF</translation></message>
     <message><source>Could not start the FamilyPDF OCR plugin.</source><translation>無法啟動 FamilyPDF OCR 外掛。</translation></message>
+    <message><source>Preparing OCR...</source><translation>正在準備 OCR...</translation></message>
+    <message><source>Cancel</source><translation>取消</translation></message>
+    <message><source>OCR page %1 of %2...</source><translation>OCR 第 %1 / %2 頁...</translation></message>
+    <message><source>Rendering pages...</source><translation>正在轉換頁面影像...</translation></message>
+    <message><source>OCR was cancelled. No file was written.</source><translation>已取消 OCR，未寫入任何檔案。</translation></message>
+    <message><source>OCR failed.</source><translation>OCR 失敗。</translation></message>
+    <message><source>Searchable PDF saved to %1. Open it now?</source><translation>可搜尋的 PDF 已儲存到 %1。要現在開啟嗎？</translation></message>
     <message>
         <source>Required form fields</source>
         <translation>必填表單欄位</translation>
