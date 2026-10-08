@@ -47,7 +47,7 @@ function Install-Isolated {
         '/SUPPRESSMSGBOXES',
         '/NORESTART',
         '/SP-',
-        "/DIR=$Target",
+        "`"/DIR=$Target`"",
         "/COMPONENTS=$Components"
     ) -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -ne 0) {
