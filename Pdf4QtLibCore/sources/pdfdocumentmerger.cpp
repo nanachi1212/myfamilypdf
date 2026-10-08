@@ -477,32 +477,36 @@ PDFOperationResult PDFDocumentMerger::mergeToFile(const std::vector<Entry>& entr
     }
 }
 
-PDFOperationResult PDFDocumentMerger::mergeToFileImpl(const std::vector<Entry>& entries,
-                                                      const QString& destination,
-                                                      const std::function<bool()>& isCancelled)
+PDFOperationResult PDFDocumentMerger::mergeToDocument(const std::vector<Entry>& entries, PDFDocument* document)
 {
     PDFDocumentManipulator manipulator;
     manipulator.setOutlineMode(PDFDocumentManipulator::OutlineMode::Join);
     manipulator.setAttachMergedCatalogObjects(true);
     PDFDocumentManipulator::AssembledPages assembledPages;
     bool needAppearances = false;
-    for (size_t index = 0; index < entries.size(); ++index)
+    // One source per distinct document object. A file opened twice is two objects and stays two
+    // independent sources; the same object in several rows (page insertion) is copied once.
+    std::map<const PDFDocument*, int> documentIndices;
+    for (const Entry& entry : entries)
     {
-        const Entry& entry = entries[index];
         if (!entry.source.document)
         {
             return tr("Invalid document.");
         }
-        const PDFDocument* document = entry.source.document.data();
-        if (const PDFDictionary* form = document->getStorage().getDictionaryFromObject(document->getCatalog()->getFormObject()))
+        const PDFDocument* source = entry.source.document.data();
+        auto it = documentIndices.find(source);
+        if (it == documentIndices.end())
         {
-            needAppearances = needAppearances || PDFDocumentDataLoaderDecorator(document).readBooleanFromDictionary(form, "NeedAppearances", false);
+            it = documentIndices.emplace(source, int(documentIndices.size())).first;
+            if (const PDFDictionary* form = source->getStorage().getDictionaryFromObject(source->getCatalog()->getFormObject()))
+            {
+                needAppearances = needAppearances || PDFDocumentDataLoaderDecorator(source).readBooleanFromDictionary(form, "NeedAppearances", false);
+            }
+            manipulator.addDocument(it->second, source);
+            manipulator.setDocumentCaption(it->second, entry.source.displayName);
         }
-        // One document index per list row: the same file listed twice stays two independent sources.
-        const int documentIndex = int(index);
-        manipulator.addDocument(documentIndex, entry.source.document.data());
-        manipulator.setDocumentCaption(documentIndex, entry.source.displayName);
-        const PDFDocumentManipulator::AssembledPages allPages = PDFDocumentManipulator::createAllDocumentPages(documentIndex, entry.source.document.data());
+        const int documentIndex = it->second;
+        const PDFDocumentManipulator::AssembledPages allPages = PDFDocumentManipulator::createAllDocumentPages(documentIndex, source);
         for (const PDFInteger pageIndex : entry.pages)
         {
             if (pageIndex < 0 || pageIndex >= PDFInteger(allPages.size()))
@@ -518,14 +522,23 @@ PDFOperationResult PDFDocumentMerger::mergeToFileImpl(const std::vector<Entry>& 
     {
         return result;
     }
-    if (isCancelled())
-    {
-        return tr("Cancelled.");
-    }
 
-    PDFDocument assembled = manipulator.takeAssembledDocument();
-    pruneExcludedPages(&assembled);
-    finishMergedForm(&assembled, needAppearances);
+    *document = manipulator.takeAssembledDocument();
+    pruneExcludedPages(document);
+    finishMergedForm(document, needAppearances);
+    return true;
+}
+
+PDFOperationResult PDFDocumentMerger::mergeToFileImpl(const std::vector<Entry>& entries,
+                                                      const QString& destination,
+                                                      const std::function<bool()>& isCancelled)
+{
+    PDFDocument assembled;
+    PDFOperationResult result = mergeToDocument(entries, &assembled);
+    if (!result)
+    {
+        return result;
+    }
     if (isCancelled())
     {
         return tr("Cancelled.");

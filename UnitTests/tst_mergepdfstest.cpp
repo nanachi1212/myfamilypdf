@@ -229,6 +229,7 @@ private slots:
     void parsePageList();
     void twoPdfsAllPages();
     void threePdfsOrdering();
+    void mergeToDocumentSharesSource();
     void pageRangesAndCustomOrder();
     void mixedSizesRotationsAndCropBox();
     void annotationsAndAppearance();
@@ -396,6 +397,52 @@ void MergePdfsTest::threePdfsOrdering()
     // The same file twice is two independent rows.
     merged = mergeToOutput({ { a, "1" }, { b, "2" }, { a, "2" } }, path("out2.pdf"));
     QCOMPARE(pageMarkers(merged), QStringList({ "A page 1", "B page 2", "A page 2" }));
+}
+
+void MergePdfsTest::mergeToDocumentSharesSource()
+{
+    const QString a = makeFeatureFile("a.pdf", "A", 3, 300, "nameA");
+    const QString b = makeFeatureFile("b.pdf", "B", 2, 400, "nameB");
+    const PDFDocumentMerger::LoadResult loadedA = load(a);
+    const PDFDocumentMerger::LoadResult loadedB = load(b);
+    QCOMPARE(loadedA.status, PDFDocumentMerger::LoadStatus::OK);
+    QCOMPARE(loadedB.status, PDFDocumentMerger::LoadStatus::OK);
+
+    // "Insert B (pages 2,1) after page 1 of A": A is listed twice with the same document object.
+    const PDFDocumentMerger::Entry before{ loadedA.source, { 0 } };
+    const PDFDocumentMerger::Entry inserted{ loadedB.source, { 1, 0 } };
+    const PDFDocumentMerger::Entry after{ loadedA.source, { 1, 2 } };
+    pdf::PDFDocument merged;
+    const pdf::PDFOperationResult result = PDFDocumentMerger::mergeToDocument({ before, inserted, after }, &merged);
+    QVERIFY2(result, qPrintable(result.getErrorMessage()));
+    const QStringList expected = { "A page 1", "B page 2", "B page 1", "A page 2", "A page 3" };
+    QCOMPARE(pageMarkers(merged), expected);
+    QCOMPARE(countPageObjects(merged), 5);
+
+    // One source for A: its form field is in the merged form once, next to B's field.
+    const pdf::PDFForm form = pdf::PDFForm::parse(&merged, merged.getCatalog()->getFormObject());
+    QVERIFY(form.isAcroForm());
+    QStringList names;
+    for (const auto& field : form.getFormFields())
+    {
+        names << field->getName(pdf::PDFFormField::FullyQualified);
+    }
+    names.sort();
+    QCOMPARE(names, QStringList({ "nameA", "nameB" }));
+
+    // The in-memory result is a complete PDF once written.
+    const QString output = path("inserted.pdf");
+    {
+        QFile file(output);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        pdf::PDFDocumentWriter writer(nullptr);
+        const pdf::PDFOperationResult written = writer.write(&file, &merged);
+        QVERIFY2(written, qPrintable(written.getErrorMessage()));
+    }
+    bool ok = false;
+    const pdf::PDFDocument reopened = readPdf(output, &ok);
+    QVERIFY(ok);
+    QCOMPARE(pageMarkers(reopened), expected);
 }
 
 void MergePdfsTest::pageRangesAndCustomOrder()

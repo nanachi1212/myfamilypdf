@@ -277,6 +277,11 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     ui->menuFile->insertAction(ui->actionProperties, extractPagesAction);
     connect(extractPagesAction, &QAction::triggered, m_programController, [this]() { m_programController->extractPages(); });
 
+    QAction* splitDocumentAction = new QAction(tr("Split Document..."), this);
+    splitDocumentAction->setObjectName(QStringLiteral("actionSplitDocument"));
+    ui->menuFile->insertAction(ui->actionProperties, splitDocumentAction);
+    connect(splitDocumentAction, &QAction::triggered, m_programController, [this]() { m_programController->splitDocument(); });
+
     pdf::PDFWidget* pdfWidget = m_programController->getPdfWidget();
     pdfWidget->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(pdfWidget, &QWidget::customContextMenuRequested, this, &PDFViewerMainWindow::onPdfContextMenuRequested);

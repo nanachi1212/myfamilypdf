@@ -336,6 +336,21 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     ui->menuFile->insertAction(ui->actionProperties, extractPagesAction);
     connect(extractPagesAction, &QAction::triggered, m_programController, [this]() { m_programController->extractPages(); });
 
+    QAction* insertPagesAction = new QAction(tr("Insert Pages from File..."), this);
+    insertPagesAction->setObjectName(QStringLiteral("actionInsertPagesFromFile"));
+    ui->menuFile->insertAction(ui->actionProperties, insertPagesAction);
+    connect(insertPagesAction, &QAction::triggered, m_programController, [this]() { m_programController->insertPagesFromFile(); });
+
+    QAction* insertBlankPageAction = new QAction(tr("Insert Blank Page"), this);
+    insertBlankPageAction->setObjectName(QStringLiteral("actionInsertBlankPage"));
+    ui->menuFile->insertAction(ui->actionProperties, insertBlankPageAction);
+    connect(insertBlankPageAction, &QAction::triggered, m_programController, [this]() { m_programController->insertBlankPage(); });
+
+    QAction* splitDocumentAction = new QAction(tr("Split Document..."), this);
+    splitDocumentAction->setObjectName(QStringLiteral("actionSplitDocument"));
+    ui->menuFile->insertAction(ui->actionProperties, splitDocumentAction);
+    connect(splitDocumentAction, &QAction::triggered, m_programController, [this]() { m_programController->splitDocument(); });
+
     // Special tools
     QToolButton* insertStickyNoteButton = m_actionManager->createToolButtonForActionGroup(PDFActionManager::CreateStickyNoteGroup, ui->mainToolBar);
     ui->mainToolBar->addWidget(insertStickyNoteButton);

@@ -14147,6 +14147,9 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <translation>批注</translation>
     </message>
     <message><source>Export Selection as Image...</source><translation>将选中范围导出为图片...</translation></message>
+    <message><source>Insert Pages from File...</source><translation>从文件插入页面...</translation></message>
+    <message><source>Insert Blank Page</source><translation>插入空白页</translation></message>
+    <message><source>Split Document...</source><translation>拆分文档...</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFEncryptionSettingsDialog</name>
@@ -14497,6 +14500,17 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <message><source>%1 page(s) were sent to the printer.</source><translation>已将 %1 页发送到打印机。</translation></message>
     <message><source>Select some text first, then export the selection as an image.</source><translation>请先选中文字，再将选中范围导出为图片。</translation></message>
     <message><source>The selection has no visible area to export.</source><translation>选中范围没有可导出的可见区域。</translation></message>
+    <message><source>Missing page (%1) in a document.</source><translation>文档中缺少页面（%1）。</translation></message>
+    <message><source>Insert Pages from File</source><translation>从文件插入页面</translation></message>
+    <message><source>Insert the pages anyway?</source><translation>仍要插入这些页面吗？</translation></message>
+    <message><source>Insert Blank Page</source><translation>插入空白页</translation></message>
+    <message><source>The page tree of this document cannot be edited.</source><translation>无法编辑这份文档的页面树。</translation></message>
+    <message><source>Split Document</source><translation>拆分文档</translation></message>
+    <message><source>The document has only one page; there is nothing to split.</source><translation>文档只有一页，没有可拆分的内容。</translation></message>
+    <message><source>The output file %1 would overwrite the open document. Choose another folder or base name.</source><translation>输出文件 %1 会覆盖当前打开的文档。请改用其他文件夹或基本文件名。</translation></message>
+    <message><source>%1 file(s) already exist and will be replaced. Continue?</source><translation>%1 个文件已存在，将被替换。要继续吗？</translation></message>
+    <message><source>Saved %1 of %2 files. %3 failed: %4</source><translation>已保存 %1 / %2 个文件。%3 失败：%4</translation></message>
+    <message><source>Saved %1 files to %2.</source><translation>已将 %1 个文件保存到 %2。</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFRecentFileManager</name>
@@ -15048,6 +15062,7 @@ Do you want to perform this action?</source>
     </message>
     <message><source>Extract Pages...</source><translation>提取页面(另存新文档)...</translation></message>
     <message><source>Export Selection as Image...</source><translation>将选中范围导出为图片...</translation></message>
+    <message><source>Split Document...</source><translation>拆分文档...</translation></message>
 </context>
 <context>
     <name>pdfviewer::PDFViewerSettingsDialog</name>
@@ -15632,5 +15647,39 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>将使用最�
     <message><source>The merge was cancelled. No file was written.</source><translation>已取消合并，未写入任何文件。</translation></message>
     <message><source>The merge failed. No file was written.</source><translation>合并失败，未写入任何文件。</translation></message>
     <message><source>No file was written.</source><translation>未写入任何文件。</translation></message>
+</context>
+<context>
+    <name>pdfviewer::PDFInsertPagesDialog</name>
+    <message><source>Insert Pages from File</source><translation>从文件插入页面</translation></message>
+    <message><source>%1 (%2 pages)</source><translation>%1（%2 页）</translation></message>
+    <message><source>File</source><translation>文件</translation></message>
+    <message><source>all, or for example 1-3,8</source><translation>all，或例如 1-3,8</translation></message>
+    <message><source>Pages</source><translation>页面</translation></message>
+    <message><source>After page</source><translation>插入在此页之后</translation></message>
+    <message><source>Before page</source><translation>插入在此页之前</translation></message>
+    <message><source>of %1</source><translation>／共 %1 页</translation></message>
+    <message><source>Position</source><translation>位置</translation></message>
+    <message><source>Insert</source><translation>插入</translation></message>
+    <message><source>No pages selected.</source><translation>尚未选择页面。</translation></message>
+</context>
+<context>
+    <name>pdfviewer::PDFSplitDocumentDialog</name>
+    <message><source>Split Document</source><translation>拆分文档</translation></message>
+    <message><source>Each part is saved as a new PDF named &lt;base name&gt;_p&lt;pages&gt;.pdf. The open document is not changed.</source><translation>每个部分会另存为新的 PDF，文件名为“基本文件名_p页码.pdf”。当前打开的文档不会被更动。</translation></message>
+    <message><source>Every page</source><translation>每一页一个文件</translation></message>
+    <message><source>Every N pages</source><translation>每 N 页一个文件</translation></message>
+    <message><source>New file starts at pages</source><translation>在指定页码开始新文件</translation></message>
+    <message><source>Split</source><translation>拆分</translation></message>
+    <message><source>Pages per file</source><translation>每个文件的页数</translation></message>
+    <message><source>for example 5,12 (parts 1-4, 5-11, 12-%1)</source><translation>例如 5,12（分成 1-4、5-11、12-%1）</translation></message>
+    <message><source>Start pages</source><translation>起始页码</translation></message>
+    <message><source>Browse...</source><translation>浏览...</translation></message>
+    <message><source>Select Output Folder</source><translation>选择输出文件夹</translation></message>
+    <message><source>Output folder</source><translation>输出文件夹</translation></message>
+    <message><source>Base name</source><translation>基本文件名</translation></message>
+    <message><source>Select an existing output folder.</source><translation>请选择一个已存在的输出文件夹。</translation></message>
+    <message><source>Enter a base name without folder separators.</source><translation>请输入不含文件夹分隔符的基本文件名。</translation></message>
+    <message><source>Enter the page numbers where a new file starts.</source><translation>请输入新文件开始的页码。</translation></message>
+    <message><source>This split would produce a single file. Choose different settings.</source><translation>这样拆分只会产生一个文件，请改用其他设置。</translation></message>
 </context>
 </TS>

@@ -102,6 +102,12 @@ public:
                                           const std::atomic_bool* cancel,
                                           bool* cancelled);
 
+    /// Assembles the entries into \p document in memory; nothing is written to disk. Entries that
+    /// share the same PDFDocument object share one source, so a document listed in several rows
+    /// (for example "pages before", "inserted pages", "pages after") is copied once.
+    /// \returns true, or an error message.
+    static PDFOperationResult mergeToDocument(const std::vector<Entry>& entries, PDFDocument* document);
+
 private:
     static PDFOperationResult mergeToFileImpl(const std::vector<Entry>& entries,
                                               const QString& destination,

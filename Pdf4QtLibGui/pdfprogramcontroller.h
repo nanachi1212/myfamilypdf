@@ -344,6 +344,15 @@ public:
     void extractPages();
     void mergePdfs();
     void extractPages(const std::vector<pdf::PDFInteger>& pageIndices);
+
+    /// Inserts pages of another PDF into the open document (asks for the file, then the pages and position).
+    void insertPagesFromFile();
+    /// Same, for an already chosen file. \p passwordCallback replaces the password prompt (tests); empty: ask.
+    void insertPagesFromFile(const QString& fileName, const std::function<QString(bool*)>& passwordCallback = {});
+    /// Inserts an empty page, the size of the current page, right after the current page.
+    void insertBlankPage();
+    /// Writes the open document as several new PDFs. The open document is not changed.
+    void splitDocument();
     void deletePages(const std::vector<pdf::PDFInteger>& pageIndices);
     void rotatePages(const std::vector<pdf::PDFInteger>& pageIndices, int quarterTurns);
 
@@ -487,6 +496,8 @@ private:
     void savePageLayoutPerDocument();
     void saveDocumentViewState();
     void restoreDocumentViewState();
+    /// Writes \p pageIndices of \p document (document order as given) as a new PDF; the file is committed only when complete.
+    static pdf::PDFOperationResult writePagesToFile(const pdf::PDFDocument* document, const std::vector<pdf::PDFInteger>& pageIndices, const QString& fileName);
     QString getDocumentViewStateKey() const;
 
     PDFActionManager* m_actionManager;

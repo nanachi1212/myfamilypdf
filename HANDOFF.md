@@ -13,10 +13,18 @@
 ## 目前狀態與下一步
 
 - 專案：`F:\Projects\Codex project\myfamilypdf`，Windows x64 PDF 閱讀／編輯工具。
+- 「插入頁面與拆分文件 v10」在 branch `feature/insert-split-v10`（自 main `2e0f9c86` 建出）實作完成；依 `AGENTS.md`（未被明確要求建置）本機**未建置、未執行測試**，由 PR 的 Windows／Ubuntu／runtime CI 驗證。狀態見「v10 已交付內容」與「Git 狀態」。
 - 「縮圖拖曳重排頁面 v8」已 squash merge（PR #17，main `7cfa289b1f7e2a5c88c695062344c71870896c3d`，Windows／Ubuntu／runtime／CodeQL 全綠），不必重做。
 - 「Merge PDFs v9」已在 branch `feature/merge-pdfs-v9`（自 `7cfa289b` 建出）實作並通過本機驗證；commit／push／PR／CI／squash merge 的狀態見下方「Git 狀態」。本機 `gh` 未登入，由 ChatGPT／使用者建立 PR。
 - 先前「列印與圖片匯出 v7」已 merge（PR #15，squash，merge commit `60be9699b42d01a42b7860e153ccd77868b191b1`），不必重做 v6／v7。
 - `.ai-memory.toml` 是使用者原有 untracked 檔案，保留，不修改、不提交。
+
+## v10 已交付內容（插入頁面、空白頁、拆分文件）
+
+- Editor File 選單新增 Insert Pages from File...／Insert Blank Page；Viewer／Editor 新增 Split Document...。行為、限制與測試見 `docs/insert-split-v10.md`。
+- 引擎：`PDFDocumentMerger::mergeToDocument`（記憶體合併；同一 `PDFDocument` 物件在多列只複製一次），`mergeToFileImpl` 改為呼叫它。控制器：`insertPagesFromFile`（三列 entries → `mergeToDocument` → `Reset | PreserveUndoRedo`）、`insertBlankPage`（`appendPage` + `setPages`）、`splitDocument`（重用從 `extractPages` 抽出的 `writePagesToFile`）。新檔 `Pdf4QtLibGui/pdfpageinsertsplitdialogs.*`。繁中／簡中已補。
+- 驗證：NOT_TESTED（本機未建置）。新測試 `UnitTestsMergePdfs::mergeToDocumentSharesSource`、`UnitTestsViewer::insertAndSplitWorkflow`；CI 結果以 PR 為準。若 CI 紅燈，先看這兩個測試與 `pdfpageinsertsplitdialogs.cpp` 的編譯錯誤。
+- 本輪唯讀審查結論（給下一步排序用）：OCR 仍是 detached 的 cmd/PowerShell 黑視窗，無進度／取消／自動開啟結果；`dist/FamilyPDF` 含 CodeGenerator／JBIG2_VIEWER／PdfExampleGenerator／Qt6Test.dll 與 AudioBook 用的 ffmpeg DLL；儲存為整檔重寫＋整檔 SHA-256，大檔效能瓶頸最可能在此；`deletePages` 後 `performSaveAs()` 的 flaky 根因未查。
 
 ## v9 已交付內容（Merge PDFs）
 
@@ -72,7 +80,8 @@
 
 ## Git 狀態
 
-- v9：branch `feature/merge-pdfs-v9`（本機驗證完成；commit／push／PR 狀態以 `git log`／GitHub 為準，見最終回報）。
+- v10：branch `feature/insert-split-v10`；commit／push／PR／CI 狀態以 `git log`／GitHub 為準。本機 `gh` 已登入（2026-10-08）。
+- v9：PR #18 已 squash merge（`2e0f9c86`）。
 - v8：PR #17 已 squash merge（`7cfa289b`）。
 - v7：PR #15 已 squash merge 為 `60be9699`，本機 `main` 已同步，feature branch 已刪除（本機與遠端）。本機 `gh` 仍未登入，無法自行建立 PR 或查 CI；merge 由使用者在 GitHub 完成。
 

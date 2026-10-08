@@ -40,6 +40,7 @@
 #include "pdfprintdialog.h"
 #include "pdfexportimagesdialog.h"
 #include "pdfmergepdfsdialog.h"
+#include "pdfpageinsertsplitdialogs.h"
 #include "pdfpageoutput.h"
 #include "pdfpagereorder.h"
 #include "pdfoptimizedocumentdialog.h"
@@ -82,6 +83,7 @@
 #include <QSaveFile>
 #include <QtConcurrent/QtConcurrent>
 #include <QInputDialog>
+#include <QLineEdit>
 #include <QMainWindow>
 #include <QToolBar>
 #include <QXmlStreamWriter>
@@ -3544,41 +3546,288 @@ void PDFProgramController::extractPages(const std::vector<pdf::PDFInteger>& page
         return;
     }
 
-    pdf::PDFDocumentManipulator::AssembledPages assembledPages;
-    const pdf::PDFDocumentManipulator::AssembledPages allPages = pdf::PDFDocumentManipulator::createAllDocumentPages(0, document);
-    for (const pdf::PDFInteger pageIndex : selectedPages)
-    {
-        assembledPages.push_back(allPages[pageIndex]);
-    }
-
-    pdf::PDFDocumentManipulator manipulator;
-    manipulator.setOutlineMode(pdf::PDFDocumentManipulator::OutlineMode::NoOutline);
-    manipulator.addDocument(0, document);
-    pdf::PDFOperationResult result = manipulator.assemble(assembledPages);
-    if (result)
-    {
-        pdf::PDFDocumentWriter writer(nullptr);
-        // Commit only a complete PDF. QSaveFile's direct-write fallback stays disabled.
-        QSaveFile output(fileName);
-        if (!output.open(QIODevice::WriteOnly))
-        {
-            result = output.errorString();
-        }
-        else
-        {
-            result = writer.write(&output, &manipulator.getAssembledDocument());
-            if (result && !output.commit()) result = output.errorString();
-            if (!result) output.cancelWriting();
-        }
-    }
-
+    const pdf::PDFOperationResult result = writePagesToFile(document, selectedPages, fileName);
     if (!result)
     {
         QMessageBox::critical(m_mainWindow, tr("Extract Pages"), result.getErrorMessage());
         return;
     }
 
-    QMessageBox::information(m_mainWindow, tr("Extract Pages"), tr("Saved %1 pages to %2.").arg(assembledPages.size()).arg(QDir::toNativeSeparators(fileName)));
+    QMessageBox::information(m_mainWindow, tr("Extract Pages"), tr("Saved %1 pages to %2.").arg(selectedPages.size()).arg(QDir::toNativeSeparators(fileName)));
+}
+
+pdf::PDFOperationResult PDFProgramController::writePagesToFile(const pdf::PDFDocument* document, const std::vector<pdf::PDFInteger>& pageIndices, const QString& fileName)
+{
+    pdf::PDFDocumentManipulator::AssembledPages assembledPages;
+    const pdf::PDFDocumentManipulator::AssembledPages allPages = pdf::PDFDocumentManipulator::createAllDocumentPages(0, document);
+    for (const pdf::PDFInteger pageIndex : pageIndices)
+    {
+        if (pageIndex < 0 || pageIndex >= pdf::PDFInteger(allPages.size()))
+        {
+            return tr("Missing page (%1) in a document.").arg(pageIndex + 1);
+        }
+        assembledPages.push_back(allPages[size_t(pageIndex)]);
+    }
+
+    pdf::PDFDocumentManipulator manipulator;
+    manipulator.setOutlineMode(pdf::PDFDocumentManipulator::OutlineMode::NoOutline);
+    manipulator.addDocument(0, document);
+    pdf::PDFOperationResult result = manipulator.assemble(assembledPages);
+    if (!result)
+    {
+        return result;
+    }
+
+    pdf::PDFDocumentWriter writer(nullptr);
+    // Commit only a complete PDF. QSaveFile's direct-write fallback stays disabled.
+    QSaveFile output(fileName);
+    if (!output.open(QIODevice::WriteOnly))
+    {
+        return output.errorString();
+    }
+    result = writer.write(&output, &manipulator.getAssembledDocument());
+    if (result && !output.commit())
+    {
+        result = output.errorString();
+    }
+    if (!result)
+    {
+        output.cancelWriting();
+    }
+    return result;
+}
+
+void PDFProgramController::insertPagesFromFile()
+{
+    if (!m_pdfDocument)
+    {
+        return;
+    }
+    const QFileInfo sourceInfo(getOriginalFileName());
+    const QString directory = sourceInfo.absolutePath().isEmpty() ? m_settings->getDirectory() : sourceInfo.absolutePath();
+    const QString fileName = QFileDialog::getOpenFileName(m_mainWindow, tr("Insert Pages from File"), directory, tr("PDF document (*.pdf)"));
+    if (!fileName.isEmpty())
+    {
+        insertPagesFromFile(fileName);
+    }
+}
+
+void PDFProgramController::insertPagesFromFile(const QString& fileName, const std::function<QString(bool*)>& passwordCallback)
+{
+    if (!m_pdfDocument)
+    {
+        return;
+    }
+
+    // The dialogs are modal; automatic reload must not swap the document underneath them.
+    const pdf::PDFDocumentPointer documentKeepAlive = m_pdfDocument;
+    m_isOutputWorkflowActive = true;
+    const auto outputWorkflowGuard = qScopeGuard([this]() { m_isOutputWorkflowActive = false; });
+
+    const QString title = tr("Insert Pages from File");
+    auto queryPassword = [this, &fileName, &passwordCallback](bool* ok)
+    {
+        if (passwordCallback)
+        {
+            return passwordCallback(ok);
+        }
+        return QInputDialog::getText(m_mainWindow, tr("Encrypted document"),
+                                     tr("Enter password to access document content") + QLatin1Char('\n') + QFileInfo(fileName).fileName(),
+                                     QLineEdit::Password, QString(), ok);
+    };
+    const pdf::PDFDocumentMerger::LoadResult loaded = pdf::PDFDocumentMerger::loadSource(fileName, queryPassword);
+    if (loaded.status == pdf::PDFDocumentMerger::LoadStatus::Cancelled)
+    {
+        return;
+    }
+    if (loaded.status != pdf::PDFDocumentMerger::LoadStatus::OK)
+    {
+        QMessageBox::critical(m_mainWindow, title, loaded.errorMessage);
+        return;
+    }
+
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount());
+    const std::vector<pdf::PDFInteger> currentPages = m_pdfWidget->getDrawWidget()->getCurrentPages();
+    const pdf::PDFInteger currentPage = currentPages.empty() ? 0 : currentPages.front();
+    PDFInsertPagesDialog dialog(loaded.source, pageCount, currentPage, m_mainWindow);
+    if (dialog.exec() != QDialog::Accepted || !m_pdfDocument)
+    {
+        return;
+    }
+    const pdf::PDFInteger insertIndex = std::clamp<pdf::PDFInteger>(dialog.getInsertIndex(), 0, pageCount);
+
+    const QFileInfo sourceInfo(getOriginalFileName());
+    pdf::PDFDocumentMerger::Entry target;
+    target.source = pdf::PDFDocumentMerger::createSource(getOriginalFileName(), sourceInfo.fileName().isEmpty() ? tr("Untitled") : sourceInfo.fileName(), m_pdfDocument);
+    for (pdf::PDFInteger page = 0; page < pageCount; ++page)
+    {
+        target.pages.push_back(page);
+    }
+    pdf::PDFDocumentMerger::Entry inserted;
+    inserted.source = loaded.source;
+    inserted.pages = dialog.getPages();
+
+    const pdf::PDFDocumentMerger::Report report = pdf::PDFDocumentMerger::analyze({ target, inserted });
+    if (!report.blockers.isEmpty())
+    {
+        QMessageBox::critical(m_mainWindow, title, report.blockers.join(QLatin1String("\n\n")));
+        return;
+    }
+    if (!report.warnings.isEmpty())
+    {
+        const auto answer = QMessageBox::warning(m_mainWindow, title,
+                                                 report.warnings.join(QLatin1String("\n\n")) + QLatin1String("\n\n") + tr("Insert the pages anyway?"),
+                                                 QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (answer != QMessageBox::Yes)
+        {
+            return;
+        }
+    }
+
+    // Before / inserted / after. The open document appears twice but is copied once (same object).
+    std::vector<pdf::PDFDocumentMerger::Entry> entries;
+    pdf::PDFDocumentMerger::Entry before = target;
+    before.pages.assign(target.pages.begin(), target.pages.begin() + insertIndex);
+    pdf::PDFDocumentMerger::Entry after = target;
+    after.pages.assign(target.pages.begin() + insertIndex, target.pages.end());
+    if (!before.pages.empty())
+    {
+        entries.push_back(before);
+    }
+    entries.push_back(inserted);
+    if (!after.pages.empty())
+    {
+        entries.push_back(after);
+    }
+
+    pdf::PDFDocument assembled;
+    const pdf::PDFOperationResult result = pdf::PDFDocumentMerger::mergeToDocument(entries, &assembled);
+    if (!result)
+    {
+        QMessageBox::critical(m_mainWindow, title, result.getErrorMessage());
+        return;
+    }
+
+    pdf::PDFDocumentPointer newDocument(new pdf::PDFDocument(assembled));
+    pdf::PDFModifiedDocument::ModificationFlags flags(pdf::PDFModifiedDocument::Reset);
+    flags.setFlag(pdf::PDFModifiedDocument::PreserveUndoRedo);
+    onDocumentModified(pdf::PDFModifiedDocument(newDocument, m_optionalContentActivity, flags));
+    m_pdfWidget->getDrawWidgetProxy()->goToPage(insertIndex);
+}
+
+void PDFProgramController::insertBlankPage()
+{
+    if (!m_pdfDocument)
+    {
+        return;
+    }
+
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(m_pdfDocument->getCatalog()->getPageCount());
+    const std::vector<pdf::PDFInteger> currentPages = m_pdfWidget->getDrawWidget()->getCurrentPages();
+    const pdf::PDFInteger currentPage = std::clamp<pdf::PDFInteger>(currentPages.empty() ? 0 : currentPages.front(), 0, std::max<pdf::PDFInteger>(pageCount - 1, 0));
+
+    pdf::PDFDocumentModifier modifier(m_pdfDocument.data());
+    pdf::PDFDocumentBuilder* builder = modifier.getBuilder();
+    std::vector<pdf::PDFObjectReference> pages = builder->getPages();
+    if (pdf::PDFInteger(pages.size()) != pageCount)
+    {
+        builder->flattenPageTree();
+        pages = builder->getPages();
+    }
+    if (pdf::PDFInteger(pages.size()) != pageCount)
+    {
+        QMessageBox::warning(m_mainWindow, tr("Insert Blank Page"), tr("The page tree of this document cannot be edited."));
+        return;
+    }
+
+    // Same size as the page being read; A4 when the document has no page yet.
+    const QRectF mediaBox = pageCount > 0 ? m_pdfDocument->getCatalog()->getPage(size_t(currentPage))->getMediaBox() : QRectF(0, 0, 595.276, 841.89);
+    const pdf::PDFObjectReference blankPage = builder->appendPage(mediaBox);
+    const pdf::PDFInteger insertIndex = pageCount > 0 ? currentPage + 1 : 0;
+    pages.insert(pages.begin() + insertIndex, blankPage);
+    builder->setPages(pages);
+    modifier.markReset();
+    if (!modifier.finalize())
+    {
+        return;
+    }
+
+    pdf::PDFModifiedDocument::ModificationFlags flags = modifier.getFlags();
+    flags.setFlag(pdf::PDFModifiedDocument::PreserveUndoRedo);
+    onDocumentModified(pdf::PDFModifiedDocument(modifier.getDocument(), m_optionalContentActivity, flags));
+    m_pdfWidget->getDrawWidgetProxy()->goToPage(insertIndex);
+}
+
+void PDFProgramController::splitDocument()
+{
+    const pdf::PDFDocument* document = getDocument();
+    if (!document)
+    {
+        return;
+    }
+    const QString title = tr("Split Document");
+    const pdf::PDFInteger pageCount = pdf::PDFInteger(document->getCatalog()->getPageCount());
+    if (pageCount < 2)
+    {
+        QMessageBox::information(m_mainWindow, title, tr("The document has only one page; there is nothing to split."));
+        return;
+    }
+
+    const QFileInfo sourceInfo(getOriginalFileName());
+    const QString baseName = sourceInfo.completeBaseName().isEmpty() ? tr("document") : sourceInfo.completeBaseName();
+    const QString directory = sourceInfo.absolutePath().isEmpty() ? m_settings->getDirectory() : sourceInfo.absolutePath();
+    PDFSplitDocumentDialog dialog(pageCount, QDir::toNativeSeparators(directory), baseName, m_mainWindow);
+    if (dialog.exec() != QDialog::Accepted)
+    {
+        return;
+    }
+    document = getDocument();
+    if (!document || pdf::PDFInteger(document->getCatalog()->getPageCount()) != pageCount)
+    {
+        return;
+    }
+
+    const PDFSplitDocumentDialog::Plan& plan = dialog.getPlan();
+    QStringList fileNames;
+    QStringList existing;
+    for (const std::vector<pdf::PDFInteger>& part : plan.parts)
+    {
+        const QString pages = part.size() == 1 ? QString::number(part.front() + 1) : QString("%1-%2").arg(part.front() + 1).arg(part.back() + 1);
+        const QString fileName = QDir(plan.directory).filePath(QString("%1_p%2.pdf").arg(plan.baseName, pages));
+        if (!sourceInfo.absoluteFilePath().isEmpty() && QFileInfo(fileName) == sourceInfo)
+        {
+            QMessageBox::critical(m_mainWindow, title, tr("The output file %1 would overwrite the open document. Choose another folder or base name.").arg(QDir::toNativeSeparators(fileName)));
+            return;
+        }
+        if (QFileInfo::exists(fileName))
+        {
+            existing << QDir::toNativeSeparators(fileName);
+        }
+        fileNames << fileName;
+    }
+    if (!existing.isEmpty())
+    {
+        const auto answer = QMessageBox::question(m_mainWindow, title,
+                                                  tr("%1 file(s) already exist and will be replaced. Continue?").arg(existing.size()) + QLatin1String("\n\n") + existing.join(QLatin1Char('\n')),
+                                                  QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (answer != QMessageBox::Yes)
+        {
+            return;
+        }
+    }
+
+    int saved = 0;
+    for (size_t index = 0; index < plan.parts.size(); ++index)
+    {
+        const pdf::PDFOperationResult result = writePagesToFile(document, plan.parts[index], fileNames[int(index)]);
+        if (!result)
+        {
+            QMessageBox::critical(m_mainWindow, title, tr("Saved %1 of %2 files. %3 failed: %4").arg(saved).arg(plan.parts.size()).arg(QDir::toNativeSeparators(fileNames[int(index)]), result.getErrorMessage()));
+            return;
+        }
+        ++saved;
+    }
+    QMessageBox::information(m_mainWindow, title, tr("Saved %1 files to %2.").arg(saved).arg(QDir::toNativeSeparators(plan.directory)));
 }
 
 void PDFProgramController::mergePdfs()
