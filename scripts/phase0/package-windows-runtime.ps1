@@ -68,7 +68,7 @@ New-Item -ItemType Directory -Path $baseLicenseRoot -Force | Out-Null
 $qtSbomRoot = Join-Path $packageRoot 'THIRD-PARTY-SBOM\Qt'
 New-Item -ItemType Directory -Path $qtSbomRoot -Force | Out-Null
 $qtSourceSbomRoot = Join-Path $QtPrefix 'sbom'
-$qtSbomModules = @('qtbase', 'qtmultimedia', 'qtspeech', 'qtsvg', 'qttranslations')
+$qtSbomModules = @('qtbase', 'qtsvg', 'qttranslations')
 foreach ($module in $qtSbomModules) {
     $sbom = Join-Path $qtSourceSbomRoot "$module-6.9.1.spdx"
     if (-not (Test-Path -LiteralPath $sbom -PathType Leaf)) {
@@ -99,9 +99,7 @@ $baseNotice = @(
     'PDF4QT license: LICENSE-PDF4QT.txt',
     'Qt licensing information and corresponding source: https://www.qt.io/licensing/open-source-lgpl-obligations',
     'Qt source code: https://code.qt.io/cgit/qt/',
-    'The multimedia runtime includes FFmpeg libraries distributed with Qt.',
-    'FFmpeg licensing and source: https://ffmpeg.org/legal.html and https://ffmpeg.org/download.html',
-    'Qt 6.9.1 package SBOMs, including the FFmpeg runtime relationship, are included in THIRD-PARTY-SBOM\Qt.',
+    'Qt 6.9.1 package SBOMs are included in THIRD-PARTY-SBOM\Qt.',
     'Office export dependency hashes and notices are included under office-export.',
     'Microsoft Visual C++ and DirectX runtime files remain subject to Microsoft license terms.',
     '',
@@ -196,11 +194,9 @@ $requiredQtModules = @(
     'Qt6Concurrent.dll',
     'Qt6Core.dll',
     'Qt6Gui.dll',
-    'Qt6Multimedia.dll',
     'Qt6Network.dll',
     'Qt6PrintSupport.dll',
     'Qt6Svg.dll',
-    'Qt6TextToSpeech.dll',
     'Qt6Widgets.dll',
     'Qt6Xml.dll'
 )
@@ -220,11 +216,6 @@ $requiredPlugins = @(
     'imageformats\qjpeg.dll',
     'imageformats\qsvg.dll',
     'styles\qmodernwindowsstyle.dll',
-    'texttospeech\qtexttospeech_mock.dll',
-    'texttospeech\qtexttospeech_sapi.dll',
-    'texttospeech\qtexttospeech_winrt.dll',
-    'multimedia\ffmpegmediaplugin.dll',
-    'multimedia\windowsmediaplugin.dll',
     'networkinformation\qnetworklistmanager.dll',
     'tls\qcertonlybackend.dll',
     'tls\qschannelbackend.dll'

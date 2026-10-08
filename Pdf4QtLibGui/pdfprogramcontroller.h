@@ -63,7 +63,6 @@ namespace pdfviewer
 class PDFViewerSettings;
 class PDFUndoRedoManager;
 class PDFRecentFileManager;
-class PDFTextToSpeech;
 class PDFActionComboBox;
 class PDFFullscreenWidget;
 
@@ -302,7 +301,6 @@ public:
         Forms           = 0x0002,   ///< Forms
         UndoRedo        = 0x0004,   ///< Undo/redo
         Plugins         = 0x0008,   ///< Plugins
-        TextToSpeech    = 0x0010,   ///< Text to speech
         AllFeatures     = 0xFFFF,   ///< All features enabled
     };
     Q_DECLARE_FLAGS(Features, Feature)
@@ -319,7 +317,6 @@ public:
     pdf::PDFDocument* getDocument() const { return m_pdfDocument.data(); }
     pdf::PDFCertificateStore* getCertificateStore() const { return const_cast<pdf::PDFCertificateStore*>(&m_certificateStore); }
     PDFBookmarkManager* getBookmarkManager() const { return m_bookmarkManager; }
-    PDFTextToSpeech* getTextToSpeech() const { return m_textToSpeech; }
     const std::vector<pdf::PDFSignatureVerificationResult>* getSignatures() const { return &m_signatures; }
 
     void initialize(Features features,
@@ -552,7 +549,6 @@ private:
     PDFRecentFileManager* m_recentFileManager;
     pdf::PDFOptionalContentActivity* m_optionalContentActivity;
     pdf::PDFDocumentPointer m_pdfDocument;
-    PDFTextToSpeech* m_textToSpeech;
     bool m_isDocumentSetInProgress;
 
     QFuture<AsyncReadingResult> m_future;

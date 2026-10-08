@@ -82,7 +82,6 @@ public:
         ColorPostprocessingSettings,
         SecuritySettings,
         UISettings,
-        SpeechSettings,
         FormSettings,
         SignatureSettings,
         PluginsSettings
@@ -113,8 +112,6 @@ private:
     void savePluginsTable();
     void updatePluginInformation();
 
-    void setSpeechEngine(const QString& engine, const QString& locale);
-
     /// Returns true, if dialog can be closed. If not, then message is displayed
     /// and false is returned.
     bool canCloseDialog();
@@ -125,9 +122,6 @@ private:
     OtherSettings m_otherSettings;
     QList<QAction*> m_actions;
     bool m_isLoadingData;
-    QStringList m_textToSpeechEngines;
-    QString m_currentSpeechEngine;
-    QString m_currentSpeechLocale;
     pdf::PDFCertificateStore m_certificateStore;
     QStringList m_enabledPlugins;
     pdf::PDFPluginInfos m_plugins;

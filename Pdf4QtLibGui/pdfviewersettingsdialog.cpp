@@ -35,7 +35,6 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QListWidgetItem>
-#include <QTextToSpeech>
 #include <QDomDocument>
 #include <QStyledItemDelegate>
 
@@ -83,7 +82,6 @@ PDFViewerSettingsDialog::PDFViewerSettingsDialog(const PDFViewerSettings::Settin
 {
     ui->setupUi(this);
 
-    m_textToSpeechEngines = QTextToSpeech::availableEngines();
 
     new QListWidgetItem(QIcon(":/resources/engine.svg"), tr("Engine"), ui->optionsPagesWidget, EngineSettings);
     new QListWidgetItem(QIcon(":/resources/rendering.svg"), tr("Rendering"), ui->optionsPagesWidget, RenderingSettings);
@@ -94,7 +92,6 @@ PDFViewerSettingsDialog::PDFViewerSettingsDialog(const PDFViewerSettings::Settin
     new QListWidgetItem(QIcon(":/resources/cms.svg"), tr("Colors | Postprocessing"), ui->optionsPagesWidget, ColorPostprocessingSettings);
     new QListWidgetItem(QIcon(":/resources/security.svg"), tr("Security"), ui->optionsPagesWidget, SecuritySettings);
     new QListWidgetItem(QIcon(":/resources/ui.svg"), tr("UI"), ui->optionsPagesWidget, UISettings);
-    new QListWidgetItem(QIcon(":/resources/speech.svg"), tr("Speech"), ui->optionsPagesWidget, SpeechSettings);
     new QListWidgetItem(QIcon(":/resources/form-settings.svg"), tr("Forms"), ui->optionsPagesWidget, FormSettings);
     new QListWidgetItem(QIcon(":/resources/signature.svg"), tr("Signature"), ui->optionsPagesWidget, SignatureSettings);
     new QListWidgetItem(QIcon(":/resources/plugins.svg"), tr("Plugins"), ui->optionsPagesWidget, PluginsSettings);
@@ -207,11 +204,6 @@ PDFViewerSettingsDialog::PDFViewerSettingsDialog(const PDFViewerSettings::Settin
         }
     }
 
-    // Text to speech
-    for (const QString& engine : m_textToSpeechEngines)
-    {
-        ui->speechEnginesComboBox->addItem(engine, engine);
-    }
 
     connect(ui->trustedCertificateStoreTableWidget, &QTableWidget::itemSelectionChanged, this, &PDFViewerSettingsDialog::updateTrustedCertificatesTableActions);
     connect(ui->pluginsTableWidget, &QTableWidget::itemSelectionChanged, this, &PDFViewerSettingsDialog::updatePluginInformation);
@@ -275,9 +267,6 @@ void PDFViewerSettingsDialog::on_optionsPagesWidget_currentItemChanged(QListWidg
             ui->stackedWidget->setCurrentWidget(ui->uiPage);
             break;
 
-        case SpeechSettings:
-            ui->stackedWidget->setCurrentWidget(ui->speechPage);
-            break;
 
         case FormSettings:
             ui->stackedWidget->setCurrentWidget(ui->formPage);
@@ -409,53 +398,6 @@ void PDFViewerSettingsDialog::loadData()
     ui->backgroundColorEdit->setText(m_cmsSettings.backgroundColor.name(QColor::HexRgb));
     ui->sigmoidFunctionSlopeEdit->setValue(m_cmsSettings.sigmoidSlopeFactor);
     ui->bitonalThresholdEdit->setValue(m_cmsSettings.bitonalThreshold);
-
-    // Text-to-speech. Jakub Melka: engine/locale/voice can be unset (for example, when the
-    // application is started for the first time) - in that case we select the default values,
-    // so the speech works without manual configuration by the user.
-    int speechEngineIndex = ui->speechEnginesComboBox->findData(m_settings.m_speechEngine);
-    if (speechEngineIndex == -1 && ui->speechEnginesComboBox->count() > 0)
-    {
-        speechEngineIndex = 0;
-    }
-    if (speechEngineIndex != -1)
-    {
-        m_settings.m_speechEngine = ui->speechEnginesComboBox->itemData(speechEngineIndex).toString();
-    }
-    ui->speechEnginesComboBox->setCurrentIndex(speechEngineIndex);
-    setSpeechEngine(m_settings.m_speechEngine, m_settings.m_speechLocale);
-
-    int speechLocaleIndex = ui->speechLocaleComboBox->findData(m_settings.m_speechLocale);
-    if (speechLocaleIndex == -1)
-    {
-        speechLocaleIndex = ui->speechLocaleComboBox->findData(QLocale::system().name());
-    }
-    if (speechLocaleIndex == -1 && ui->speechLocaleComboBox->count() > 0)
-    {
-        speechLocaleIndex = 0;
-    }
-    if (speechLocaleIndex != -1)
-    {
-        m_settings.m_speechLocale = ui->speechLocaleComboBox->itemData(speechLocaleIndex).toString();
-
-        // Jakub Melka: voices are filled for the old locale, we must update them
-        setSpeechEngine(m_settings.m_speechEngine, m_settings.m_speechLocale);
-    }
-    ui->speechLocaleComboBox->setCurrentIndex(speechLocaleIndex);
-
-    int speechVoiceIndex = ui->speechVoiceComboBox->findData(m_settings.m_speechVoice);
-    if (speechVoiceIndex == -1 && ui->speechVoiceComboBox->count() > 0)
-    {
-        speechVoiceIndex = 0;
-    }
-    if (speechVoiceIndex != -1)
-    {
-        m_settings.m_speechVoice = ui->speechVoiceComboBox->itemData(speechVoiceIndex).toString();
-    }
-    ui->speechVoiceComboBox->setCurrentIndex(speechVoiceIndex);
-    ui->speechRateEdit->setValue(m_settings.m_speechRate);
-    ui->speechPitchEdit->setValue(m_settings.m_speechPitch);
-    ui->speechVolumeEdit->setValue(m_settings.m_speechVolume);
 
     // Form Settings
     ui->formHighlightFieldsCheckBox->setChecked(m_settings.m_formAppearanceFlags.testFlag(pdf::PDFFormManager::HighlightFields));
@@ -629,30 +571,7 @@ void PDFViewerSettingsDialog::saveData()
     {
         m_otherSettings.maximumRecentFileCount = ui->maximumRecentFileCountEdit->value();
     }
-    else if (sender == ui->speechEnginesComboBox)
-    {
-        m_settings.m_speechEngine = ui->speechEnginesComboBox->currentData().toString();
-    }
-    else if (sender == ui->speechLocaleComboBox)
-    {
-        m_settings.m_speechLocale = ui->speechLocaleComboBox->currentData().toString();
-    }
-    else if (sender == ui->speechVoiceComboBox)
-    {
-        m_settings.m_speechVoice = ui->speechVoiceComboBox->currentData().toString();
-    }
-    else if (sender == ui->speechRateEdit)
-    {
-        m_settings.m_speechRate = ui->speechRateEdit->value();
-    }
-    else if (sender == ui->speechPitchEdit)
-    {
-        m_settings.m_speechPitch = ui->speechPitchEdit->value();
-    }
-    else if (sender == ui->speechVolumeEdit)
-    {
-        m_settings.m_speechVolume = ui->speechVolumeEdit->value();
-    }
+
     else if (sender == ui->magnifierSizeEdit)
     {
         m_settings.m_magnifierSize = ui->magnifierSizeEdit->value();
@@ -907,41 +826,6 @@ void PDFViewerSettingsDialog::updatePluginInformation()
     }
 }
 
-void PDFViewerSettingsDialog::setSpeechEngine(const QString& engine, const QString& locale)
-{
-    if (m_currentSpeechEngine == engine && m_currentSpeechLocale == locale)
-    {
-        return;
-    }
-
-    QTextToSpeech textToSpeech(engine, nullptr);
-    textToSpeech.setLocale(QLocale(locale));
-
-    if (m_currentSpeechEngine != engine)
-    {
-        m_currentSpeechEngine = engine;
-
-        QVector<QLocale> locales = textToSpeech.availableLocales();
-        ui->speechLocaleComboBox->setUpdatesEnabled(false);
-        ui->speechLocaleComboBox->clear();
-        for (const QLocale& currentLocale : locales)
-        {
-            ui->speechLocaleComboBox->addItem(QString("%1 (%2)").arg(currentLocale.nativeLanguageName(), currentLocale.nativeTerritoryName()), currentLocale.name());
-        }
-        ui->speechLocaleComboBox->setUpdatesEnabled(true);
-    }
-
-    m_currentSpeechLocale = locale;
-
-    QVector<QVoice> voices = textToSpeech.availableVoices();
-    ui->speechVoiceComboBox->setUpdatesEnabled(false);
-    ui->speechVoiceComboBox->clear();
-    for (const QVoice& voice : voices)
-    {
-        ui->speechVoiceComboBox->addItem(QString("%1 (%2, %3)").arg(voice.name(), QVoice::genderName(voice.gender()), QVoice::ageName(voice.age())), voice.name());
-    }
-    ui->speechVoiceComboBox->setUpdatesEnabled(true);
-}
 
 bool PDFViewerSettingsDialog::canCloseDialog()
 {

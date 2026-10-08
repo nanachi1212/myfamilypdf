@@ -380,7 +380,7 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     m_programController->getPdfWidget()->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_programController->getPdfWidget(), &QWidget::customContextMenuRequested, this, &PDFEditorMainWindow::onPdfContextMenuRequested);
 
-    m_sidebarWidget = new PDFSidebarWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), m_programController->getTextToSpeech(), m_programController->getCertificateStore(), m_programController->getBookmarkManager(), m_programController->getSettings(), true, this);
+    m_sidebarWidget = new PDFSidebarWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), m_programController->getCertificateStore(), m_programController->getBookmarkManager(), m_programController->getSettings(), true, this);
     m_sidebarDockWidget = new QDockWidget(tr("&Sidebar"), this);
     m_sidebarDockWidget->setObjectName("SidebarDockWidget");
     m_sidebarDockWidget->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);

@@ -70,7 +70,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core LinguistTools)
 if(PDF4QT_BUILD_ONLY_CORE_LIBRARY)
     find_package(Qt6 REQUIRED COMPONENTS Core Gui Svg Xml)
 else()
-    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg Xml PrintSupport TextToSpeech Concurrent)
+    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg Xml PrintSupport Concurrent)
 endif()
 
 if(PDF4QT_BUILD_TESTS)
@@ -297,7 +297,7 @@ if(PDF4QT_INSTALL_DEPENDENCIES AND NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
         install(DIRECTORY ${PDF4QT_QT_ROOT}/bin/
             RUNTIME DESTINATION ${PDF4QT_INSTALL_LIB_DIR}/
             FILES_MATCHING
-            REGEX "(Qt6Core|Qt6Gui|Qt6PrintSupport|Qt6Svg|Qt6TextToSpeech|Qt6Widgets|Qt6Xml|Qt6Multimedia|Qt6Network)\\..*"
+            REGEX "(Qt6Core|Qt6Gui|Qt6PrintSupport|Qt6Svg|Qt6Widgets|Qt6Xml|Qt6Network)\\..*"
             PATTERN "Debug" EXCLUDE
             PATTERN "*.pdb" EXCLUDE
         )
@@ -330,16 +330,6 @@ if(PDF4QT_INSTALL_DEPENDENCIES AND NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
 
         install(DIRECTORY ${PDF4QT_QT_ROOT}/plugins/styles/
             RUNTIME DESTINATION ${PDF4QT_INSTALL_LIB_DIR}/styles/
-            FILES_MATCHING
-            PATTERN "*.dll"
-            PATTERN "*.so"
-            PATTERN "*.dylib"
-            REGEX "d\\..*" EXCLUDE
-            PATTERN "*.pdb" EXCLUDE
-        )
-
-        install(DIRECTORY ${PDF4QT_QT_ROOT}/plugins/texttospeech/
-            RUNTIME DESTINATION ${PDF4QT_INSTALL_LIB_DIR}/texttospeech/
             FILES_MATCHING
             PATTERN "*.dll"
             PATTERN "*.so"
