@@ -337,6 +337,11 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     ui->menuFile->insertAction(ui->actionProperties, extractPagesAction);
     connect(extractPagesAction, &QAction::triggered, m_programController, [this]() { m_programController->extractPages(); });
 
+    QAction* splitDocumentAction = new QAction(tr("Split Document..."), this);
+    splitDocumentAction->setObjectName(QStringLiteral("actionSplitDocument"));
+    ui->menuFile->insertAction(ui->actionProperties, splitDocumentAction);
+    connect(splitDocumentAction, &QAction::triggered, m_programController, [this]() { m_programController->splitDocument(); });
+
     // Editor only: the Viewer has no page insertion (v11). The current page is the anchor.
     QAction* insertBlankPageAction = new QAction(tr("Insert Blank Page..."), this);
     insertBlankPageAction->setObjectName(QStringLiteral("actionInsertBlankPage"));

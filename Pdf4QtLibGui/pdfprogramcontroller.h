@@ -346,6 +346,9 @@ public:
     void extractPages();
     void mergePdfs();
     void extractPages(const std::vector<pdf::PDFInteger>& pageIndices);
+    /// Writes the open document as several new PDFs (every page / every N pages / from given pages).
+    /// The open document is not changed.
+    void splitDocument();
     void deletePages(const std::vector<pdf::PDFInteger>& pageIndices);
     void rotatePages(const std::vector<pdf::PDFInteger>& pageIndices, int quarterTurns);
 
@@ -532,6 +535,8 @@ private:
     void savePageLayoutPerDocument();
     void saveDocumentViewState();
     void restoreDocumentViewState();
+    /// Writes \p pageIndices of \p document (in the given order) as a new PDF; the file is committed only when complete.
+    static pdf::PDFOperationResult writePagesToFile(const pdf::PDFDocument* document, const std::vector<pdf::PDFInteger>& pageIndices, const QString& fileName);
     QString getDocumentViewStateKey() const;
 
     PDFActionManager* m_actionManager;
