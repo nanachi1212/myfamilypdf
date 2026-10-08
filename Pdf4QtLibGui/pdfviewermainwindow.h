@@ -33,7 +33,6 @@
 #include "pdfdocumentpropertiesdialog.h"
 #include "pdfwidgettool.h"
 #include "pdfrecentfilemanager.h"
-#include "pdftexttospeech.h"
 #include "pdfannotation.h"
 #include "pdfform.h"
 #include "pdfundoredomanager.h"

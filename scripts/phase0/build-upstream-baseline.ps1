@@ -171,12 +171,10 @@ function Prepare-TestRuntime {
     $requiredQtModules = @(
         'Qt6Core.dll',
         'Qt6Gui.dll',
-        'Qt6Multimedia.dll',
         'Qt6Network.dll',
         'Qt6PrintSupport.dll',
         'Qt6Svg.dll',
         'Qt6Test.dll',
-        'Qt6TextToSpeech.dll',
         'Qt6Widgets.dll',
         'Qt6Xml.dll'
     )
@@ -186,14 +184,9 @@ function Prepare-TestRuntime {
         'imageformats\qico.dll',
         'imageformats\qjpeg.dll',
         'imageformats\qsvg.dll',
-        'multimedia\ffmpegmediaplugin.dll',
-        'multimedia\windowsmediaplugin.dll',
         'networkinformation\qnetworklistmanager.dll',
         'platforms\qwindows.dll',
         'styles\qmodernwindowsstyle.dll',
-        'texttospeech\qtexttospeech_mock.dll',
-        'texttospeech\qtexttospeech_sapi.dll',
-        'texttospeech\qtexttospeech_winrt.dll',
         'tls\qcertonlybackend.dll',
         'tls\qschannelbackend.dll'
     )

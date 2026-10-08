@@ -57,7 +57,6 @@ class PDFOptionalContentTreeItemModel;
 
 namespace pdfviewer
 {
-class PDFTextToSpeech;
 class PDFViewerSettings;
 class PDFBookmarkItemModel;
 
@@ -67,7 +66,6 @@ class PDFSidebarWidget : public QWidget
 
 public:
     explicit PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
-                              PDFTextToSpeech* textToSpeech,
                               pdf::PDFCertificateStore* certificateStore,
                               PDFBookmarkManager* bookmarkManager,
                               PDFViewerSettings* settings,
@@ -170,7 +168,6 @@ private:
 
     Ui::PDFSidebarWidget* ui;
     pdf::PDFDrawWidgetProxy* m_proxy;
-    PDFTextToSpeech* m_textToSpeech;
     pdf::PDFCertificateStore* m_certificateStore;
     PDFBookmarkManager* m_bookmarkManager;
     PDFViewerSettings* m_settings;

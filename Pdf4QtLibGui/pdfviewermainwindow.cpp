@@ -269,7 +269,7 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     ui->mainToolBar->addSeparator();
 
     // Special tools
-    m_programController->initialize(PDFProgramController::Features(PDFProgramController::TextToSpeech | PDFProgramController::Tools), this, this, m_actionManager, m_progress);
+    m_programController->initialize(PDFProgramController::Features(PDFProgramController::Tools), this, this, m_actionManager, m_progress);
     QAction* ocrAction = ui->menuTools->addAction(tr("Create Searchable PDF with OCR..."));
     connect(ocrAction, &QAction::triggered, m_programController, &PDFProgramController::launchOcrPlugin);
 
@@ -289,7 +289,7 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     setCentralWidget(pdfWidget);
     setFocusProxy(pdfWidget);
 
-    m_sidebarWidget = new PDFSidebarWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), m_programController->getTextToSpeech(), m_programController->getCertificateStore(), m_programController->getBookmarkManager(), m_programController->getSettings(), false, this);
+    m_sidebarWidget = new PDFSidebarWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), m_programController->getCertificateStore(), m_programController->getBookmarkManager(), m_programController->getSettings(), false, this);
     m_sidebarDockWidget = new QDockWidget(tr("&Sidebar"), this);
     m_sidebarDockWidget->setObjectName("SidebarDockWidget");
     m_sidebarDockWidget->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);

@@ -26,7 +26,6 @@
 #include "pdfviewersettings.h"
 
 #include "pdfwidgetutils.h"
-#include "pdftexttospeech.h"
 #include "pdfdrawwidget.h"
 #include "pdfwidgettool.h"
 
@@ -54,7 +53,6 @@
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QPainter>
-#include <QTextToSpeech>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -77,7 +75,6 @@ namespace pdfviewer
 {
 
 PDFSidebarWidget::PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
-                                   PDFTextToSpeech* textToSpeech,
                                    pdf::PDFCertificateStore* certificateStore,
                                    PDFBookmarkManager* bookmarkManager,
                                    PDFViewerSettings* settings,
@@ -86,7 +83,6 @@ PDFSidebarWidget::PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
     QWidget(parent),
     ui(new Ui::PDFSidebarWidget),
     m_proxy(proxy),
-    m_textToSpeech(textToSpeech),
     m_certificateStore(certificateStore),
     m_bookmarkManager(bookmarkManager),
     m_settings(settings),
@@ -216,12 +212,6 @@ PDFSidebarWidget::PDFSidebarWidget(pdf::PDFDrawWidgetProxy* proxy,
             connect(pageInfo.second.button, &QToolButton::clicked, this, &PDFSidebarWidget::onPageButtonClicked);
         }
     }
-
-    m_textToSpeech->initializeUI(ui->speechLocaleComboBox, ui->speechVoiceComboBox,
-                                 ui->speechRateEdit, ui->speechPitchEdit, ui->speechVolumeEdit,
-                                 ui->speechPlayButton, ui->speechPauseButton, ui->speechStopButton, ui->speechSynchronizeButton,
-                                 ui->speechRateValueLabel, ui->speechPitchValueLabel, ui->speechVolumeValueLabel,
-                                 ui->speechActualTextEdit);
 
     ui->signatureTreeWidget->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->signatureTreeWidget, &QTreeWidget::customContextMenuRequested, this, &PDFSidebarWidget::onSignatureCustomContextMenuRequested);
@@ -404,7 +394,7 @@ bool PDFSidebarWidget::isEmpty(Page page) const
             return !m_document || !m_bookmarkManager;
 
         case Speech:
-            return !m_textToSpeech->isValid();
+            return true;    // reading aloud was removed; the page stays hidden
 
         case Signatures:
             return m_signatures.empty();
@@ -443,25 +433,6 @@ void PDFSidebarWidget::selectPage(Page page)
         }
     }
 
-    if (page == Speech && ui->speechVoiceComboBox->count() == 0)
-    {
-        // Check, if speech engine is properly set
-        QStringList speechEngines = QTextToSpeech::availableEngines();
-        const QString engineErrorMessage = m_textToSpeech ? m_textToSpeech->getEngineErrorMessage() : QString();
-
-        if (speechEngines.isEmpty())
-        {
-            QMessageBox::critical(this, tr("Error"), tr("Speech feature is unavailable. No speech engines detected. If you're using Linux, please install speech libraries like 'flite' or 'speechd'."));
-        }
-        else if (!engineErrorMessage.isEmpty())
-        {
-            QMessageBox::critical(this, tr("Error"), tr("Speech engine failed to initialize. Reported error: %1").arg(engineErrorMessage));
-        }
-        else
-        {
-            QMessageBox::critical(this, tr("Error"), tr("The speech feature is available, but its options are not properly set. Please check the speech settings in the options dialog."));
-        }
-    }
 }
 
 std::vector<PDFSidebarWidget::Page> PDFSidebarWidget::getValidPages() const

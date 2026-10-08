@@ -57,7 +57,6 @@
 #include "pdfpagegeometrydialog.h"
 #include "pdfsendmail.h"
 #include "pdfrecentfilemanager.h"
-#include "pdftexttospeech.h"
 #include "pdfencryptionsettingsdialog.h"
 #include "pdfwidgetannotation.h"
 #include "pdfwidgetformmanager.h"
@@ -433,7 +432,6 @@ PDFProgramController::PDFProgramController(QObject* parent) :
     m_undoRedoManager(nullptr),
     m_recentFileManager(new PDFRecentFileManager(this)),
     m_optionalContentActivity(nullptr),
-    m_textToSpeech(nullptr),
     m_isDocumentSetInProgress(false),
     m_futureWatcher(nullptr),
     m_recoveryTimer(new QTimer(this)),
@@ -764,13 +762,6 @@ void PDFProgramController::initialize(Features features,
     connect(m_settings, &PDFViewerSettings::settingsChanged, this, &PDFProgramController::onViewerSettingsChanged);
     connect(m_CMSManager, &pdf::PDFCMSManager::colorManagementSystemChanged, this, &PDFProgramController::onColorManagementSystemChanged);
 
-    if (features.testFlag(TextToSpeech))
-    {
-        m_textToSpeech = new PDFTextToSpeech(this);
-        m_textToSpeech->setProxy(m_pdfWidget->getDrawWidgetProxy());
-        m_textToSpeech->setSettings(m_settings);
-    }
-
     initializeAnnotationManager();
     m_annotationManager->setEditingEnabled(features.testFlag(UndoRedo));
     initializeBookmarkManager();
@@ -829,11 +820,6 @@ void PDFProgramController::initActionComboBox(PDFActionComboBox* comboBox)
 void PDFProgramController::finishInitialization()
 {
     readSettings(Settings(WindowSettings | ActionSettings));
-
-    if (m_textToSpeech)
-    {
-        m_textToSpeech->setSettings(m_settings);
-    }
 
     updatePageLayoutActions();
     m_mainWindowInterface->updateUI(true);
@@ -2471,11 +2457,6 @@ void PDFProgramController::readSettings(Settings settingsFlags)
         m_settings->readSettings(settings, m_CMSManager->getDefaultSettings());
         m_CMSManager->setSettings(m_settings->getColorManagementSystemSettings());
 
-        if (m_textToSpeech)
-        {
-            m_textToSpeech->setSettings(m_settings);
-        }
-
         if (m_formManager)
         {
             m_formManager->setAppearanceFlags(m_settings->getSettings().m_formAppearanceFlags);
@@ -3056,11 +3037,6 @@ void PDFProgramController::setDocument(pdf::PDFModifiedDocument document, std::v
         m_toolManager->setDocument(document);
     }
 
-    if (m_textToSpeech)
-    {
-        m_textToSpeech->setDocument(document);
-    }
-
     if (m_undoRedoManager)
     {
         m_undoRedoManager->setIsCurrentSaved(isCurrentSaved);
@@ -3480,10 +3456,6 @@ void PDFProgramController::onActionOptionsTriggered()
         if (m_recentFileManager)
         {
             m_recentFileManager->setRecentFilesLimit(dialog.getOtherSettings().maximumRecentFileCount);
-        }
-        if (m_textToSpeech)
-        {
-            m_textToSpeech->setSettings(m_settings);
         }
         if (m_formManager)
         {
