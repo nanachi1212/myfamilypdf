@@ -52,7 +52,7 @@ if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) {
         '/SUPPRESSMSGBOXES',
         '/NORESTART',
         '/SP-',
-        "/DIR=$innoRoot"
+        "`"/DIR=$innoRoot`""
     ) -WindowStyle Hidden -Wait -PassThru
     if ($installerProcess.ExitCode -ne 0) {
         throw "Inno Setup installation failed with exit code $($installerProcess.ExitCode)."
