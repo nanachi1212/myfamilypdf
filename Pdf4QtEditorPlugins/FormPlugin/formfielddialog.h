@@ -19,6 +19,8 @@ namespace pdfplugin
 
 class FormFieldDialog : public QDialog
 {
+    Q_OBJECT
+
 public:
     enum class FieldType
     {
