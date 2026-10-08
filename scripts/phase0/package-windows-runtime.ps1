@@ -115,14 +115,24 @@ $baseNotice | Set-Content `
     -Encoding UTF8
 
 # Start from a clean staging directory, then copy application, third-party and
-# explicitly verified release Qt runtime files.
+# explicitly verified release Qt runtime files. Developer-only tools built next to
+# the applications (code generator, example generator, JBIG2 viewer) are not shipped.
+$developerTools = @('CodeGenerator.exe', 'JBIG2_VIEWER.exe', 'PdfExampleGenerator.exe')
 Get-ChildItem -LiteralPath $runtimeDirectory -File |
     Where-Object {
         $_.Name -notlike 'Qt6*.dll' -and
         $_.Name -notlike 'UnitTests*.exe' -and
-        $_.Name -ne 'vc_redist.x64.exe'
+        $_.Name -notlike '*.pdb' -and
+        $_.Name -ne 'vc_redist.x64.exe' -and
+        $developerTools -notcontains $_.Name
     } |
     Copy-Item -Destination $packageRoot -Force
+foreach ($developerTool in $developerTools) {
+    $shipped = Join-Path $packageRoot $developerTool
+    if (Test-Path -LiteralPath $shipped -PathType Leaf) {
+        throw "Developer tool must not be packaged: $shipped"
+    }
+}
 foreach ($applicationDirectory in @('pdfplugins', 'translations')) {
     $sourceDirectory = Join-Path $runtimeDirectory $applicationDirectory
     if (Test-Path -LiteralPath $sourceDirectory -PathType Container) {
