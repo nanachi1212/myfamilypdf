@@ -157,8 +157,15 @@ $vsWhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe
 if (-not (Test-Path -LiteralPath $vsWhere -PathType Leaf)) {
     throw "vswhere was not found: $vsWhere"
 }
-$visualStudioRoot = (& $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Redist.14.Latest -property installationPath |
+$visualStudioRoot = (& $vsWhere -products * -requires Microsoft.VisualStudio.Component.VC.Redist.14.Latest -property installationPath |
     Select-Object -First 1)
+if ([string]::IsNullOrWhiteSpace($visualStudioRoot)) {
+    # Some installs (for example VS 2022 next to a newer VS) do not register the component;
+    # use any instance that actually contains the redistributable folder.
+    $visualStudioRoot = (& $vsWhere -all -products * -property installationPath |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_ 'VC\Redist\MSVC') -PathType Container } |
+        Select-Object -First 1)
+}
 if ([string]::IsNullOrWhiteSpace($visualStudioRoot)) {
     throw 'Visual C++ redistributable files were not found.'
 }
