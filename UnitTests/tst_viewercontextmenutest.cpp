@@ -52,6 +52,7 @@
 #include "pdfmergepdfsdialog.h"
 #include "pdfinsertpagesdialog.h"
 #include "pdfsplitdocumentdialog.h"
+#include "pdfchmconverter.h"
 #include "pdfdocumentmerger.h"
 #include "pdfdocumentpropertiesdialog.h"
 #include "pdfsecurityhandler.h"
@@ -218,6 +219,8 @@ private slots:
     void pageReorderOrderMath();
     void pageReorderInsertionGeometry();
     void pageSelectionHelpers();
+    void chmHelpers();
+    void chmSampleFile();
     void thumbnailReorderWorkflow();
     void reorderPreservesContentAfterSave();
     void reorderFlattensNestedPageTree();
@@ -3067,6 +3070,97 @@ void ViewerContextMenuTest::pageReorderOrderMath_data()
     QTest::newRow("self: single page before") << 6 << QList<int>{2} << 2 << QList<int>{0, 1, 2, 3, 4, 5};
     QTest::newRow("self: single page after") << 6 << QList<int>{2} << 3 << QList<int>{0, 1, 2, 3, 4, 5};
     QTest::newRow("self: everything") << 4 << QList<int>{0, 1, 2, 3} << 2 << QList<int>{0, 1, 2, 3};
+}
+
+void ViewerContextMenuTest::chmHelpers()
+{
+    using pdfviewer::PDFChmConverter;
+
+    QCOMPARE(PDFChmConverter::resolvePath(QStringLiteral("/html"), QStringLiteral("a%20b.htm#top")), QStringLiteral("/html/a b.htm"));
+    QCOMPARE(PDFChmConverter::resolvePath(QStringLiteral("/html"), QStringLiteral("..\\img\\x.png")), QStringLiteral("/img/x.png"));
+    QCOMPARE(PDFChmConverter::resolvePath(QStringLiteral("/html"), QStringLiteral("ms-its:help.chm::/top.htm")), QStringLiteral("/top.htm"));
+    QCOMPARE(PDFChmConverter::resolvePath(QStringLiteral(""), QStringLiteral("index.htm")), QStringLiteral("/index.htm"));
+
+    const QString hhc = QStringLiteral(
+        "<HTML><BODY><OBJECT type=\"text/site properties\"><param name=\"ImageType\" value=\"Folder\"></OBJECT>"
+        "<UL><LI><OBJECT type=\"text/sitemap\"><param name=\"Name\" value=\"Rules &amp; Tools\"><param name=\"Local\" value=\"rules.htm\"></OBJECT>"
+        "<UL><LI><OBJECT type=\"text/sitemap\"><param name=\"Name\" value=\"Combat\"><param name=\"Local\" value=\"sub/combat.htm#hit\"></OBJECT></UL>"
+        "<LI><OBJECT type=\"text/sitemap\"><param name=\"Name\" value=\"Appendix\"></OBJECT></UL></BODY></HTML>");
+    const std::vector<PDFChmConverter::Topic> topics = PDFChmConverter::parseTableOfContents(hhc, QStringLiteral("/"));
+    QCOMPARE(topics.size(), size_t(3));
+    QCOMPARE(topics[0].title, QStringLiteral("Rules & Tools"));
+    QCOMPARE(topics[0].path, QStringLiteral("/rules.htm"));
+    QCOMPARE(topics[0].depth, 0);
+    QCOMPARE(topics[1].path, QStringLiteral("/sub/combat.htm"));
+    QCOMPARE(topics[1].depth, 1);
+    QCOMPARE(topics[2].title, QStringLiteral("Appendix"));
+    QVERIFY(topics[2].path.isEmpty());
+    QCOMPARE(topics[2].depth, 0);
+
+    // Charset declaration wins; the help file language is the fallback (0x0804 = Simplified Chinese, GBK).
+    QCOMPARE(PDFChmConverter::decodeText(QByteArray("<meta charset=\"utf-8\">\xE4\xB8\xAD"), 0x0804), QString::fromUtf8("<meta charset=\"utf-8\">\xE4\xB8\xAD"));
+#ifdef Q_OS_WIN
+    QCOMPARE(PDFChmConverter::decodeText(QByteArray("\xD6\xD0\xCE\xC4"), 0x0804), QString::fromUtf8("\xE4\xB8\xAD\xE6\x96\x87"));
+    QCOMPARE(PDFChmConverter::decodeText(QByteArray("\xA4\xA4\xA4\xE5"), 0x0404), QString::fromUtf8("\xE4\xB8\xAD\xE6\x96\x87"));
+#endif
+
+    pdfviewer::PDFChmArchive archive;
+    QString errorMessage;
+    QVERIFY(!archive.open(QFINDTESTDATA("fixtures/pyhanko-signed.pdf"), &errorMessage));
+    QVERIFY(!errorMessage.isEmpty());
+}
+
+void ViewerContextMenuTest::chmSampleFile()
+{
+    // A real .chm cannot be made without Microsoft's help compiler, so this check runs only when one is given:
+    // FAMILYPDF_CHM_SAMPLE = the .chm, FAMILYPDF_CHM_REFERENCE = the same file extracted with 7-Zip.
+    const QString sample = qEnvironmentVariable("FAMILYPDF_CHM_SAMPLE");
+    if (sample.isEmpty())
+    {
+        QSKIP("FAMILYPDF_CHM_SAMPLE is not set");
+    }
+
+    pdfviewer::PDFChmArchive archive;
+    QString errorMessage;
+    QVERIFY2(archive.open(sample, &errorMessage), qPrintable(errorMessage));
+
+    const QString reference = qEnvironmentVariable("FAMILYPDF_CHM_REFERENCE");
+    if (!reference.isEmpty())
+    {
+        int compared = 0;
+        for (const QString& name : archive.fileNames())
+        {
+            if (name.startsWith(QLatin1String("::")) || name.startsWith(QLatin1String("/#")) || name.startsWith(QLatin1String("/$")) || name.endsWith(QLatin1Char('/')))
+            {
+                continue;
+            }
+            QFile file(reference + name);
+            if (!file.open(QIODevice::ReadOnly))
+            {
+                continue;
+            }
+            QVERIFY2(archive.read(name) == file.readAll(), qPrintable(name));
+            ++compared;
+        }
+        QVERIFY(compared > 0);
+        qInfo("Compared %d files", compared);
+    }
+
+    const QString pdfFileName = m_temp.filePath("chm-sample.pdf");
+    QElapsedTimer timer;
+    timer.start();
+    errorMessage = pdfviewer::PDFChmConverter::convertToPdf(sample, pdfFileName, nullptr);
+    QVERIFY2(errorMessage.isEmpty(), qPrintable(errorMessage));
+    qInfo("Converted in %lld ms", timer.elapsed());
+
+    pdf::PDFDocumentReader reader(nullptr, [](bool* ok) { *ok = false; return QString(); }, true, false);
+    const pdf::PDFDocument document = reader.readFromFile(pdfFileName);
+    QCOMPARE(reader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
+    QVERIFY(document.getCatalog()->getPageCount() > 0);
+    QVERIFY(document.getCatalog()->getOutlineRootPtr());
+    QVERIFY(document.getCatalog()->getOutlineRootPtr()->getChildCount() > 0);
+    qInfo("Pages %d, top-level bookmarks %d", int(document.getCatalog()->getPageCount()), int(document.getCatalog()->getOutlineRootPtr()->getChildCount()));
+    QFile::copy(pdfFileName, qEnvironmentVariable("FAMILYPDF_CHM_OUTPUT"));
 }
 
 void ViewerContextMenuTest::pageSelectionHelpers()

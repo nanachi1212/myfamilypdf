@@ -53,6 +53,8 @@ add_library(Pdf4QtLibGui SHARED
     pdfsidebarwidget.h
     pdfinsertpagesdialog.cpp
     pdfinsertpagesdialog.h
+    pdfchmconverter.cpp
+    pdfchmconverter.h
     pdfsplitdocumentdialog.cpp
     pdfsplitdocumentdialog.h
     pdfmergepdfsdialog.cpp

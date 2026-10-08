@@ -21,6 +21,7 @@ $requiredMessages = @(
 $requiredRegistryFragments = @(
     'Software\Classes\Applications\Pdf4QtEditor.exe',
     'Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open',
+    'Software\Classes\SystemFileAssociations\.chm\shell\FamilyPDF.Open',
     'ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""'
 )
 
@@ -43,8 +44,8 @@ foreach ($installer in $installers) {
         $text -split "`r?`n" |
             Where-Object { $_ -match '^Root:\s' }
     )
-    if ($registryLines.Count -ne 6) {
-        throw "Expected 6 shell registry entries in $installer, found $($registryLines.Count)."
+    if ($registryLines.Count -ne 10) {
+        throw "Expected 10 shell registry entries in $installer, found $($registryLines.Count)."
     }
     if (@($registryLines | Where-Object { $_ -notmatch '^Root:\s+HKCU;' }).Count -gt 0) {
         throw "Shell integration must remain user-scoped (HKCU): $installer"

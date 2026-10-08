@@ -89,10 +89,14 @@ Source: "..\dist\FamilyPDF-windows-x64\*"; DestDir: "{app}"; Excludes: "portable
 [Registry]
 Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtEditor.exe"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "FamilyPDF Editor"; Flags: uninsdeletekey; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtEditor.exe\SupportedTypes"; ValueType: none; ValueName: ".pdf"; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtEditor.exe\SupportedTypes"; ValueType: none; ValueName: ".chm"; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\Applications\Pdf4QtEditor.exe\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open"; ValueType: string; ValueName: ""; ValueData: "{cm:OpenWithFamilyPDF}"; Flags: uninsdeletekey; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\Pdf4QtEditor.exe"; Tasks: pdfshell
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.chm\shell\FamilyPDF.Open"; ValueType: string; ValueName: ""; ValueData: "{cm:OpenWithFamilyPDF}"; Flags: uninsdeletekey; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.chm\shell\FamilyPDF.Open"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\Pdf4QtEditor.exe"; Tasks: pdfshell
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.chm\shell\FamilyPDF.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Pdf4QtEditor.exe"" ""%1"""; Tasks: pdfshell
 #endif
 #endif
 

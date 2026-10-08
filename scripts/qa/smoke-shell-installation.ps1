@@ -15,7 +15,8 @@ $summaryPath = Join-Path $buildRoot 'shell-installer-smoke-summary.json'
 $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{D8942855-6D26-4801-908C-B8CD588A19C5}_is1'
 $shellPaths = @(
     'HKCU:\Software\Classes\Applications\Pdf4QtEditor.exe',
-    'HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open'
+    'HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open',
+    'HKCU:\Software\Classes\SystemFileAssociations\.chm\shell\FamilyPDF.Open'
 )
 
 foreach ($path in $shellPaths) {
@@ -80,6 +81,8 @@ try {
         'HKCU:\Software\Classes\Applications\Pdf4QtEditor.exe\shell\open\command' =
             "`"$editor`" `"%1`""
         'HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\FamilyPDF.Open\command' =
+            "`"$editor`" `"%1`""
+        'HKCU:\Software\Classes\SystemFileAssociations\.chm\shell\FamilyPDF.Open\command' =
             "`"$editor`" `"%1`""
     }
     foreach ($entry in $expectedCommands.GetEnumerator()) {

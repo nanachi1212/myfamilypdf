@@ -6888,7 +6888,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <translation>Lanczos</translation>
     </message>
     <message>
-        <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="+1496"/>
+        <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="+1497"/>
         <source>Round-trip validation found a different page count.</source>
         <translation>往返驗證發現頁數不一致。</translation>
     </message>
@@ -6920,6 +6920,37 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <location line="+32"/>
         <source>Landscape</source>
         <translation>橫向</translation>
+    </message>
+    <message>
+        <location filename="../Pdf4QtLibGui/pdfchmconverter.cpp" line="+559"/>
+        <source>The file is not a compiled HTML help (.chm) file.</source>
+        <translation>這不是編譯過的 HTML 說明檔（.chm）。</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <location line="+6"/>
+        <source>The help file directory is damaged.</source>
+        <translation>說明檔的目錄已損毀。</translation>
+    </message>
+    <message>
+        <location line="+33"/>
+        <source>The help file contains no files.</source>
+        <translation>說明檔裡沒有任何檔案。</translation>
+    </message>
+    <message>
+        <location line="+358"/>
+        <source>The help file contains no pages.</source>
+        <translation>說明檔裡沒有任何頁面。</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Cannot write file &apos;%1&apos;.</source>
+        <translation>無法寫入檔案「%1」。</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Conversion was cancelled.</source>
+        <translation>已取消轉換。</translation>
     </message>
 </context>
 <context>
@@ -17380,7 +17411,7 @@ Pages (leave blank for all; example: 1-3,5):</source>
         <translation>進階搜尋(&amp;V)...</translation>
     </message>
     <message>
-        <location line="+193"/>
+        <location line="+205"/>
         <source>New document</source>
         <translation>新檔案</translation>
     </message>
@@ -17390,7 +17421,7 @@ Pages (leave blank for all; example: 1-3,5):</source>
         <translation> / %1</translation>
     </message>
     <message>
-        <location line="-425"/>
+        <location line="-437"/>
         <source>Extract Pages...</source>
         <translation>擷取頁面(另存新檔案)...</translation>
     </message>
@@ -17415,12 +17446,12 @@ Pages (leave blank for all; example: 1-3,5):</source>
         <translation>新增註解</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+15"/>
         <source>Annotations</source>
         <translation>註解</translation>
     </message>
     <message>
-        <location line="-22"/>
+        <location line="-34"/>
         <source>Export Selection as Image...</source>
         <translation>將選取範圍匯出為圖片...</translation>
     </message>
@@ -18725,12 +18756,12 @@ Pages (leave blank for all; example: 1-3,5):</source>
 <context>
     <name>pdfviewer::PDFProgramController</name>
     <message>
-        <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="+2280"/>
+        <location filename="../Pdf4QtLibGui/pdfprogramcontroller.cpp" line="+2325"/>
         <source>Untitled</source>
         <translation>未命名</translation>
     </message>
     <message>
-        <location line="-2878"/>
+        <location line="-2923"/>
         <source>Printing document</source>
         <translation>列印文件</translation>
     </message>
@@ -18932,7 +18963,7 @@ The replacement completed but final validation failed. Stop editing this documen
         <translation>請輸入密碼以存取檔案內容</translation>
     </message>
     <message>
-        <location line="+576"/>
+        <location line="+587"/>
         <source>Document &apos;%1&apos; was successfully loaded!</source>
         <translation>文件 &apos;%1&apos;已成功載入！</translation>
     </message>
@@ -19029,12 +19060,32 @@ The replacement completed but final validation failed. Stop editing this documen
     </message>
     <message>
         <location line="+27"/>
-        <location line="+1007"/>
+        <location line="+1041"/>
         <source>Select PDF document</source>
         <translation>選取PDF文件</translation>
     </message>
     <message>
-        <location line="-1007"/>
+        <location line="-1041"/>
+        <source>PDF or help file (*.pdf *.chm);;PDF document (*.pdf);;Compiled HTML help (*.chm)</source>
+        <translation>PDF 或說明檔 (*.pdf *.chm);;PDF 文件 (*.pdf);;CHM 說明檔 (*.chm)</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Converting the help file to PDF...</source>
+        <translation>正在把說明檔轉成 PDF，第一次開啟需要一點時間...</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location line="+16"/>
+        <source>Open Help File</source>
+        <translation>開啟說明檔</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Cannot open &apos;%1&apos;. %2</source>
+        <translation>無法開啟「%1」。%2</translation>
+    </message>
+    <message>
         <location line="+78"/>
         <location line="+728"/>
         <source>PDF document (*.pdf)</source>
@@ -19150,8 +19201,9 @@ The replacement completed but final validation failed. Stop editing this documen
         <translation>正在準備 OCR...</translation>
     </message>
     <message>
-        <location line="-3439"/>
-        <location line="+3439"/>
+        <location line="-3484"/>
+        <location line="+2634"/>
+        <location line="+850"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
@@ -19181,7 +19233,7 @@ The replacement completed but final validation failed. Stop editing this documen
         <translation>可搜尋的 PDF 已儲存到 %1。要現在開啟嗎？</translation>
     </message>
     <message>
-        <location line="-3009"/>
+        <location line="-3054"/>
         <source>Required form fields</source>
         <translation>必填表單欄位</translation>
     </message>
@@ -19231,7 +19283,7 @@ Save the incomplete form anyway?</source>
         <translation>選取範圍沒有可匯出的可見區域。</translation>
     </message>
     <message>
-        <location line="+2628"/>
+        <location line="+2673"/>
         <source>Missing page (%1) in a document.</source>
         <translation>檔案中缺少頁面（%1）。</translation>
     </message>
@@ -19455,7 +19507,7 @@ Page %2: %3</source>
 <context>
     <name>pdfviewer::PDFSidebarWidget</name>
     <message>
-        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="+964"/>
+        <location filename="../Pdf4QtLibGui/pdfsidebarwidget.cpp" line="+965"/>
         <location line="+16"/>
         <location line="+17"/>
         <location line="+4"/>
@@ -19963,7 +20015,7 @@ Do you want to perform this action?</source>
         <translation>不放入資料夾</translation>
     </message>
     <message>
-        <location line="-1704"/>
+        <location line="-1705"/>
         <source>Annotations</source>
         <translation>註解</translation>
     </message>
@@ -19973,7 +20025,7 @@ Do you want to perform this action?</source>
         <translation>搜尋註解</translation>
     </message>
     <message>
-        <location line="+669"/>
+        <location line="+670"/>
         <source>Comment</source>
         <translation>註解</translation>
     </message>
