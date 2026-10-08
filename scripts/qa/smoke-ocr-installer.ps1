@@ -49,7 +49,7 @@ $install = Start-Process -FilePath $setup -ArgumentList @(
     '/SUPPRESSMSGBOXES',
     '/NORESTART',
     '/SP-',
-    "/DIR=$installRoot"
+    "`"/DIR=$installRoot`""
 ) -WindowStyle Hidden -Wait -PassThru
 if ($install.ExitCode -ne 0) {
     throw "OCR smoke installer failed with exit code $($install.ExitCode)."

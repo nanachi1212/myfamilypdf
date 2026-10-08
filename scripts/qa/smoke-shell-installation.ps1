@@ -60,7 +60,7 @@ try {
         '/NORESTART',
         '/SP-',
         '/LANG=english',
-        "/DIR=$installRoot",
+        "`"/DIR=$installRoot`"",
         '/TASKS=pdfshell'
     ) -WindowStyle Hidden -Wait -PassThru
     if ($installProcess.ExitCode -ne 0) {
