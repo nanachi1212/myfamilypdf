@@ -514,6 +514,18 @@ void PDFEditorMainWindow::onPdfContextMenuRequested(const QPoint& pos)
     QAction* note = menu.addAction(tr("Add Comment"), m_actionManager->getAction(PDFActionManager::CreateStickyNoteNote), &QAction::trigger);
     note->setEnabled(m_actionManager->getAction(PDFActionManager::CreateStickyNoteNote)->isEnabled());
     menu.addAction(ui->actionSelectText);
+
+    // Bookmark the page under the cursor, not the current page of the toolbar action:
+    // in continuous or two page layouts these differ. The position is relative to the
+    // PDFWidget, while the page layout is relative to the draw widget inside it.
+    QWidget* drawWidget = widget->getDrawWidget()->getWidget();
+    const pdf::PDFInteger pageIndex = widget->getDrawWidgetProxy()->getPageUnderPoint(drawWidget->mapFrom(widget, pos), nullptr);
+    QAction* bookmarkAction = menu.addAction(ui->actionBookmarkPage->icon(), ui->actionBookmarkPage->text(), this, [this, pageIndex]() {
+        m_programController->getBookmarkManager()->toggleBookmark(pageIndex);
+    });
+    bookmarkAction->setObjectName(QStringLiteral("actionContextBookmarkPage"));
+    bookmarkAction->setEnabled(pageIndex != -1);
+
     menu.addAction(tr("Annotations"), this, [this]() {
         m_sidebarDockWidget->show();
         m_sidebarWidget->selectPage(PDFSidebarWidget::Notes);

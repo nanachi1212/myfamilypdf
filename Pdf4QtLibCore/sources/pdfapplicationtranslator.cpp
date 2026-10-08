@@ -60,7 +60,22 @@ void PDFApplicationTranslator::installTranslator()
     {
         case E_LANGUAGE_AUTOMATIC_SELECTION:
         {
-            if (m_translator->load(QLocale::system(), "PDF4QT", "_", translationPath))
+            // Qt looks for zh_Hant_TW, zh_Hant and zh, but never for zh_TW, so Chinese is chosen here.
+            const QLocale systemLocale = QLocale::system();
+            bool loaded = false;
+            if (systemLocale.language() == QLocale::Chinese)
+            {
+                const QLocale::Territory territory = systemLocale.territory();
+                const bool traditional = systemLocale.script() == QLocale::TraditionalChineseScript ||
+                                         territory == QLocale::Taiwan || territory == QLocale::HongKong || territory == QLocale::Macao;
+                loaded = m_translator->load(QLatin1String(traditional ? "PDF4QT_zh_TW.qm" : "PDF4QT_zh_CN.qm"), translationPath);
+            }
+            else
+            {
+                loaded = m_translator->load(systemLocale, "PDF4QT", "_", translationPath);
+            }
+
+            if (loaded)
             {
                 QCoreApplication::installTranslator(m_translator);
             }

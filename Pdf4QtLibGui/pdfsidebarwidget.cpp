@@ -504,7 +504,8 @@ void PDFSidebarWidget::updateButtons()
     {
         if (pageInfo.second.button)
         {
-            pageInfo.second.button->setEnabled(!isEmpty(pageInfo.first));
+            // A page with nothing to show is hidden; a greyed out icon looks like a broken button.
+            pageInfo.second.button->setVisible(!isEmpty(pageInfo.first));
         }
     }
 }

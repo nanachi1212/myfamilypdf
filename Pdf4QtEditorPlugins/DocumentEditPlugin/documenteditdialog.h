@@ -37,6 +37,8 @@ private:
 
 class DecorationDialog : public QDialog
 {
+    Q_OBJECT
+
 public:
     enum class Mode
     {
@@ -74,6 +76,8 @@ private:
 
 class PageGeometryDialog : public QDialog
 {
+    Q_OBJECT
+
 public:
     explicit PageGeometryDialog(QWidget* parent = nullptr);
 
@@ -100,6 +104,8 @@ private:
 
 class PageSelectionDialog : public QDialog
 {
+    Q_OBJECT
+
 public:
     explicit PageSelectionDialog(QString title, QWidget* parent = nullptr);
 

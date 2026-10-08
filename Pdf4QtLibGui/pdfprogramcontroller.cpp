@@ -3340,6 +3340,13 @@ void PDFProgramController::loadPlugins()
     };
     std::sort(m_loadedPlugins.begin(), m_loadedPlugins.end(), comparator);
 
+    // Toolbar titles are the plugin names from the plugin metadata, listed here for translation.
+    [[maybe_unused]] static const char* const pluginToolbarNames[] = {
+        QT_TR_NOOP("Document Edit"), QT_TR_NOOP("Editor"), QT_TR_NOOP("FamilyPDF Office Export"),
+        QT_TR_NOOP("Forms"), QT_TR_NOOP("Redact"), QT_TR_NOOP("Signature"), QT_TR_NOOP("Scanner"),
+        QT_TR_NOOP("Dimensions"), QT_TR_NOOP("OutputPreview"), QT_TR_NOOP("SoftProofing"), QT_TR_NOOP("ObjectInspector")
+    };
+
     // Plugin toolbars go to their own row, so they do not squeeze the main toolbar
     // (page number, zoom) out of sight.
     m_mainWindow->addToolBarBreak();
@@ -3353,7 +3360,7 @@ void PDFProgramController::loadPlugins()
 
         if (!actions.empty())
         {
-            QToolBar* toolBar = m_mainWindow->addToolBar(plugin.first.name);
+            QToolBar* toolBar = m_mainWindow->addToolBar(tr(plugin.first.name.toUtf8().constData()));
             toolBar->setObjectName(QString("Plugin_Toolbar_%1").arg(plugin.first.name));
             m_mainWindowInterface->adjustToolbar(toolBar);
             QMenu* menu = m_mainWindowInterface->addToolMenu(plugin.second->getPluginMenuName());
