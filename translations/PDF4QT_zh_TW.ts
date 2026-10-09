@@ -16465,12 +16465,12 @@ Pages (leave blank for all; example: 1-3,5):</source>
     <message>
         <location line="+1"/>
         <source>Create Redacted &amp;Document</source>
-        <translation>建立可塗黑文件(&amp;D)</translation>
+        <translation>建立塗黑文件(&amp;D)</translation>
     </message>
     <message>
         <location line="+42"/>
         <source>Redac&amp;t</source>
-        <translation>修訂(&amp;T)</translation>
+        <translation>塗黑(&amp;T)</translation>
     </message>
     <message>
         <location line="+16"/>
