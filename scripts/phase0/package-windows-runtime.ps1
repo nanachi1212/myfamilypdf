@@ -191,6 +191,11 @@ foreach ($directXRuntime in @('dxcompiler.dll', 'dxil.dll')) {
     Copy-Item -LiteralPath $source -Destination $packageRoot -Force
 }
 
+# Shortcuts use this copy of the icon. Windows keeps a cache of the icon of each exe it has seen and
+# can go on showing the old one after an update; a file with a new name is not in that cache.
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'Pdf4QtEditor\app-icon.ico') `
+    -Destination (Join-Path $packageRoot 'FamilyPDF.ico') -Force
+
 $requiredQtModules = @(
     'Qt6Concurrent.dll',
     'Qt6Core.dll',
