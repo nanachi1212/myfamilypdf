@@ -54,6 +54,7 @@ SetupLogging=yes
 CloseApplications=yes
 RestartApplications=no
 UninstallDisplayIcon={app}\Pdf4QtEditor.exe
+SetupIconFile=..\Pdf4QtEditor\app-icon.ico
 
 [Languages]
 Name: "chinesetraditional"; MessagesFile: "compiler:Languages\ChineseTraditional.isl"

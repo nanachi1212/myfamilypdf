@@ -26,6 +26,9 @@ add_executable(Pdf4QtEditor
     app.qrc
 )
 
+# The icon is inside the compiled resource; rebuild it when the .ico changes.
+set_source_files_properties(icon.rc PROPERTIES OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/app-icon.ico)
+
 target_link_libraries(Pdf4QtEditor PRIVATE Pdf4QtLibCore Pdf4QtLibWidgets Pdf4QtLibGui Qt6::Core Qt6::Gui Qt6::Widgets)
 
 set_target_properties(Pdf4QtEditor PROPERTIES
