@@ -4391,6 +4391,11 @@ bool PDFProgramController::runOcr(const QString& inputFile, const QString& outpu
     QProcess process;
     process.setProcessChannelMode(QProcess::MergedChannels);
     process.setWorkingDirectory(QFileInfo(scriptPath).absolutePath());
+    // Windows PowerShell started from a PowerShell 7 session inherits PowerShell 7's module path and then
+    // cannot load its own cmdlets (Get-FileHash); the default path is what the script needs.
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    environment.remove(QStringLiteral("PSModulePath"));
+    process.setProcessEnvironment(environment);
     QStringList output;
     // "OCR page 7 (3/120)..." lines of FamilyPDF-OCR.ps1 drive the progress bar.
     static const QRegularExpression pageLine(QStringLiteral("^OCR page (\\d+) \\((\\d+)/(\\d+)\\)"));

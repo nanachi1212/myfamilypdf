@@ -6252,6 +6252,7 @@ void ViewerContextMenuTest::ocrRunsInApp()
     };
     const QString okScript = writeScript("fake-ocr.ps1",
         "param([string]$InputPdf, [string]$OutputPdf)\r\n"
+        "if ($env:PSModulePath -like '*fake-pwsh7-modules*') { Write-Host 'module path was inherited'; exit 3 }\r\n"
         "Write-Host 'Rendering PDF pages at 300 DPI...'\r\n"
         "Write-Host 'OCR page 1 (1/2)...'\r\n"
         "Write-Host 'OCR page 2 (2/2)...'\r\n"
@@ -6270,6 +6271,8 @@ void ViewerContextMenuTest::ocrRunsInApp()
         "exit 0\r\n");
     QVERIFY(!okScript.isEmpty() && !failScript.isEmpty() && !slowScript.isEmpty());
 
+    // A PowerShell 7 module path in the environment (the Editor started from PowerShell 7) must not reach the script.
+    qputenv("PSModulePath", "C:\\fake-pwsh7-modules");
     // Success: the progress dialog follows the page lines; the final question is answered "No".
     QStringList labels;
     int maximumSeen = 0;
