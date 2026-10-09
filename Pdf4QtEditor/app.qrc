@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/">
         <file>familypdf-app-icon.svg</file>
+        <file>morandi-app-icon.png</file>
     </qresource>
 </RCC>

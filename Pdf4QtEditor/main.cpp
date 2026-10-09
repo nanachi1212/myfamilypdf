@@ -101,7 +101,7 @@ QCoreApplication::setApplicationName("FamilyPDF Editor");
 
     pdf::PDFWidgetUtils::setDarkTheme(isLightGui, isDarkGui);
 
-    QIcon appIcon(":/familypdf-app-icon.svg");
+    QIcon appIcon(":/morandi-app-icon.png");
     QApplication::setWindowIcon(appIcon);
 
     const QStringList savedSession = pdfviewer::PDFSessionManager::loadPaths();
