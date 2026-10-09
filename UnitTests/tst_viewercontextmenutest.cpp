@@ -53,6 +53,7 @@
 #include "pdfinsertpagesdialog.h"
 #include "pdfsplitdocumentdialog.h"
 #include "pdfchmconverter.h"
+#include "pdfchinesefold.h"
 #include "pdfdocumentmerger.h"
 #include "pdfdocumentpropertiesdialog.h"
 #include "pdfsecurityhandler.h"
@@ -220,6 +221,7 @@ private slots:
     void pageReorderInsertionGeometry();
     void pageSelectionHelpers();
     void chmHelpers();
+    void chineseScriptFolding();
     void chmSampleFile();
     void thumbnailReorderWorkflow();
     void reorderPreservesContentAfterSave();
@@ -3108,6 +3110,17 @@ void ViewerContextMenuTest::chmHelpers()
     QString errorMessage;
     QVERIFY(!archive.open(QFINDTESTDATA("fixtures/pyhanko-signed.pdf"), &errorMessage));
     QVERIFY(!errorMessage.isEmpty());
+}
+
+void ViewerContextMenuTest::chineseScriptFolding()
+{
+    // "Parry" and "level" written in Traditional and in Simplified Chinese must compare equal.
+    const QString traditional = QString::fromUtf8("\xE6\xA0\xBC\xE6\x93\x8B 3\xE7\xB4\x9A ABC");
+    const QString simplified = QString::fromUtf8("\xE6\xA0\xBC\xE6\x8C\xA1 3\xE7\xBA\xA7 ABC");
+    QCOMPARE(pdf::foldChineseScript(traditional), pdf::foldChineseScript(simplified));
+    QCOMPARE(pdf::foldChineseScript(traditional).size(), traditional.size());
+    QCOMPARE(pdf::foldChineseScript(simplified), simplified);
+    QCOMPARE(pdf::foldChineseScript(QStringLiteral("Page 12 abc")), QStringLiteral("Page 12 abc"));
 }
 
 void ViewerContextMenuTest::chmSampleFile()

@@ -102,6 +102,7 @@ $baseNotice = @(
     'Qt 6.9.1 package SBOMs are included in THIRD-PARTY-SBOM\Qt.',
     'Office export dependency hashes and notices are included under office-export.',
     'Microsoft Visual C++ and DirectX runtime files remain subject to Microsoft license terms.',
+    'The Traditional/Simplified Chinese character table used by text search comes from OpenCC (https://github.com/BYVoid/OpenCC), Apache License 2.0.',
     '',
     'Bundled vcpkg dependency notices are included in THIRD-PARTY-LICENSES\Base:',
     ($copiedLicensePackages | Sort-Object | ForEach-Object { "- $_" })
