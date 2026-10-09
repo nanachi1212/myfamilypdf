@@ -110,6 +110,8 @@ add_library(Pdf4QtLibCore SHARED
     sources/pdfsnapper.h
     sources/pdfstructuretree.cpp
     sources/pdfstructuretree.h
+    sources/pdfchinesefold.cpp
+    sources/pdfchinesefold.h
     sources/pdftextlayout.cpp
     sources/pdftextlayout.h
     sources/pdftransparencyrenderer.cpp

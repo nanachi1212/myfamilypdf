@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdftextlayout.h"
+#include "pdfchinesefold.h"
 #include "pdfutils.h"
 #include "pdfexecutionpolicy.h"
 #include "pdfcms.h"
@@ -1273,11 +1274,14 @@ PDFFindResults PDFTextFlow::find(const QString& text, Qt::CaseSensitivity caseSe
 {
     PDFFindResults results;
 
-    int index = m_text.indexOf(text, 0, caseSensitivity);
+    // Traditional and Simplified Chinese match each other; folding keeps every character in place.
+    const QString flowText = foldChineseScript(m_text);
+    const QString foldedText = foldChineseScript(text);
+    int index = flowText.indexOf(foldedText, 0, caseSensitivity);
     while (index != -1)
     {
         PDFFindResult result;
-        result.matched = text;
+        result.matched = m_text.mid(index, text.length());
         result.textSelectionItems = getTextSelectionItems(index, text.length());
         result.context = getContext(index, text.length());
 
@@ -1286,7 +1290,7 @@ PDFFindResults PDFTextFlow::find(const QString& text, Qt::CaseSensitivity caseSe
             results.emplace_back(qMove(result));
         }
 
-        index = m_text.indexOf(text, index + 1, caseSensitivity);
+        index = flowText.indexOf(foldedText, index + 1, caseSensitivity);
     }
 
     return results;
@@ -1296,7 +1300,9 @@ PDFFindResults PDFTextFlow::find(const QRegularExpression& expression) const
 {
     PDFFindResults results;
 
-    QRegularExpressionMatchIterator iterator = expression.globalMatch(m_text, 0, QRegularExpression::NormalMatch, QRegularExpression::NoMatchOption);
+    // Traditional and Simplified Chinese match each other, as in the plain text search.
+    const QRegularExpression foldedExpression(foldChineseScript(expression.pattern()), expression.patternOptions());
+    QRegularExpressionMatchIterator iterator = foldedExpression.globalMatch(foldChineseScript(m_text), 0, QRegularExpression::NormalMatch, QRegularExpression::NoMatchOption);
     while (iterator.hasNext())
     {
         QRegularExpressionMatch match = iterator.next();
@@ -1306,7 +1312,7 @@ PDFFindResults PDFTextFlow::find(const QRegularExpression& expression) const
         const int length = match.capturedLength();
 
         PDFFindResult result;
-        result.matched = match.captured();
+        result.matched = m_text.mid(index, length);
         result.textSelectionItems = getTextSelectionItems(index, length);
         result.context = getContext(index, length);
 
