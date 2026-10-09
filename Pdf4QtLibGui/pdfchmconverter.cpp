@@ -21,6 +21,8 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QStringDecoder>
+#include <QAbstractTextDocumentLayout>
+#include <QPalette>
 #include <QTextDocument>
 #include <QUrl>
 
@@ -529,6 +531,21 @@ QString htmlUnescape(QString text)
     return text;
 }
 
+/// Paper colors. The default context takes the application palette, which in the dark theme
+/// paints white text onto the white page.
+QAbstractTextDocumentLayout::PaintContext paintContext(const QRectF& clip)
+{
+    QAbstractTextDocumentLayout::PaintContext context;
+    context.clip = clip;
+    context.palette.setColor(QPalette::Text, Qt::black);
+    context.palette.setColor(QPalette::WindowText, Qt::black);
+    context.palette.setColor(QPalette::Base, Qt::white);
+    context.palette.setColor(QPalette::Window, Qt::white);
+    context.palette.setColor(QPalette::Link, QColor(0, 0, 238));
+    context.palette.setColor(QPalette::LinkVisited, QColor(85, 26, 139));
+    return context;
+}
+
 bool isHtml(const QString& path)
 {
     return path.endsWith(QLatin1String(".htm"), Qt::CaseInsensitive) || path.endsWith(QLatin1String(".html"), Qt::CaseInsensitive);
@@ -911,6 +928,7 @@ QString PDFChmConverter::cachedPdfPath(const QString& chmFileName)
     hash.addData(info.absoluteFilePath().toLower().toUtf8());
     hash.addData(QByteArray::number(info.size()));
     hash.addData(QByteArray::number(info.lastModified().toMSecsSinceEpoch()));
+    hash.addData(QByteArrayLiteral("converter 2"));    // Bump when the output changes, so old conversions are redone
     const QString directory = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/chm/") + QString::fromLatin1(hash.result().toHex().left(16));
     return directory + QLatin1Char('/') + info.completeBaseName() + QStringLiteral(".pdf");
 }
@@ -1014,7 +1032,9 @@ QString PDFChmConverter::convertToPdf(const QString& chmFileName, const QString&
                 }
                 painter.save();
                 painter.translate(0, -page * pageSize.height());
-                document.drawContents(&painter, QRectF(QPointF(0, page * pageSize.height()), pageSize));
+                const QRectF clip(QPointF(0, page * pageSize.height()), pageSize);
+                painter.setClipRect(clip);
+                document.documentLayout()->draw(&painter, paintContext(clip));
                 painter.restore();
                 ++pageCount;
             }
