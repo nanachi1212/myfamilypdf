@@ -27,6 +27,7 @@
 #include "pdfbookmarkmanager.h"
 #include "pdfbookmarkmodel.h"
 
+#include <QPointer>
 #include <QStyledItemDelegate>
 
 namespace pdfviewer
@@ -53,7 +54,7 @@ private:
 
     QString getPageText(const PDFBookmarkManager::Bookmark& bookmark) const;
 
-    PDFBookmarkManager* m_bookmarkManager = nullptr;
+    QPointer<PDFBookmarkManager> m_bookmarkManager;  // Cleared when the controller deletes the manager first
 };
 
 }   // namespace pdfviewer

@@ -451,9 +451,12 @@ void ViewerContextMenuTest::searchExperience()
     dialog = window->findChild<QDialog*>("findDialog");
     query = dialog->findChild<QLineEdit*>("findQuery");
     status = dialog->findChild<QLabel*>("findStatus");
-    query->setText(QStringLiteral("中文搜尋"));
+    query->setText(QString::fromUtf8("\xE4\xB8\xAD\xE6\x96\x87\xE6\x90\x9C\xE5\xB0\x8B"));
     QTRY_COMPARE(status->text(), QString("1 / 4"));
-    query->setText(QStringLiteral("中文搜尋 2026"));
+    query->setText(QString::fromUtf8("\xE4\xB8\xAD\xE6\x96\x87\xE6\x90\x9C\xE5\xB0\x8B\x20\x32\x30\x32\x36"));
+    QTRY_COMPARE(status->text(), QString("1 / 2"));
+    // The document is in Traditional Chinese; the Simplified query finds the same text.
+    query->setText(QString::fromUtf8("\xE4\xB8\xAD\xE6\x96\x87\xE6\x90\x9C\xE5\xAF\xBB\x20\x32\x30\x32\x36"));
     QTRY_COMPARE(status->text(), QString("1 / 2"));
     dialog->reject();
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
@@ -749,7 +752,7 @@ void ViewerContextMenuTest::searchWarmCacheBenchmark()
     auto* dialog = m_window->findChild<QDialog*>("findDialog");
     auto* query = dialog->findChild<QLineEdit*>("findQuery");
     auto* status = dialog->findChild<QLabel*>("findStatus");
-    for (const QString& phrase : {QStringLiteral("alpha"), QStringLiteral("alpha"), QStringLiteral("中文搜尋"), QStringLiteral("EndNeedle"), QStringLiteral("ABC")})
+    for (const QString& phrase : {QStringLiteral("alpha"), QStringLiteral("alpha"), QString::fromUtf8("\xE4\xB8\xAD\xE6\x96\x87\xE6\x90\x9C\xE5\xB0\x8B"), QStringLiteral("EndNeedle"), QStringLiteral("ABC")})
     {
         query->clear();
         QElapsedTimer timer; timer.start();
@@ -3121,7 +3124,38 @@ void ViewerContextMenuTest::chineseScriptFolding()
     QCOMPARE(pdf::foldChineseScript(traditional).size(), traditional.size());
     QCOMPARE(pdf::foldChineseScript(simplified), simplified);
     QCOMPARE(pdf::foldChineseScript(QStringLiteral("Page 12 abc")), QStringLiteral("Page 12 abc"));
+
+    const QString documentText = QString::fromUtf8("\xE6\xA0\xBC\xE6\x93\x8B\xE5\xB0\x88\xE5\xAE\xB6\x2F\xE6\xA0\xBC\xE6\x8C\xA1\xE4\xB8\x93\xE5\xAE\xB6");
+    pdf::PDFTextLayout layout;
+    for (qsizetype index = 0; index < documentText.size(); ++index)
+    {
+        pdf::PDFTextCharacterInfo info;
+        info.character = documentText.at(index);
+        info.advance = 12.0;
+        info.fontSize = 12.0;
+        info.matrix = QTransform::fromTranslate(index * info.advance, 0.0);
+        info.outline.addRect(QRectF(0.0, 0.0, 10.0, 12.0));
+        layout.addCharacter(info);
+    }
+    layout.perform();
+    const pdf::PDFTextFlows flows = pdf::PDFTextFlow::createTextFlows(layout, pdf::PDFTextFlow::FlowFlags(), 0);
+    QCOMPARE(flows.size(), size_t(1));
+    const pdf::PDFTextFlow& flow = flows.front();
+    QVERIFY(flow.getText().startsWith(documentText));
+
+    const pdf::PDFFindResults simplifiedQuery = flow.find(QString::fromUtf8("\xE6\xA0\xBC\xE6\x8C\xA1\xE4\xB8\x93\xE5\xAE\xB6"), Qt::CaseSensitive);
+    QCOMPARE(simplifiedQuery.size(), size_t(2));
+    QCOMPARE(simplifiedQuery[0].matched, QString::fromUtf8("\xE6\xA0\xBC\xE6\x93\x8B\xE5\xB0\x88\xE5\xAE\xB6"));
+    QCOMPARE(simplifiedQuery[1].matched, QString::fromUtf8("\xE6\xA0\xBC\xE6\x8C\xA1\xE4\xB8\x93\xE5\xAE\xB6"));
+
+    const pdf::PDFFindResults traditionalQuery = flow.find(QString::fromUtf8("\xE6\xA0\xBC\xE6\x93\x8B\xE5\xB0\x88\xE5\xAE\xB6"), Qt::CaseSensitive);
+    QCOMPARE(traditionalQuery.size(), size_t(2));
+    const QRegularExpression simplifiedPattern(QString::fromUtf8("\xE6\xA0\xBC\xE6\x8C\xA1\xE4\xB8\x93\xE5\xAE\xB6"));
+    const QRegularExpression traditionalPattern(QString::fromUtf8("\xE6\xA0\xBC\xE6\x93\x8B\xE5\xB0\x88\xE5\xAE\xB6"));
+    QCOMPARE(flow.find(simplifiedPattern).size(), size_t(2));
+    QCOMPARE(flow.find(traditionalPattern).size(), size_t(2));
 }
+
 
 void ViewerContextMenuTest::chmSampleFile()
 {

@@ -7,6 +7,7 @@
 
 #include "pdfbookmarkmanager.h"
 
+#include <QPointer>
 #include <QAbstractItemModel>
 
 namespace pdfviewer
@@ -41,7 +42,7 @@ private:
     int getFolderBookmarkIndex(int folderIndex, int childRow) const;
     int getRootRowForBookmark(int bookmarkIndex) const;
 
-    PDFBookmarkManager* m_bookmarkManager = nullptr;
+    QPointer<PDFBookmarkManager> m_bookmarkManager;  // Cleared when the controller deletes the manager first
 };
 
 } // namespace pdfviewer
