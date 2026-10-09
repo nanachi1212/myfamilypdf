@@ -105,9 +105,9 @@ Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.chm\shell\FamilyPD
 #ifndef UpgradeVerificationBuild
 #ifndef ShellVerificationBuild
 [Icons]
-Name: "{group}\FamilyPDF 編輯器"; Filename: "{app}\Pdf4QtEditor.exe"; WorkingDir: "{app}"
+Name: "{group}\FamilyPDF 編輯器"; Filename: "{app}\Pdf4QtEditor.exe"; WorkingDir: "{app}"; IconFilename: "{app}\FamilyPDF.ico"
 Name: "{group}\{cm:CompareShortcut}"; Filename: "{app}\Pdf4QtDiff.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\FamilyPDF"; Filename: "{app}\Pdf4QtEditor.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\FamilyPDF"; Filename: "{app}\Pdf4QtEditor.exe"; WorkingDir: "{app}"; IconFilename: "{app}\FamilyPDF.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\Pdf4QtEditor.exe"; Description: "{cm:LaunchProgram,FamilyPDF}"; Flags: nowait postinstall skipifsilent
