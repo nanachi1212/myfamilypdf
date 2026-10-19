@@ -2240,9 +2240,10 @@ PDFSecurityHandlerPointer PDFSecurityHandlerFactory::createSecurityHandler(const
 
     PDFSecurityHandlerPointer handlerPointer(handler);
 
+    // Verify the handler with the same owner password used to create it (empty owner password falls back to the user password)
     bool firstTry = true;
     const bool isPublicKeySecurity = settings.algorithm == Algorithm::Certificate;
-    auto passwordCallback = [isPublicKeySecurity, &settings, &firstTry](bool* b) { *b = firstTry; firstTry = false; return !isPublicKeySecurity ? settings.ownerPassword : settings.userPassword; };
+    auto passwordCallback = [isPublicKeySecurity, &settings, &firstTry](bool* b) { *b = firstTry; firstTry = false; return !isPublicKeySecurity ? (settings.ownerPassword.isEmpty() ? settings.userPassword : settings.ownerPassword) : settings.userPassword; };
     handler->authenticate(passwordCallback, !isPublicKeySecurity);
     if (handler->getAuthorizationResult() == PDFSecurityHandler::AuthorizationResult::OwnerAuthorized ||
         (isPublicKeySecurity && handler->getAuthorizationResult() == PDFSecurityHandler::AuthorizationResult::UserAuthorized))
