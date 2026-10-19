@@ -1035,6 +1035,7 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
             const qint64 bufferSize = qint64(rowStride) * qint64(height);
             if (bufferSize > std::numeric_limits<int>::max())
             {
+                jpeg_destroy_decompress(&codec);
                 throw PDFException(PDFTranslationContext::tr("JPEG (DCT) image is too large."));
             }
 

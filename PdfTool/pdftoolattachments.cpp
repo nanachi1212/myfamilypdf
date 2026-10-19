@@ -25,6 +25,8 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QDir>
+#include <QSet>
 #include <QMimeDatabase>
 
 namespace pdftool
@@ -163,6 +165,7 @@ int PDFToolAttachmentsApplication::execute(const PDFToolOptions& options)
             return ErrorInvalidArguments;
         }
 
+        QSet<QString> savedOutputFiles;
         for (const FileInfo& info : embeddedFiles)
         {
             if (!info.isSaved)
@@ -188,6 +191,21 @@ int PDFToolAttachmentsApplication::execute(const PDFToolOptions& options)
             {
                 outputFile = QString("%1/%2").arg(options.attachmentsOutputDirectory, outputFile);
             }
+
+            // Different attachments can have the same bare name (a/x.txt, b/x.txt),
+            // don't overwrite a file already saved by this run.
+            if (savedOutputFiles.contains(outputFile))
+            {
+                const QFileInfo outputFileInfo(outputFile);
+                const QString suffix = outputFileInfo.completeSuffix().isEmpty() ? QString() : "." + outputFileInfo.completeSuffix();
+                QString uniqueOutputFile;
+                for (int index = 2; uniqueOutputFile.isEmpty() || savedOutputFiles.contains(uniqueOutputFile); ++index)
+                {
+                    uniqueOutputFile = outputFileInfo.dir().filePath(QString("%1 (%2)%3").arg(outputFileInfo.baseName()).arg(index).arg(suffix));
+                }
+                outputFile = uniqueOutputFile;
+            }
+            savedOutputFiles.insert(outputFile);
 
             try
             {
