@@ -897,6 +897,7 @@ QStringList PDFWidgetFormManager::getMissingRequiredFields() const
 
 void PDFWidgetFormManager::clearEditors()
 {
+    m_mouseGrabInfo = MouseGrabInfo();
     qDeleteAll(m_widgetEditors);
     m_widgetEditors.clear();
 }
@@ -2015,6 +2016,11 @@ void PDFListBoxPseudowidget::setSelection(std::set<int> selection, bool force)
     // but we do it only, when widget loses focus (so no need to update appearance often).
     // I hope it will be OK.
 
+    for (auto it = selection.begin(); it != selection.end();)
+    {
+        if (*it < 0 || size_t(*it) >= m_options.size()) it = selection.erase(it);
+        else ++it;
+    }
     m_selection = qMove(selection);
 }
 
@@ -2073,6 +2079,8 @@ void PDFListBoxPseudowidget::setCurrentItem(int index, Qt::KeyboardModifiers mod
             indexTo = qMax(index, m_currentIndex);
         }
 
+        indexFrom = getValidIndex(indexFrom);
+        indexTo = getValidIndex(indexTo);
         for (int i = indexFrom; i <= indexTo; ++i)
         {
             newSelection.insert(i);
@@ -2324,7 +2332,12 @@ std::set<int> PDFFormFieldListBoxEditor::getSelectedItems(PDFObject value, PDFOb
     else
     {
         std::sort(indicesVector.begin(), indicesVector.end());
-        std::copy(indicesVector.cbegin(), indicesVector.cend(), std::inserter(result, result.cend()));
+        const auto* parentField = dynamic_cast<const PDFFormFieldChoice*>(m_formWidget.getParent());
+        for (PDFInteger index : indicesVector)
+        {
+            if (parentField && index >= 0 && quint64(index) < parentField->getOptions().size())
+                result.insert(static_cast<int>(index));
+        }
     }
 
     return result;

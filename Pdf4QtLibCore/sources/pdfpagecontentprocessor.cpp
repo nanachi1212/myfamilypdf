@@ -789,6 +789,11 @@ void PDFPageContentProcessor::processForm(const QTransform& matrix,
                                           const QByteArray& content,
                                           PDFInteger formStructuralParent)
 {
+    if (m_formDepth >= 64)
+    {
+        throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("Form nesting is too deep."));
+    }
+    PDFTemporaryValueChange depthGuard(&m_formDepth, m_formDepth + 1);
     if (isContentKindSuppressed(ContentKind::Forms))
     {
         // Process of forms is suppressed

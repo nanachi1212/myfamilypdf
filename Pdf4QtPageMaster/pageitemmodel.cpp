@@ -1833,7 +1833,9 @@ QString PageItemModel::getGroupNameFromDocument(int index, bool useTitle) const
         return tr("Page Group");
     }
 
-    const DocumentItem& item = m_documents.at(index);
+    const auto documentIt = m_documents.find(index);
+    if (documentIt == m_documents.end()) return tr("Page Group");
+    const DocumentItem& item = documentIt->second;
 
     if (useTitle)
     {

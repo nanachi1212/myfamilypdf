@@ -728,7 +728,7 @@ void PDFDocumentSanitizer::performSanitizeFileAttachments()
     {
         PDFObject namesObject = builder.getObject(catalogDictionary->get("Names"));
         const PDFDictionary* namesDictionary = builder.getDictionaryFromObject(namesObject);
-        if (namesDictionary->hasKey("EmbeddedFiles"))
+        if (namesDictionary && namesDictionary->hasKey("EmbeddedFiles"))
         {
             PDFDictionary dictionaryCopy = *namesDictionary;
             dictionaryCopy.setEntry(PDFInplaceOrMemoryString("EmbeddedFiles"), PDFObject());
@@ -760,7 +760,7 @@ void PDFDocumentSanitizer::performSanitizeEmbeddedSearchIndex()
     {
         PDFObject pieceInfoObject = builder.getObject(catalogDictionary->get("PieceInfo"));
         const PDFDictionary* pieceInfoDictionary = builder.getDictionaryFromObject(pieceInfoObject);
-        if (pieceInfoDictionary->hasKey("SearchIndex"))
+        if (pieceInfoDictionary && pieceInfoDictionary->hasKey("SearchIndex"))
         {
             PDFDictionary dictionaryCopy = *pieceInfoDictionary;
             dictionaryCopy.setEntry(PDFInplaceOrMemoryString("SearchIndex"), PDFObject());
@@ -924,7 +924,7 @@ void PDFDocumentSanitizer::removeAnnotations(const std::function<bool (const PDF
         for (const PDFObjectReference& annotationReference : annotationReferences)
         {
             PDFAnnotationPtr annotation = PDFAnnotation::parse(&m_storage, annotationReference);
-            if (filter(annotation.get()))
+            if (annotation && filter(annotation.get()))
             {
                 annotationsToBeRemoved.emplace_back(pageReference, annotationReference);
             }

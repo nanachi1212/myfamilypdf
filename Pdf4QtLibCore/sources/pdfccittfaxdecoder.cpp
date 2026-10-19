@@ -297,6 +297,11 @@ PDFCCITTFaxDecoder::PDFCCITTFaxDecoder(const QByteArray* stream, const PDFCCITTF
 
 PDFImageData PDFCCITTFaxDecoder::decode()
 {
+    // Rows == 0 is valid for streams terminated by an end-of-block marker.
+    if (m_parameters.columns <= 0 || m_parameters.columns > 65536 || m_parameters.rows < 0 || m_parameters.rows > 65536)
+    {
+        throw PDFException(PDFTranslationContext::tr("Invalid CCITT image dimensions."));
+    }
     PDFBitWriter writer(1);
     std::vector<int> codingLine;
     std::vector<int> referenceLine;

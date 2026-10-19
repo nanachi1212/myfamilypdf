@@ -291,9 +291,8 @@ PDFCertificateInfo PDFCertificateInfo::getCertificateInfo(x509_st* certificate)
         info.setNotValidBefore(getDateTimeFromASN(notBeforeTime));
         info.setNotValidAfter(getDateTimeFromASN(notAfterTime));
 
-        X509_PUBKEY* publicKey = X509_get_X509_PUBKEY(certificate);
-        EVP_PKEY* evpKey = X509_PUBKEY_get(publicKey);
-        const int keyType = EVP_PKEY_type(EVP_PKEY_base_id(evpKey));
+        EVP_PKEY* evpKey = X509_get0_pubkey(certificate);
+        const int keyType = evpKey ? EVP_PKEY_type(EVP_PKEY_base_id(evpKey)) : EVP_PKEY_NONE;
 
         PDFCertificateInfo::PublicKey key = PDFCertificateInfo::KeyUnknown;
         switch (keyType)
@@ -319,7 +318,7 @@ PDFCertificateInfo PDFCertificateInfo::getCertificateInfo(x509_st* certificate)
         }
         info.setPublicKey(key);
 
-        const int bits = EVP_PKEY_bits(evpKey);
+        const int bits = evpKey ? EVP_PKEY_bits(evpKey) : 0;
         info.setKeySize(bits);
 
         uint32_t keyUsage = X509_get_key_usage(certificate);

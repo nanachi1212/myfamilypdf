@@ -1165,6 +1165,7 @@ private:
     std::set<QString> m_onceReportedErrors;
 
     /// Active structural parent key
+    int m_formDepth = 0;
     PDFInteger m_structuralParentKey;
 };
 

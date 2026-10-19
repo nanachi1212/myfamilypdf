@@ -188,7 +188,13 @@ bool SaneScannerBackend::setOptionInt(SANE_Handle handle, const char* name, int 
     }
 
     const SANE_Option_Descriptor* descriptor = sane_get_option_descriptor(handle, option);
-    if (descriptor && descriptor->type == SANE_TYPE_FIXED)
+    if (!descriptor || descriptor->size != sizeof(SANE_Word) ||
+        (descriptor->type != SANE_TYPE_INT && descriptor->type != SANE_TYPE_FIXED) ||
+        !SANE_OPTION_IS_SETTABLE(descriptor->cap))
+    {
+        return false;
+    }
+    if (descriptor->type == SANE_TYPE_FIXED)
     {
         SANE_Fixed saneValue = SANE_FIX(value);
         return sane_control_option(handle, option, SANE_ACTION_SET_VALUE, &saneValue, nullptr) == SANE_STATUS_GOOD;
@@ -260,8 +266,19 @@ QImage SaneScannerBackend::readImage(SANE_Handle handle, int dpi, QString* error
         return QImage();
     }
 
-    QByteArray rawData(parameters.bytes_per_line * parameters.lines, Qt::Uninitialized);
-    int offset = 0;
+    const bool gray8 = parameters.format == SANE_FRAME_GRAY && parameters.depth == 8;
+    const bool mono = parameters.format == SANE_FRAME_GRAY && parameters.depth == 1;
+    const bool rgb8 = parameters.format == SANE_FRAME_RGB && parameters.depth == 8;
+    const qint64 rowBytes = mono ? (qint64(parameters.pixels_per_line) + 7) / 8 : qint64(parameters.pixels_per_line) * (rgb8 ? 3 : 1);
+    const qint64 bufferBytes = qint64(parameters.bytes_per_line) * parameters.lines;
+    if ((!gray8 && !mono && !rgb8) || parameters.bytes_per_line <= 0 || parameters.bytes_per_line < rowBytes ||
+        bufferBytes <= 0 || bufferBytes > 512 * 1024 * 1024)
+    {
+        if (errorMessage) *errorMessage = QObject::tr("The scanner reported invalid image parameters.");
+        return QImage();
+    }
+    QByteArray rawData(qsizetype(bufferBytes), char(0));
+    qsizetype offset = 0;
     while (offset < rawData.size())
     {
         SANE_Int bytesRead = 0;
@@ -278,7 +295,7 @@ QImage SaneScannerBackend::readImage(SANE_Handle handle, int dpi, QString* error
             }
             return QImage();
         }
-        if (bytesRead <= 0)
+        if (bytesRead <= 0 || bytesRead > rawData.size() - offset)
         {
             break;
         }
@@ -286,13 +303,26 @@ QImage SaneScannerBackend::readImage(SANE_Handle handle, int dpi, QString* error
         offset += bytesRead;
     }
 
+    if (offset < rawData.size())
+    {
+        // ADF devices can finish a short page early. Keep only complete received rows.
+        const qsizetype completeRows = offset / parameters.bytes_per_line;
+        if (completeRows == 0)
+        {
+            if (errorMessage) *errorMessage = QObject::tr("The scanner returned an incomplete image.");
+            return QImage();
+        }
+        parameters.lines = static_cast<SANE_Int>(completeRows);
+        rawData.truncate(completeRows * parameters.bytes_per_line);
+    }
     QImage image;
     if (parameters.format == SANE_FRAME_GRAY && parameters.depth == 8)
     {
         image = QImage(parameters.pixels_per_line, parameters.lines, QImage::Format_Grayscale8);
+        if (image.isNull()) return QImage();
         for (int y = 0; y < parameters.lines; ++y)
         {
-            memcpy(image.scanLine(y), rawData.constData() + y * parameters.bytes_per_line, parameters.pixels_per_line);
+            memcpy(image.scanLine(y), rawData.constData() + qsizetype(y) * parameters.bytes_per_line, parameters.pixels_per_line);
         }
     }
     else if (parameters.format == SANE_FRAME_GRAY && parameters.depth == 1)
@@ -306,9 +336,10 @@ QImage SaneScannerBackend::readImage(SANE_Handle handle, int dpi, QString* error
     else if (parameters.format == SANE_FRAME_RGB && parameters.depth == 8)
     {
         image = QImage(parameters.pixels_per_line, parameters.lines, QImage::Format_RGB888);
+        if (image.isNull()) return QImage();
         for (int y = 0; y < parameters.lines; ++y)
         {
-            memcpy(image.scanLine(y), rawData.constData() + y * parameters.bytes_per_line, parameters.pixels_per_line * 3);
+            memcpy(image.scanLine(y), rawData.constData() + qsizetype(y) * parameters.bytes_per_line, parameters.pixels_per_line * 3);
         }
     }
     else

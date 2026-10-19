@@ -88,7 +88,7 @@ PDFFunctionPtr PDFFunction::createFunctionImpl(const PDFDocument* document, cons
     std::vector<PDFReal> range = loader.readNumberArrayFromDictionary(dictionary, "Range");
 
     // Domain is required for all function
-    if (domain.empty())
+    if (domain.empty() || domain.size() % 2 != 0 || range.size() % 2 != 0)
     {
         throw PDFException(PDFParsingContext::tr("Fuction has invalid domain."));
     }
@@ -142,7 +142,7 @@ PDFFunctionPtr PDFFunction::createFunctionImpl(const PDFDocument* document, cons
                 throw PDFException(PDFParsingContext::tr("Sampled function hasn't any output."));
             }
 
-            if (domain.size() != encode.size())
+            if (domain.size() != 2 * m || encode.size() != 2 * m)
             {
                 throw PDFException(PDFParsingContext::tr("Sampled function has invalid encode array."));
             }
@@ -221,6 +221,10 @@ PDFFunctionPtr PDFFunction::createFunctionImpl(const PDFDocument* document, cons
             // Determine n.
             uint32_t n = static_cast<uint32_t>(std::max({ static_cast<size_t>(1), range.size() / 2, c0.size(), c1.size() }));
 
+            if (!range.empty() && range.size() != 2 * size_t(n))
+            {
+                throw PDFException(PDFParsingContext::tr("Invalid function range size."));
+            }
             // Resolve default values
             if (c0.empty())
             {
@@ -302,6 +306,10 @@ PDFFunctionPtr PDFFunction::createFunctionImpl(const PDFDocument* document, cons
                         }
                     }
 
+                    if (!range.empty() && range.size() != 2 * size_t(n))
+                    {
+                        throw PDFException(PDFParsingContext::tr("Invalid function range size."));
+                    }
                     return std::make_shared<PDFStitchingFunction>(1, n, std::move(domain), std::move(range), std::move(partialFunctions));
                 }
                 else

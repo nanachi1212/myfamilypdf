@@ -165,8 +165,9 @@ QString ItemPropertiesDialog::getRotationText(pdf::PageRotation rotation) const
 
 void ItemPropertiesDialog::setValueLabelText(QLabel* label, const QString& text) const
 {
+    label->setTextFormat(Qt::PlainText);
     label->setText(text);
-    label->setToolTip(text);
+    label->setToolTip(text.toHtmlEscaped());
     label->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
 }
 

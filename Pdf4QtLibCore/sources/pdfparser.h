@@ -345,6 +345,7 @@ private:
     /// Lexical analyzer for scanning tokens
     PDFLexicalAnalyzer m_lexicalAnalyzer;
 
+    int m_parseDepth = 0;
     PDFLexicalAnalyzer::Token m_lookAhead1;
     PDFLexicalAnalyzer::Token m_lookAhead2;
 };

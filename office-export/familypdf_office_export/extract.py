@@ -5,6 +5,8 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+import math
+
 import pdfplumber
 
 from .model import (
@@ -278,8 +280,12 @@ def _extract_images(
     if not page.images:
         return [], []
 
+    pixels = float(page.width) * float(page.height) * 4
+    if not math.isfinite(pixels) or pixels <= 0 or pixels > 50_000_000:
+        return [], [f"Page {page_number} image rendering exceeds the 50 MP limit."]
+
     try:
-        rendered = page.to_image(resolution=144).original.convert("RGB")
+        rendered = page.to_image(resolution=144).original
     except Exception as error:
         return [], [
             f"Page {page_number} images could not be rendered: {error}"

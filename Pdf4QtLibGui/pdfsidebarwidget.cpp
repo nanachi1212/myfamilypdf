@@ -612,12 +612,14 @@ void PDFSidebarWidget::updateSignatures(const std::vector<pdf::PDFSignatureVerif
 
         const bool verified = signature.isSignatureValid();
         const bool invalid = signature.hasSignatureError();
-        const QString validity = verified ? tr("Valid") : invalid ? tr("Invalid") : tr("Unknown");
+        const bool hasWarnings = signature.hasWarning();
+        const QString validity = invalid ? tr("Invalid") : hasWarnings ? tr("Warnings - review required") : verified ? tr("Valid") : tr("Unknown");
         const QString trust = signature.isCertificateValid() ? tr("Trusted")
             : signature.hasCertificateError() ? tr("Untrusted") : tr("Unknown");
         rootItem->setText(0, text + QStringLiteral(" — ") + validity + QStringLiteral(" / ") + trust);
-        rootItem->setIcon(0, invalid ? errorIcon : verified && signature.isCertificateValid() ? okIcon : warningIcon);
-        new QTreeWidgetItem(rootItem, QStringList(tr("Cryptographic signature: %1").arg(validity)));
+        rootItem->setIcon(0, invalid ? errorIcon : hasWarnings ? warningIcon : verified && signature.isCertificateValid() ? okIcon : warningIcon);
+        const QString cryptographicValidity = verified ? tr("Valid") : invalid ? tr("Invalid") : tr("Unknown");
+        new QTreeWidgetItem(rootItem, QStringList(tr("Cryptographic signature: %1").arg(cryptographicValidity)));
         new QTreeWidgetItem(rootItem, QStringList(tr("Certificate trust: %1").arg(trust)));
         new QTreeWidgetItem(rootItem, QStringList(tr("Field: %1").arg(signature.getSignatureFieldQualifiedName())));
         if (signature.hasFlag(pdf::PDFSignatureVerificationResult::Warning_Signature_NotCoveredBytes))
@@ -862,7 +864,7 @@ void PDFSidebarWidget::updateNotes()
                     auto* item = new QStandardItem(QIcon(":/resources/bubble.svg"), caption);
                     item->setData(int(m_markupAnnotations.size()), Qt::UserRole);
                     item->setData(contents, Qt::UserRole + 1);
-                    item->setToolTip(contents);
+                    item->setToolTip(contents.toHtmlEscaped());
                     item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
                     m_markupAnnotations.emplace_back(reference, pageIndex);
                     m_notesTreeModel->appendRow(item);

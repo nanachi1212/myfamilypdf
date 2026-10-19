@@ -253,13 +253,13 @@ void ObjectViewerWidget::updateUi()
                 QByteArray dataToBeAdjusted = m_document->getDecodedStream(stream);
                 dataToBeAdjusted.replace('\r', ' ');
                 QByteArray percentEncodedData = dataToBeAdjusted.toPercentEncoding(m_printableCharacters);
-                ui->contentTextBrowser->setText(QString::fromLatin1(percentEncodedData));
+                ui->contentTextBrowser->setPlainText(QString::fromLatin1(percentEncodedData));
                 ui->stackedWidget->setCurrentWidget(ui->contentTextBrowserPage);
             }
         }
         catch (const pdf::PDFException &exception)
         {
-            ui->contentTextBrowser->setText(exception.getMessage());
+            ui->contentTextBrowser->setPlainText(exception.getMessage());
             ui->stackedWidget->setCurrentWidget(ui->contentTextBrowserPage);
         }
     }
@@ -267,7 +267,7 @@ void ObjectViewerWidget::updateUi()
     {
         QByteArray serializedObject = pdf::PDFDocumentWriter::getSerializedObject(m_currentObject);
         QByteArray percentEncodedData = serializedObject.toPercentEncoding(m_printableCharacters);
-        ui->contentTextBrowser->setText(QString::fromLatin1(percentEncodedData));
+        ui->contentTextBrowser->setPlainText(QString::fromLatin1(percentEncodedData));
         ui->stackedWidget->setCurrentWidget(ui->contentTextBrowserPage);
     }
 }

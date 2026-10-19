@@ -77,7 +77,8 @@ void OutputPreviewWidget::setPageImage(QImage image, pdf::PDFFloatBitmapWithColo
     if (m_imagePointUnderCursor.has_value())
     {
         QPoint point = m_imagePointUnderCursor.value();
-        if (point.x() >= image.width() || point.y() >= image.height())
+        if (point.x() < 0 || point.y() < 0 || point.x() >= m_pageImage.width() || point.y() >= m_pageImage.height() ||
+            point.x() >= m_originalProcessBitmap.getWidth() || point.y() >= m_originalProcessBitmap.getHeight())
         {
             m_imagePointUnderCursor = std::nullopt;
         }
@@ -438,7 +439,11 @@ void OutputPreviewWidget::buildInfoBoxItems()
 
                 QStringList colorValues;
                 colorValues.reserve(pixelFormat.getColorChannelCount());
-                Q_ASSERT(pixelFormat.getColorChannelCount() == separations.size());
+                if (pixelFormat.getColorChannelCount() != separations.size())
+                {
+                    // The mapper changed while the previous asynchronous render is visible.
+                    return;
+                }
 
                 std::vector<QColor> inkColors;
 

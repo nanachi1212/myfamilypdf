@@ -1,4 +1,4 @@
-﻿// MIT License
+// MIT License
 //
 // Copyright (c) 2018-2025 Jakub Melka and Contributors
 //
@@ -428,7 +428,7 @@ PDFSecurityHandlerPointer PDFSecurityHandler::createSecurityHandler(const PDFObj
     }
 
     // Only valid for V == 2 or V == 3, otherwise we set file encryption key length manually
-    int Length = 40;
+    PDFInteger Length = 40;
 
     switch (V)
     {
@@ -439,6 +439,10 @@ PDFSecurityHandlerPointer PDFSecurityHandler::createSecurityHandler(const PDFObj
         case 2:
         case 3:
             Length = parseInt(dictionary, "Length", false, 40);
+            if (Length < 40 || Length > 128 || Length % 8 != 0)
+            {
+                throw PDFException(PDFTranslationContext::tr("Invalid encryption key length."));
+            }
             break;
 
         case 4:
@@ -456,7 +460,7 @@ PDFSecurityHandlerPointer PDFSecurityHandler::createSecurityHandler(const PDFObj
 
     // Create security handler
     handler->m_V = V;
-    handler->m_keyLength = Length;
+    handler->m_keyLength = static_cast<int>(Length);
 
     // Add "Identity" filter to the filters
     CryptFilter identityFilter;
@@ -780,7 +784,22 @@ CryptFilter PDFSecurityHandler::parseCryptFilter(PDFInteger length, const PDFObj
         throw PDFException(PDFTranslationContext::tr("Unsupported authorization event '%1'.").arg(QString::fromLatin1(authEventName)));
     }
 
-    filter.keyLength = parseInt(cryptFilterDictionary, "Length", false, publicKey ? length : length / 8);
+    const PDFInteger encodedLength = parseInt(cryptFilterDictionary, "Length", false, publicKey ? length : length / 8);
+    if (filter.type != CryptFilterType::None)
+    {
+        if (encodedLength <= 0 || encodedLength > (publicKey ? 256 : 32) || (publicKey && encodedLength % 8 != 0))
+        {
+            throw PDFException(PDFTranslationContext::tr("Invalid crypt filter key length."));
+        }
+        const PDFInteger byteLength = publicKey ? encodedLength / 8 : encodedLength;
+        if ((filter.type == CryptFilterType::V2 && (byteLength < 5 || byteLength > 16)) ||
+            (filter.type == CryptFilterType::AESV2 && byteLength != 16) ||
+            (filter.type == CryptFilterType::AESV3 && byteLength != 32))
+        {
+            throw PDFException(PDFTranslationContext::tr("Invalid crypt filter key length."));
+        }
+        filter.keyLength = static_cast<int>(byteLength);
+    }
 
     // Recipients
     filter.recipients = parseRecipients(cryptFilterDictionary);
@@ -840,7 +859,11 @@ std::vector<uint8_t> PDFStandardOrPublicSecurityHandler::createV2_ObjectEncrypti
     std::vector<uint8_t> objectEncryptionKey(MD5_DIGEST_LENGTH, uint8_t(0));
     MD5(inputKeyData.data(), inputKeyData.size(), objectEncryptionKey.data());
 
-    // Use up to (n + 5) bytes, maximally 16, from the digest as object encryption key
+    // Validate before addition and conversion to an allocation size.
+    if (filter.keyLength < 5 || filter.keyLength > 16)
+    {
+        throw PDFException(PDFTranslationContext::tr("Invalid crypt filter key length."));
+    }
     size_t objectEncryptionKeySize = qMin(filter.keyLength + 5, MD5_DIGEST_LENGTH);
     objectEncryptionKey.resize(objectEncryptionKeySize);
 
@@ -1537,7 +1560,7 @@ QByteArray PDFStandardSecurityHandler::createFileEncryptionKey(const QByteArray&
             MD5_Final(fileEncryptionKey.data(), &context);
 
             const int keyByteLength = m_keyLength / 8;
-            if (keyByteLength > MD5_DIGEST_LENGTH)
+            if (keyByteLength < 5 || keyByteLength > MD5_DIGEST_LENGTH)
             {
                 throw PDFException(PDFTranslationContext::tr("Encryption key length (%1) exceeded maximal value of %2.").arg(keyByteLength).arg(MD5_DIGEST_LENGTH));
             }
@@ -1661,7 +1684,7 @@ QByteArray PDFStandardSecurityHandler::createUserPasswordFromOwnerPassword(const
     MD5_Final(hash.data(), &context);
 
     const int keyByteLength = m_keyLength / 8;
-    if (keyByteLength > MD5_DIGEST_LENGTH)
+    if (keyByteLength < 5 || keyByteLength > MD5_DIGEST_LENGTH)
     {
         throw PDFException(PDFTranslationContext::tr("Encryption key length (%1) exceeded maximal value of %2.").arg(keyByteLength).arg(MD5_DIGEST_LENGTH));
     }

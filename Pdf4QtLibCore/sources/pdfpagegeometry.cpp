@@ -154,7 +154,10 @@ public:
             const PDFArray* array = contentObjectDereferenced.getArray();
             for (const PDFObject& object : *array)
             {
-                appendContentReference(builder, contentReferences, object);
+                if (builder->getObject(object).isStream())
+                {
+                    appendContentReference(builder, contentReferences, object);
+                }
             }
         }
     }

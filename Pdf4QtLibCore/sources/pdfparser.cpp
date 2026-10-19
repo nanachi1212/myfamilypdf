@@ -24,7 +24,7 @@
 #include "pdfconstants.h"
 #include "pdfexception.h"
 
-#include <QFile>
+#include <QScopedValueRollback>
 #include <QThread>
 #include <QMetaEnum>
 
@@ -712,6 +712,11 @@ PDFParser::PDFParser(std::function<PDFLexicalAnalyzer::Token ()> tokenFetcher) :
 
 PDFObject PDFParser::getObject()
 {
+    if (m_parseDepth >= 128)
+    {
+        error(tr("PDF object nesting is too deep."));
+    }
+    QScopedValueRollback<int> depthGuard(m_parseDepth, m_parseDepth + 1);
     switch (m_lookAhead1.type)
     {
         case PDFLexicalAnalyzer::TokenType::Boolean:
@@ -869,28 +874,10 @@ PDFObject PDFParser::getObject()
                 m_lexicalAnalyzer.skipStreamStart();
                 QByteArray buffer = m_lexicalAnalyzer.fetchByteArray(length);
 
-                // According to the PDF Reference 1.7, chapter 3.2.7, stream content can also be specified
-                // in the external file. If this is the case, then we must try to load the stream data
-                // from the external file.
+                // Documents must not make the parser access local files or network shares.
                 if (dictionary->hasKey(PDF_STREAM_DICT_FILE_SPECIFICATION))
                 {
-                    PDFObject fileName = m_context ? m_context->getObject(dictionary->get(PDF_STREAM_DICT_FILE_SPECIFICATION)) : dictionary->get(PDF_STREAM_DICT_FILE_SPECIFICATION);
-
-                    if (!fileName.isString())
-                    {
-                        error(tr("Stream data should be in external file, but invalid file name is specified."));
-                    }
-
-                    QFile streamDataFile(fileName.getString());
-                    if (streamDataFile.open(QFile::ReadOnly))
-                    {
-                        buffer = streamDataFile.readAll();
-                        streamDataFile.close();
-                    }
-                    else
-                    {
-                        error(tr("Can't open stream data stored in external file '%1'.").arg(QString(fileName.getString())));
-                    }
+                    error(tr("External stream files are not supported."));
                 }
 
                 // Refill lookahead tokens

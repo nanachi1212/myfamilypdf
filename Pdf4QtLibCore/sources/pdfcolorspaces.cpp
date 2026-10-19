@@ -1,4 +1,4 @@
-﻿// MIT License
+// MIT License
 //
 // Copyright (c) 2018-2025 Jakub Melka and Contributors
 //
@@ -644,7 +644,17 @@ QImage PDFAbstractColorSpace::createAlphaMask(const PDFImageData& softMask)
         throw PDFException(PDFTranslationContext::tr("Invalid size of soft mask."));
     }
 
+    const quint64 requiredBytes = quint64(softMask.getStride()) * softMask.getHeight();
+    if (requiredBytes > quint64(softMask.getData().size()) ||
+        (softMask.getBitsPerComponent() == 8 && softMask.getStride() < softMask.getWidth()))
+    {
+        throw PDFException(PDFTranslationContext::tr("Truncated soft mask data."));
+    }
     QImage image(softMask.getWidth(), softMask.getHeight(), QImage::Format_Alpha8);
+    if (image.isNull())
+    {
+        throw PDFException(PDFTranslationContext::tr("Invalid size of soft mask."));
+    }
 
     unsigned int componentCount = softMask.getComponents();
     if (componentCount != 1)
@@ -2660,8 +2670,12 @@ const unsigned char* PDFImageData::getRow(unsigned int rowIndex) const
 {
     const unsigned char* data = reinterpret_cast<const unsigned char*>(m_data.constData());
 
-    Q_ASSERT(rowIndex < m_height);
-    return data + (rowIndex * m_stride);
+    const quint64 offset = quint64(rowIndex) * m_stride;
+    if (rowIndex >= m_height || offset > quint64(m_data.size()) || m_stride > quint64(m_data.size()) - offset)
+    {
+        throw PDFException(PDFTranslationContext::tr("Invalid image row."));
+    }
+    return data + offset;
 }
 
 bool PDFPatternColorSpace::equals(const PDFAbstractColorSpace* other) const

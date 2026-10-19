@@ -452,7 +452,7 @@ void PDFDocumentReader::processObjectStreams(PDFXRefTable* xrefTable, PDFObjectS
         try
         {
             PDFParsingContext context(objectFetcher);
-            if (objectStreamReference.objectNumber >= static_cast<PDFInteger>(objects.size()))
+            if (objectStreamReference.objectNumber < 0 || objectStreamReference.objectNumber >= static_cast<PDFInteger>(objects.size()))
             {
                 throw PDFException(PDFTranslationContext::tr("Object stream %1 not found.").arg(objectStreamReference.objectNumber));
             }
