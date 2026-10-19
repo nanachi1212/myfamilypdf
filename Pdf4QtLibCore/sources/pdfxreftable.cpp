@@ -32,6 +32,7 @@
 #include "pdfdbgheap.h"
 
 #include <stack>
+#include <limits>
 
 namespace pdf
 {
@@ -291,6 +292,11 @@ void PDFXRefTable::readXRefTable(PDFParsingContext* context, const QByteArray& b
                     {
                         PDFInteger firstObjectNumber = indexArray[2 * i];
                         PDFInteger count = indexArray[2 * i + 1];
+
+                        if (firstObjectNumber < 0 || count < 0 || count > std::numeric_limits<int>::max() - firstObjectNumber)
+                        {
+                            throw PDFException(tr("Invalid format of cross-reference stream - invalid Index entry."));
+                        }
 
                         const PDFInteger lastObjectIndex = firstObjectNumber + count - 1;
                         const PDFInteger currentDesiredSize = lastObjectIndex + 1;

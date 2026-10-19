@@ -1030,12 +1030,27 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
             const unsigned int height = codec.output_height;
             const unsigned int components = codec.output_components;
             const unsigned int bitsPerComponent =  8;
-            QByteArray buffer(rowStride * height, 0);
+
+            // Compute the size in 64-bit, so a huge image can't wrap it around to a small buffer
+            const qint64 bufferSize = qint64(rowStride) * qint64(height);
+            if (bufferSize > std::numeric_limits<int>::max())
+            {
+                jpeg_destroy_decompress(&codec);
+                throw PDFException(PDFTranslationContext::tr("JPEG (DCT) image is too large."));
+            }
+
+            QByteArray buffer(bufferSize, 0);
             JSAMPROW rowData = reinterpret_cast<JSAMPROW>(buffer.data());
 
             while (scanLineCount)
             {
                 JDIMENSION readCount = jpeg_read_scanlines(&codec, samples, 1);
+                if (readCount == 0)
+                {
+                    // Data ended (decoder suspended), stop instead of writing rows past the buffer
+                    break;
+                }
+
                 std::memcpy(rowData, samples[0], rowStride);
                 scanLineCount -= readCount;
                 rowData += rowStride;

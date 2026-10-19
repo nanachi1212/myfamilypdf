@@ -454,6 +454,12 @@ PDFPatternPtr PDFPattern::createShadingPattern(const PDFDictionary* colorSpaceDi
                 }
             }
 
+            const size_t colorComponentCount = colorSpace->getColorComponentCount();
+            if (functions.size() > 1 && colorComponentCount != functions.size())
+            {
+                throw PDFException(PDFTranslationContext::tr("Invalid mesh shading pattern color functions. Expected %1 functions, but %2 provided.").arg(int(colorComponentCount)).arg(int(functions.size())));
+            }
+
             type4567Shading->m_antiAlias = antialias;
             type4567Shading->m_backgroundColor = backgroundColor;
             type4567Shading->m_originalBackgroundColor = qMove(originalBackgroundColor);

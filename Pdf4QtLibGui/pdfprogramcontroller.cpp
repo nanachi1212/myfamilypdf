@@ -1086,8 +1086,30 @@ void PDFProgramController::onActionTriggered(const pdf::PDFAction* action)
                 const pdf::PDFActionLaunch::Win& winSpecification = typedAction->getWinSpecification();
                 if (!winSpecification.file.isEmpty())
                 {
+                    // Strings come from the document. A NUL byte would make the dialog show
+                    // something different from what ShellExecuteA receives, so refuse
+                    // control characters entirely.
+                    auto hasControlCharacters = [](const QByteArray& array)
+                    {
+                        return std::any_of(array.cbegin(), array.cend(), [](char c) { return static_cast<unsigned char>(c) < 0x20 || c == 0x7F; });
+                    };
+
+                    if (hasControlCharacters(winSpecification.file) ||
+                        hasControlCharacters(winSpecification.directory) ||
+                        hasControlCharacters(winSpecification.parameters) ||
+                        hasControlCharacters(winSpecification.operation))
+                    {
+                        QMessageBox::warning(m_mainWindow, tr("Launch application"), tr("Launch action was refused, because it contains invalid characters."));
+                        continue;
+                    }
+
                     QString message = tr("Would you like to launch application '%1' in working directory '%2' with parameters '%3'?").arg(QString::fromLatin1(winSpecification.file), QString::fromLatin1(winSpecification.directory), QString::fromLatin1(winSpecification.parameters));
-                    if (QMessageBox::question(m_mainWindow, tr("Launch application"), message) == QMessageBox::Yes)
+
+                    // Show document-supplied text as plain text, so it can't be restyled or hidden with HTML
+                    QMessageBox questionBox(QMessageBox::Question, tr("Launch application"), message, QMessageBox::Yes | QMessageBox::No, m_mainWindow);
+                    questionBox.setTextFormat(Qt::PlainText);
+                    questionBox.setDefaultButton(QMessageBox::No);
+                    if (questionBox.exec() == QMessageBox::Yes)
                     {
                         auto getStringOrNULL = [](const QByteArray& array) -> LPCSTR
                         {
@@ -1115,7 +1137,10 @@ void PDFProgramController::onActionTriggered(const pdf::PDFAction* action)
                 if (!plaftormFileName.isEmpty())
                 {
                     QString message = tr("Would you like to launch application '%1'?").arg(plaftormFileName);
-                    if (QMessageBox::question(m_mainWindow, tr("Launch application"), message) == QMessageBox::Yes)
+                    QMessageBox questionBox(QMessageBox::Question, tr("Launch application"), message, QMessageBox::Yes | QMessageBox::No, m_mainWindow);
+                    questionBox.setTextFormat(Qt::PlainText);
+                    questionBox.setDefaultButton(QMessageBox::No);
+                    if (questionBox.exec() == QMessageBox::Yes)
                     {
                         const HINSTANCE result = ::ShellExecuteW(NULL, NULL, plaftormFileName.toStdWString().c_str(), NULL, NULL, SW_SHOWNORMAL);
                         if (result <= HINSTANCE(32))

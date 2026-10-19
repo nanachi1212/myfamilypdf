@@ -2113,7 +2113,10 @@ PDFSecurityHandlerPointer PDFSecurityHandlerFactory::createSecurityHandler(const
         standardHandler->m_R = getRevisionFromAlgorithm(settings.algorithm);
         standardHandler->m_permissions = settings.permissions | 0xFFFFF000;
 
-        QByteArray adjustedOwnerPassword = handler->adjustPassword(settings.ownerPassword, standardHandler->m_R);
+        // PDF specification, Algorithm 3, step a): if there is no owner password, use the user password
+        // instead. An empty owner password would let anyone open the document as owner without a password.
+        const QString& ownerPassword = settings.ownerPassword.isEmpty() ? settings.userPassword : settings.ownerPassword;
+        QByteArray adjustedOwnerPassword = handler->adjustPassword(ownerPassword, standardHandler->m_R);
         QByteArray adjustedUserPassword = handler->adjustPassword(settings.userPassword, standardHandler->m_R);
 
         // Generate encryption entries
@@ -2237,9 +2240,10 @@ PDFSecurityHandlerPointer PDFSecurityHandlerFactory::createSecurityHandler(const
 
     PDFSecurityHandlerPointer handlerPointer(handler);
 
+    // Verify the handler with the same owner password used to create it (empty owner password falls back to the user password)
     bool firstTry = true;
     const bool isPublicKeySecurity = settings.algorithm == Algorithm::Certificate;
-    auto passwordCallback = [isPublicKeySecurity, &settings, &firstTry](bool* b) { *b = firstTry; firstTry = false; return !isPublicKeySecurity ? settings.ownerPassword : settings.userPassword; };
+    auto passwordCallback = [isPublicKeySecurity, &settings, &firstTry](bool* b) { *b = firstTry; firstTry = false; return !isPublicKeySecurity ? (settings.ownerPassword.isEmpty() ? settings.userPassword : settings.ownerPassword) : settings.userPassword; };
     handler->authenticate(passwordCallback, !isPublicKeySecurity);
     if (handler->getAuthorizationResult() == PDFSecurityHandler::AuthorizationResult::OwnerAuthorized ||
         (isPublicKeySecurity && handler->getAuthorizationResult() == PDFSecurityHandler::AuthorizationResult::UserAuthorized))
