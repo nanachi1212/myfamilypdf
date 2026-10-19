@@ -254,6 +254,12 @@ QByteArray PDFLzwStreamDecoder::decompress()
 
             for (uint32_t currentCode = code; currentCode != TABLE_SIZE; currentCode = m_table[currentCode].previous)
             {
+                // Corrupted stream can create too long (or cyclic) chains, do not write past the buffer
+                if (m_currentSequenceEnd == m_sequence.end())
+                {
+                    throw PDFException(PDFTranslationContext::tr("Invalid code in the LZW stream."));
+                }
+
                 *m_currentSequenceEnd++ = m_table[currentCode].character;
             }
 
@@ -265,6 +271,11 @@ QByteArray PDFLzwStreamDecoder::decompress()
         {
             // We use the buffer from previous run, just add a new
             // character to the end.
+            if (m_currentSequenceEnd == m_sequence.end())
+            {
+                throw PDFException(PDFTranslationContext::tr("Invalid code in the LZW stream."));
+            }
+
             *m_currentSequenceEnd++ = m_newCharacter;
         }
         else

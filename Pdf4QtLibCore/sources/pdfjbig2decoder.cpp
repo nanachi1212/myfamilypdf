@@ -23,6 +23,9 @@
 #include "pdfjbig2decoder.h"
 #include "pdfexception.h"
 #include "pdfccittfaxdecoder.h"
+
+#include <limits>
+
 #include "pdfdbgheap.h"
 
 namespace pdf
@@ -3646,18 +3649,30 @@ PDFJBIG2Bitmap::PDFJBIG2Bitmap() :
 
 }
 
+/// Returns width * height, computed in 64-bit. Throws, if dimensions are negative or the
+/// pixel count doesn't fit into int (pixel indices are computed in int).
+static int getCheckedPixelCount(int width, int height)
+{
+    const qint64 pixelCount = qint64(width) * qint64(height);
+    if (width < 0 || height < 0 || pixelCount > std::numeric_limits<int>::max())
+    {
+        throw PDFException(PDFTranslationContext::tr("JBIG2 invalid bitmap size (%1 x %2).").arg(width).arg(height));
+    }
+    return int(pixelCount);
+}
+
 PDFJBIG2Bitmap::PDFJBIG2Bitmap(int width, int height) :
     m_width(width),
     m_height(height)
 {
-    m_data.resize(width * height, 0);
+    m_data.resize(getCheckedPixelCount(width, height), 0);
 }
 
 PDFJBIG2Bitmap::PDFJBIG2Bitmap(int width, int height, uint8_t fill) :
     m_width(width),
     m_height(height)
 {
-    m_data.resize(width * height, fill);
+    m_data.resize(getCheckedPixelCount(width, height), fill);
 }
 
 PDFJBIG2Bitmap::~PDFJBIG2Bitmap()
@@ -3690,8 +3705,9 @@ void PDFJBIG2Bitmap::paint(const PDFJBIG2Bitmap& bitmap, int offsetX, int offset
     // Expand, if it is allowed and target bitmap has too low height
     if (expandY && offsetY + bitmap.getHeight() > m_height)
     {
-        m_height = offsetY + bitmap.getHeight();
-        m_data.resize(getPixelCount(), expandPixel);
+        const int newHeight = offsetY + bitmap.getHeight();
+        m_data.resize(getCheckedPixelCount(m_width, newHeight), expandPixel);
+        m_height = newHeight;
     }
 
     // Check out pathological cases

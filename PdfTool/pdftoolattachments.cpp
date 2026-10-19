@@ -24,6 +24,7 @@
 #include "pdfexception.h"
 
 #include <QFile>
+#include <QFileInfo>
 #include <QMimeDatabase>
 
 namespace pdftool
@@ -170,10 +171,17 @@ int PDFToolAttachmentsApplication::execute(const PDFToolOptions& options)
                 continue;
             }
 
-            QString outputFile = info.fileName;
+            // The attachment name comes from the document, so keep only its bare file name.
+            // Otherwise a name like "..\..\x.bat" or "C:\x.bat" could write anywhere.
+            QString outputFile = QFileInfo(info.fileName).fileName();
             if (!options.attachmentsTargetFile.isEmpty())
             {
                 outputFile = options.attachmentsTargetFile;
+            }
+            else if (outputFile.isEmpty() || outputFile == "." || outputFile == "..")
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid attachment file name '%1'.").arg(info.fileName), options.outputCodec);
+                return ErrorFailedWriteToFile;
             }
 
             if (!options.attachmentsOutputDirectory.isEmpty())

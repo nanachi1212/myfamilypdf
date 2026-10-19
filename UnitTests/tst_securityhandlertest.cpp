@@ -6,6 +6,8 @@
 
 #include <QtTest>
 
+#include <memory>
+
 using namespace pdf;
 
 class SecurityHandlerTest : public QObject
@@ -17,6 +19,7 @@ private slots:
     void aesV3UsesFreshInitializationVector();
     void aesV3RejectsTruncatedCiphertext();
     void aesV3RejectsInvalidPadding();
+    void emptyOwnerPasswordDoesNotGrantAccess();
 };
 
 static PDFSecurityHandlerPointer createAes256Handler()
@@ -79,6 +82,29 @@ void SecurityHandlerTest::aesV3RejectsInvalidPadding()
 
     ciphertext[ciphertext.size() - 1] = '\0';
     QVERIFY(handler->decrypt(ciphertext, reference, PDFSecurityHandler::EncryptionScope::Stream).isEmpty());
+}
+
+void SecurityHandlerTest::emptyOwnerPasswordDoesNotGrantAccess()
+{
+    for (const auto algorithm : { PDFSecurityHandlerFactory::RC4, PDFSecurityHandlerFactory::AES_128, PDFSecurityHandlerFactory::AES_256 })
+    {
+        PDFSecurityHandlerFactory::SecuritySettings settings;
+        settings.algorithm = algorithm;
+        settings.encryptContents = PDFSecurityHandlerFactory::All;
+        settings.userPassword = QStringLiteral("family-pdf-user");
+        settings.id = QByteArrayLiteral("family-pdf-security-test-id");
+        const PDFSecurityHandlerPointer handler = PDFSecurityHandlerFactory::createSecurityHandler(settings);
+        QVERIFY(!handler.isNull());
+
+        // Without a password, the document must not open (neither as owner nor as user)
+        std::unique_ptr<PDFSecurityHandler> reader(handler->clone());
+        const auto noPassword = [](bool* ok) { *ok = false; return QString(); };
+        QVERIFY(reader->authenticate(noPassword, false) == PDFSecurityHandler::AuthorizationResult::Cancelled);
+
+        // Missing owner password is replaced by the user password
+        const auto userPassword = [](bool* ok) { *ok = true; return QStringLiteral("family-pdf-user"); };
+        QVERIFY(reader->authenticate(userPassword, true) == PDFSecurityHandler::AuthorizationResult::OwnerAuthorized);
+    }
 }
 
 QTEST_MAIN(SecurityHandlerTest)

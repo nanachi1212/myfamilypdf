@@ -2113,7 +2113,10 @@ PDFSecurityHandlerPointer PDFSecurityHandlerFactory::createSecurityHandler(const
         standardHandler->m_R = getRevisionFromAlgorithm(settings.algorithm);
         standardHandler->m_permissions = settings.permissions | 0xFFFFF000;
 
-        QByteArray adjustedOwnerPassword = handler->adjustPassword(settings.ownerPassword, standardHandler->m_R);
+        // PDF specification, Algorithm 3, step a): if there is no owner password, use the user password
+        // instead. An empty owner password would let anyone open the document as owner without a password.
+        const QString& ownerPassword = settings.ownerPassword.isEmpty() ? settings.userPassword : settings.ownerPassword;
+        QByteArray adjustedOwnerPassword = handler->adjustPassword(ownerPassword, standardHandler->m_R);
         QByteArray adjustedUserPassword = handler->adjustPassword(settings.userPassword, standardHandler->m_R);
 
         // Generate encryption entries
