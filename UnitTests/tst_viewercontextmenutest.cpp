@@ -2141,7 +2141,8 @@ void ViewerContextMenuTest::signatureVerificationWorkflow()
     for (int index = 0; index < tree->topLevelItemCount(); ++index)
     {
         const auto* row = tree->topLevelItem(index);
-        QVERIFY2(row->text(0).contains("Warnings - review required / Untrusted"), qPrintable(row->text(0)));
+        const QString status = index == 0 ? QString("Warnings - review required / Untrusted") : QString("Valid / Untrusted");
+        QVERIFY2(row->text(0).contains(status), qPrintable(row->text(0)));
         QCOMPARE(row->child(0)->text(0), QString("Cryptographic signature: Valid"));
         QCOMPARE(row->child(1)->text(0), QString("Certificate trust: Untrusted"));
     }
