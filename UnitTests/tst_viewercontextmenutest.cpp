@@ -2138,7 +2138,13 @@ void ViewerContextMenuTest::signatureVerificationWorkflow()
     QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
     auto* tree = viewer.findChild<QTreeWidget*>("signatureTreeWidget");
     QCOMPARE(tree->topLevelItemCount(), 2);
-    QVERIFY(tree->topLevelItem(0)->text(0).contains("Valid / Untrusted"));
+    for (int index = 0; index < tree->topLevelItemCount(); ++index)
+    {
+        const auto* row = tree->topLevelItem(index);
+        QVERIFY2(row->text(0).contains("Warnings - review required / Untrusted"), qPrintable(row->text(0)));
+        QCOMPARE(row->child(0)->text(0), QString("Cryptographic signature: Valid"));
+        QCOMPARE(row->child(1)->text(0), QString("Certificate trust: Untrusted"));
+    }
     controller->closeDocument();
 
     // Malformed /V remains a readable document with a visible unknown/invalid result.
