@@ -1,4 +1,4 @@
-﻿// MIT License
+// MIT License
 //
 // Copyright (c) 2018-2025 Jakub Melka and Contributors
 //
@@ -30,7 +30,6 @@
 #include <QStyle>
 #include <QApplication>
 #include <QMimeDatabase>
-#include <QFileIconProvider>
 #include <QMimeData>
 
 #include <algorithm>
@@ -979,8 +978,6 @@ void PDFAttachmentsTreeItemModel::update()
         if (!embeddedFiles.empty())
         {
             QMimeDatabase mimeDatabase;
-            QFileIconProvider fileIconProvider;
-            fileIconProvider.setOptions(QFileIconProvider::DontUseCustomDirectoryIcons);
             PDFAttachmentsTreeItem* root = new PDFAttachmentsTreeItem(nullptr, QIcon(), QString(), QString(), nullptr);
             m_rootItem.reset(root);
 
@@ -1022,10 +1019,6 @@ void PDFAttachmentsTreeItemModel::update()
                     fileTypeDescription = type.comment();
                 }
 
-                if (icon.isNull())
-                {
-                    icon = fileIconProvider.icon(QFileInfo(fileName));
-                }
                 if (icon.isNull())
                 {
                     icon = QApplication::style()->standardIcon(QStyle::SP_FileIcon);

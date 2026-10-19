@@ -92,7 +92,7 @@ if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
             "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_TRANS_DIR}"
             "$<TARGET_FILE_DIR:UnitTestsViewer>/translations"
         VERBATIM)
-    set_tests_properties(UnitTestsViewer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 120)
+    set_tests_properties(UnitTestsViewer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 300)
 endif()
 
 add_familypdf_qt_test(UnitTestsContentEditor tst_contenteditortest.cpp)

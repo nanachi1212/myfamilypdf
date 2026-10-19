@@ -31,6 +31,10 @@
 #include "pdfdocument.h"
 #include "pdfexception.h"
 #include "pdfjbig2decoder.h"
+#include "pdfcolorspaces.h"
+#include "pdfdocumentreader.h"
+#include "pdfccittfaxdecoder.h"
+#include <QTemporaryFile>
 
 #include <regex>
 
@@ -59,6 +63,12 @@ private slots:
     void test_header_regexp();
     void test_flat_map();
     void test_lzw_filter();
+    void test_external_stream_refused();
+    void test_parser_nesting_limit();
+    void test_truncated_runlength();
+    void test_softmask_bounds();
+    void test_function_dimensions();
+    void test_xref_wide_values();
     void test_sampled_function();
     void test_exponential_function();
     void test_stitching_function();
@@ -323,6 +333,110 @@ void LexicalAnalyzerTest::test_lzw_filter()
     QByteArray valid = "-----A---B";
 
     QCOMPARE(decoded, valid);
+}
+
+void LexicalAnalyzerTest::test_external_stream_refused()
+{
+    QTemporaryFile external;
+    QVERIFY(external.open());
+    external.write("PRIVATE LOCAL DATA");
+    external.flush();
+    external.close();
+    const QByteArray path = external.fileName().toUtf8();
+    const QByteArray input = "<< /Length 1 /F (" + path + ") >> stream\nx\nendstream";
+    pdf::PDFParser parser(input, nullptr, pdf::PDFParser::AllowStreams);
+    QVERIFY_EXCEPTION_THROWN(parser.getObject(), pdf::PDFException);
+
+    const QByteArray normal("<< /Length 1 >> stream\nx\nendstream");
+    pdf::PDFParser normalParser(normal, nullptr, pdf::PDFParser::AllowStreams);
+    QCOMPARE(*normalParser.getObject().getStream()->getContent(), QByteArray("x"));
+}
+
+void LexicalAnalyzerTest::test_parser_nesting_limit()
+{
+    const QByteArray deep = QByteArray(512, '[') + "0" + QByteArray(512, ']');
+    pdf::PDFParser parser(deep, nullptr, pdf::PDFParser::None);
+    QVERIFY_EXCEPTION_THROWN(parser.getObject(), pdf::PDFException);
+    const QByteArray ordinary("[ 1 << /Value [2 3] >> ]");
+    pdf::PDFParser normal(ordinary, nullptr, pdf::PDFParser::None);
+    QVERIFY(normal.getObject().isArray());
+}
+
+void LexicalAnalyzerTest::test_truncated_runlength()
+{
+    pdf::PDFRunLengthDecodeFilter filter;
+    const auto fetch = [](const pdf::PDFObject& object) -> const pdf::PDFObject& { return object; };
+    for (const QByteArray& data : {QByteArray::fromHex("0241"), QByteArray::fromHex("ff")})
+    {
+        QVERIFY_EXCEPTION_THROWN(filter.apply(data, fetch, pdf::PDFObject(), nullptr), pdf::PDFException);
+    }
+    QCOMPARE(filter.apply(QByteArray::fromHex("0241424380"), fetch, pdf::PDFObject(), nullptr), QByteArray("ABC"));
+    QCOMPARE(filter.apply(QByteArray::fromHex("fe4180"), fetch, pdf::PDFObject(), nullptr), QByteArray("AAA"));
+}
+
+void LexicalAnalyzerTest::test_softmask_bounds()
+{
+    using Data = pdf::PDFImageData;
+    Data shortData(1, 8, 4, 2, 4, Data::MaskingType::None, QByteArray(1, char(0)), {}, {}, {});
+    QVERIFY_EXCEPTION_THROWN(pdf::PDFAbstractColorSpace::createAlphaMask(shortData), pdf::PDFException);
+    Data smallStride(1, 8, 4, 2, 1, Data::MaskingType::None, QByteArray(2, char(0)), {}, {}, {});
+    QVERIFY_EXCEPTION_THROWN(pdf::PDFAbstractColorSpace::createAlphaMask(smallStride), pdf::PDFException);
+    Data normal(1, 8, 2, 1, 2, Data::MaskingType::None, QByteArray::fromHex("00ff"), {}, {}, {});
+    const QImage image = pdf::PDFAbstractColorSpace::createAlphaMask(normal);
+    QVERIFY(!image.isNull());
+    QCOMPARE(image.constScanLine(0)[0], uchar(0));
+    QCOMPARE(image.constScanLine(0)[1], uchar(255));
+}
+
+void LexicalAnalyzerTest::test_function_dimensions()
+{
+    for (const QByteArray& input : {
+         QByteArray("<< /FunctionType 2 /Domain [0 1] /Range [0 1] /C0 [0 0 0] /C1 [1 1 1] /N 1 >>"),
+         QByteArray("<< /FunctionType 2 /Domain [0 1 2] /C0 [0] /C1 [1] /N 1 >>"),
+         QByteArray("<< /FunctionType 0 /Domain [0 1] /Range [0 1] /Size [2 2] /Encode [0 1] /BitsPerSample 8 /Length 4 >> stream\nabcd\nendstream"),
+         QByteArray("<< /FunctionType 3 /Domain [0 1] /Range [0 1] /Bounds [] /Encode [0 1] /Functions [<< /FunctionType 2 /Domain [0 1] /C0 [0 0] /C1 [1 1] /N 1 >>] >>")})
+    {
+        pdf::PDFParser parser(input, nullptr, pdf::PDFParser::AllowStreams);
+        pdf::PDFDocument document;
+        QVERIFY_EXCEPTION_THROWN(pdf::PDFFunction::createFunction(&document, parser.getObject()), pdf::PDFException);
+    }
+}
+
+void LexicalAnalyzerTest::test_xref_wide_values()
+{
+    const auto makePdf = [](quint64 rootStreamNumber)
+    {
+        QByteArray pdf("%PDF-1.7\n");
+        const quint64 rootOffset = pdf.size();
+        pdf += "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n";
+        const quint64 pagesOffset = pdf.size();
+        pdf += "2 0 obj << /Type /Pages /Kids [] /Count 0 >> endobj\n";
+        const quint64 xrefOffset = pdf.size();
+        QByteArray entries;
+        const auto append = [&](char type, quint64 value, quint16 generation)
+        {
+            entries.append(type);
+            for (int shift = 56; shift >= 0; shift -= 8) entries.append(char((value >> shift) & 0xff));
+            entries.append(char(generation >> 8));
+            entries.append(char(generation & 0xff));
+        };
+        append(0, 0, 65535);
+        append(rootStreamNumber ? 2 : 1, rootStreamNumber ? rootStreamNumber : rootOffset, 0);
+        append(1, pagesOffset, 0);
+        append(1, xrefOffset, 0);
+        pdf += "3 0 obj << /Type /XRef /Root 1 0 R /Size 4 /W [1 8 2] /Length " + QByteArray::number(entries.size()) +
+               " >> stream\n" + entries + "\nendstream\nendobj\nstartxref\n" + QByteArray::number(xrefOffset) + "\n%%EOF\n";
+        return pdf;
+    };
+    for (const quint64 value : {quint64(2147483648ULL), quint64(0xffffffffffffffffULL)})
+    {
+        pdf::PDFDocumentReader reader(nullptr, [](bool* ok) { *ok = false; return QString(); }, false, false);
+        reader.readFromBuffer(makePdf(value));
+        QVERIFY(reader.getReadingResult() != pdf::PDFDocumentReader::Result::OK);
+    }
+    pdf::PDFDocumentReader normal(nullptr, [](bool* ok) { *ok = false; return QString(); }, false, false);
+    normal.readFromBuffer(makePdf(0));
+    QCOMPARE(normal.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
 }
 
 void LexicalAnalyzerTest::test_sampled_function()

@@ -730,7 +730,7 @@ void PDFWidgetAnnotationManager::updateFromMouseEvent(QMouseEvent* event)
                             title = PDFTranslationContext::tr("%1 (%2 replies)").arg(title).arg(repliesCount);
                         }
 
-                        m_tooltip = QString("<p><b>%1</b></p><p>%2</p>").arg(title, markupAnnotation->getContents());
+                        m_tooltip = QString("<p><b>%1</b></p><p>%2</p>").arg(title.toHtmlEscaped(), markupAnnotation->getContents().toHtmlEscaped());
                     }
                 }
 
@@ -1331,6 +1331,7 @@ void PDFWidgetAnnotationManager::createWidgetsForMarkupAnnotations(QWidget* pare
         QLabel* label = new QLabel(groupBox);
         label->setTextInteractionFlags(Qt::TextBrowserInteraction);
         label->setWordWrap(true);
+        label->setTextFormat(Qt::PlainText);
         label->setText(markupAnnotation->getContents());
         label->setFixedWidth(PDFWidgetUtils::scaleDPI_x(label, 250));
         label->setMinimumHeight(label->sizeHint().height());

@@ -283,6 +283,10 @@ void PDFXRefTable::readXRefTable(PDFParsingContext* context, const QByteArray& b
                                 }
                             }
 
+                            if (value > uint64_t(std::numeric_limits<PDFInteger>::max()))
+                            {
+                                throw PDFException(tr("Invalid cross-reference stream value."));
+                            }
                             return static_cast<PDFInteger>(value);
                         }
                         return defaultValue;
@@ -308,9 +312,9 @@ void PDFXRefTable::readXRefTable(PDFParsingContext* context, const QByteArray& b
 
                         for (PDFInteger objectNumber = firstObjectNumber; objectNumber <= lastObjectIndex; ++ objectNumber)
                         {
-                            int itemType = readNumber(columnTypeBytes, 1);
-                            int itemObjectNumberOfObjectStreamOrByteOffset = readNumber(columnObjectNumberOrByteOffsetBytes, 0);
-                            int itemGenerationNumberOrObjectIndex = readNumber(columnGenerationNumberOrObjectIndexBytes, 0);
+                            PDFInteger itemType = readNumber(columnTypeBytes, 1);
+                            PDFInteger itemObjectNumberOfObjectStreamOrByteOffset = readNumber(columnObjectNumberOrByteOffsetBytes, 0);
+                            PDFInteger itemGenerationNumberOrObjectIndex = readNumber(columnGenerationNumberOrObjectIndexBytes, 0);
 
                             switch (itemType)
                             {

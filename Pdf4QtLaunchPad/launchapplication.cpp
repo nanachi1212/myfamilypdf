@@ -25,6 +25,8 @@
 #include "pdfsettings.h"
 
 #include <QMessageBox>
+#include <QCoreApplication>
+#include <QDir>
 #include <QProcess>
 #include <QWidget>
 
@@ -57,7 +59,7 @@ bool LaunchApplication::start(const QString& program, const QStringList& extraAr
     }
     else
     {
-        internalToolPath = QString("./%1").arg(program);
+        internalToolPath = QDir(QCoreApplication::applicationDirPath()).filePath(program);
     }
 
     qint64 pid = 0;
@@ -67,7 +69,7 @@ bool LaunchApplication::start(const QString& program, const QStringList& extraAr
         return false;
     }
 #else
-    if (!QProcess::startDetached(program, arguments))
+    if (!QProcess::startDetached(QDir(QCoreApplication::applicationDirPath()).filePath(program), arguments))
     {
         QMessageBox::critical(parent, QObject::tr("Error"), QObject::tr("Failed to start process '%1'").arg(program));
         return false;

@@ -1060,7 +1060,7 @@ void PDFProgramController::onActionTriggered(const pdf::PDFAction* action)
                     }
                     else
                     {
-                        QMessageBox::critical(m_mainWindow, tr("Go to action"), tr("Failed to go to destination '%1'. Destination wasn't found.").arg(pdf::PDFEncoding::convertTextString(destinationName)));
+                        QMessageBox::critical(m_mainWindow, tr("Go to action"), tr("Failed to go to destination '%1'. Destination wasn't found.").arg(pdf::PDFEncoding::convertTextString(destinationName).toHtmlEscaped()));
                         destination = pdf::PDFDestination();
                     }
                 }
@@ -1103,7 +1103,12 @@ void PDFProgramController::onActionTriggered(const pdf::PDFAction* action)
                         continue;
                     }
 
-                    QString message = tr("Would you like to launch application '%1' in working directory '%2' with parameters '%3'?").arg(QString::fromLatin1(winSpecification.file), QString::fromLatin1(winSpecification.directory), QString::fromLatin1(winSpecification.parameters));
+                    if (!winSpecification.operation.isEmpty() && winSpecification.operation.compare("open", Qt::CaseInsensitive) != 0)
+                    {
+                        QMessageBox::warning(m_mainWindow, tr("Launch application"), tr("This launch operation is not allowed."));
+                        continue;
+                    }
+                    QString message = tr("Would you like to launch application '%1' in working directory '%2' with parameters '%3' (operation: open)?").arg(QString::fromLatin1(winSpecification.file), QString::fromLatin1(winSpecification.directory), QString::fromLatin1(winSpecification.parameters));
 
                     // Show document-supplied text as plain text, so it can't be restyled or hidden with HTML
                     QMessageBox questionBox(QMessageBox::Question, tr("Launch application"), message, QMessageBox::Yes | QMessageBox::No, m_mainWindow);
@@ -1166,15 +1171,27 @@ void PDFProgramController::onActionTriggered(const pdf::PDFAction* action)
                 }
 
                 const pdf::PDFActionURI* typedAction = dynamic_cast<const pdf::PDFActionURI*>(currentAction);
-                QByteArray URI = m_pdfDocument->getCatalog()->getBaseURI() + typedAction->getURI();
-                QString urlString = QString::fromUtf8(URI);
-                QString message = tr("Would you like to open URL '%1'?").arg(urlString);
-                if (QMessageBox::question(m_mainWindow, tr("Open URL"), message) == QMessageBox::Yes)
+                const QUrl base(QString::fromUtf8(m_pdfDocument->getCatalog()->getBaseURI()), QUrl::StrictMode);
+                const QUrl target(QString::fromUtf8(typedAction->getURI()), QUrl::StrictMode);
+                const QUrl url = target.isRelative() ? base.resolved(target) : target;
+                const QString scheme = url.scheme().toLower();
+                if (!url.isValid() || (scheme != QLatin1String("http") && scheme != QLatin1String("https") && scheme != QLatin1String("mailto")) ||
+                    (target.isRelative() && base.scheme() != QLatin1String("http") && base.scheme() != QLatin1String("https")))
                 {
-                    if (!QDesktopServices::openUrl(QUrl(urlString)))
+                    QMessageBox::warning(m_mainWindow, tr("Open URL"), tr("This URL protocol is not allowed."));
+                    continue;
+                }
+                QString urlString = url.toString(QUrl::FullyEncoded);
+                QString message = tr("Would you like to open URL '%1'?").arg(urlString);
+                QMessageBox questionBox(QMessageBox::Question, tr("Open URL"), message, QMessageBox::Yes | QMessageBox::No, m_mainWindow);
+                questionBox.setTextFormat(Qt::PlainText);
+                questionBox.setDefaultButton(QMessageBox::No);
+                if (questionBox.exec() == QMessageBox::Yes)
+                {
+                    if (!QDesktopServices::openUrl(url))
                     {
                         // Error occured
-                        QMessageBox::warning(m_mainWindow, tr("Open URL"), tr("Opening url '%1' failed.").arg(urlString));
+                        QMessageBox::warning(m_mainWindow, tr("Open URL"), tr("Opening url '%1' failed.").arg(urlString.toHtmlEscaped()));
                     }
                 }
 
@@ -4400,7 +4417,12 @@ bool PDFProgramController::runOcr(const QString& inputFile, const QString& outpu
     }
 
 #ifdef Q_OS_WIN
-    const QString shell = QStringLiteral("powershell.exe");
+    const QString shell = QDir(qEnvironmentVariable("SystemRoot")).filePath(QStringLiteral("System32/WindowsPowerShell/v1.0/powershell.exe"));
+    if (!QFileInfo(shell).isAbsolute() || !QFileInfo::exists(shell))
+    {
+        QMessageBox::warning(m_mainWindow, title, tr("Windows PowerShell was not found."));
+        return false;
+    }
 #else
     const QString shell = QStringLiteral("pwsh");
 #endif

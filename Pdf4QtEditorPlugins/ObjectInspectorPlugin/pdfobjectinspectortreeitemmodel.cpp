@@ -472,7 +472,7 @@ void PDFCreateObjectInspectorTreeItemFromObjectVisitor::visitReference(const pdf
     PDFObjectInspectorTreeItem* referenceRoot = new PDFObjectInspectorTreeItem(m_reference, pdf::PDFObject::createReference(reference), m_parents.top());
     m_parents.top()->addCreatedChild(referenceRoot);
 
-    if (m_followReferences && reference.isValid())
+    if (m_followReferences && reference.isValid() && m_parents.size() < 128)
     {
         Q_ASSERT(m_usedReferences);
 

@@ -514,8 +514,15 @@ PageItemPreviewRenderer::RenderResult PageItemPreviewRenderer::renderPreviewAsyn
                                          qMax(1.0, renderedSourcePageSize.height() - renderedCropMargins.top() - renderedCropMargins.bottom()));
             if (!renderedSourcePageSize.isEmpty() && croppedPageSize.isValid())
             {
-                renderPixelSize = QSize(qMax(pixelSize.width(), int(std::ceil(pixelSize.width() * renderedSourcePageSize.width() / croppedPageSize.width()))),
-                                        qMax(pixelSize.height(), int(std::ceil(pixelSize.height() * renderedSourcePageSize.height() / croppedPageSize.height()))));
+                const qreal width = std::ceil(pixelSize.width() * renderedSourcePageSize.width() / croppedPageSize.width());
+                const qreal height = std::ceil(pixelSize.height() * renderedSourcePageSize.height() / croppedPageSize.height());
+                if (!qIsFinite(width) || !qIsFinite(height) || width <= 0 || height <= 0)
+                {
+                    context->rasterizerPool->release(rasterizer);
+                    return result;
+                }
+                const qreal scale = qMin(qreal(1), qreal(4096) / qMax(width, height));
+                renderPixelSize = QSize(qMax(1, int(width * scale)), qMax(1, int(height * scale)));
             }
 
             QImage image = rasterizer->render(request.pageIndex,

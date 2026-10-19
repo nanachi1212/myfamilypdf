@@ -582,6 +582,10 @@ QByteArray PDFRunLengthDecodeFilter::apply(const QByteArray& data,
         {
             // Copy n + 1 characters from the input array literally (and advance iterators)
             const int count = static_cast<int>(current) + 1;
+            if (std::distance(it, itEnd) < count)
+            {
+                throw PDFException(PDFTranslationContext::tr("Truncated RunLength stream."));
+            }
             std::copy(it, std::next(it, count), std::back_inserter(result));
             std::advance(it, count);
         }
@@ -589,6 +593,10 @@ QByteArray PDFRunLengthDecodeFilter::apply(const QByteArray& data,
         {
             // Copy 257 - n copies of single character
             const int count = 257 - current;
+            if (it == itEnd)
+            {
+                throw PDFException(PDFTranslationContext::tr("Truncated RunLength stream."));
+            }
             const char toBeCopied = *it++;
             std::fill_n(std::back_inserter(result), count, toBeCopied);
         }

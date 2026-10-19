@@ -2983,6 +2983,28 @@ bool MainWindow::restoreWorkspaceStateFromJson(const QJsonObject& state, QString
             groupItem.cropMarginsMM = marginsFromJson(groupObject["cropMarginsMM"].toObject(), QMarginsF());
             groupItem.pageAdditionalRotation = pageRotationFromInt(groupObject["rotation"].toInt());
 
+            if (groupItem.pageType < PT_DocumentPage || groupItem.pageType > PT_Empty)
+            {
+                if (errorMessage) *errorMessage = tr("Invalid workspace page type.");
+                return false;
+            }
+            if (groupItem.pageType != PT_DocumentPage)
+            {
+                groupItem.documentIndex = -1;
+                groupItem.pageIndex = -1;
+            }
+            if (groupItem.pageType != PT_Image) groupItem.imageIndex = -1;
+            const QSizeF dimensions = groupItem.rotatedPageDimensionsMM;
+            const QMarginsF margins = groupItem.cropMarginsMM;
+            if (!qIsFinite(dimensions.width()) || !qIsFinite(dimensions.height()) ||
+                dimensions.width() <= 0 || dimensions.height() <= 0 || dimensions.width() > 200000 || dimensions.height() > 200000 ||
+                !qIsFinite(margins.left()) || !qIsFinite(margins.right()) || !qIsFinite(margins.top()) || !qIsFinite(margins.bottom()) ||
+                margins.left() < 0 || margins.right() < 0 || margins.top() < 0 || margins.bottom() < 0 ||
+                margins.left() + margins.right() >= dimensions.width() || margins.top() + margins.bottom() >= dimensions.height())
+            {
+                if (errorMessage) *errorMessage = tr("Invalid workspace page size or crop margins.");
+                return false;
+            }
             if (groupItem.pageType == PT_DocumentPage)
             {
                 auto documentIt = documents.find(groupItem.documentIndex);
@@ -3107,6 +3129,46 @@ bool MainWindow::loadProjectJson(const QJsonObject& project, QString* errorMessa
         return false;
     }
 
+    // Inspect untrusted references before even querying file existence.
+    QStringList sourcePaths;
+    for (const QJsonValue& value : project["documents"].toArray())
+    {
+        const QString path = value.toObject()["path"].toString();
+        if (!path.isEmpty()) sourcePaths << path;
+    }
+    for (const QJsonValue& value : project["images"].toArray())
+    {
+        const QJsonObject image = value.toObject();
+        if (!image["embeddedData"].toString().isEmpty()) continue;
+        const QString sourcePath = image["sourcePath"].toString();
+        const QString path = sourcePath.isEmpty() ? image["fileName"].toString() : sourcePath;
+        if (!path.isEmpty()) sourcePaths << path;
+    }
+    sourcePaths.removeDuplicates();
+    for (const QString& path : sourcePaths)
+    {
+        QString normalized = path;
+        normalized.replace(QLatin1Char('\\'), QLatin1Char('/'));
+        if (normalized.startsWith(QLatin1String("//")) || normalized.contains(QChar::Null) ||
+            normalized.contains(QLatin1String("://")))
+        {
+            if (errorMessage) *errorMessage = tr("Network and device paths are not allowed in workspace sources.");
+            return false;
+        }
+    }
+    if (!sourcePaths.isEmpty())
+    {
+        QMessageBox confirmation(QMessageBox::Question, tr("Workspace sources"),
+                                 tr("Allow this workspace to read these local files?\n%1").arg(sourcePaths.join(QLatin1Char('\n'))),
+                                 QMessageBox::Yes | QMessageBox::No, this);
+        confirmation.setTextFormat(Qt::PlainText);
+        confirmation.setDefaultButton(QMessageBox::No);
+        if (confirmation.exec() != QMessageBox::Yes)
+        {
+            if (errorMessage) *errorMessage = tr("Workspace source access was not approved.");
+            return false;
+        }
+    }
     std::map<int, DocumentItem> documents;
     QStringList missingSources;
     const QJsonArray documentsArray = project["documents"].toArray();
@@ -3163,7 +3225,13 @@ bool MainWindow::loadProjectJson(const QJsonObject& project, QString* errorMessa
         imageItem.format = object["format"].toString();
 
         const QString imagePath = !imageItem.sourcePath.isEmpty() ? imageItem.sourcePath : imageItem.fileName;
-        if (!imagePath.isEmpty() && QFileInfo::exists(imagePath))
+        imageItem.imageData = QByteArray::fromBase64(object["embeddedData"].toString().toLatin1());
+        imageItem.image.loadFromData(imageItem.imageData);
+        if (!imageItem.image.isNull() && imageItem.format.isEmpty())
+        {
+            imageItem.format = object["embeddedFormat"].toString();
+        }
+        if (imageItem.image.isNull() && object["embeddedData"].toString().isEmpty() && !imagePath.isEmpty() && QFileInfo::exists(imagePath))
         {
             QFile file(imagePath);
             if (file.open(QFile::ReadOnly))

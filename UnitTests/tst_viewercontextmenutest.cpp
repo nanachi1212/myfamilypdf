@@ -53,6 +53,9 @@
 #include "pdfinsertpagesdialog.h"
 #include "pdfsplitdocumentdialog.h"
 #include "pdfchmconverter.h"
+#include "pdfaction.h"
+#include "pdfparser.h"
+#include <QDesktopServices>
 #include "pdfchinesefold.h"
 #include "pdfdocumentmerger.h"
 #include "pdfdocumentpropertiesdialog.h"
@@ -221,6 +224,7 @@ private slots:
     void pageReorderInsertionGeometry();
     void pageSelectionHelpers();
     void chmHelpers();
+    void untrustedActionDialogs();
     void chineseScriptFolding();
     void chmSampleFile();
     void thumbnailReorderWorkflow();
@@ -2134,7 +2138,14 @@ void ViewerContextMenuTest::signatureVerificationWorkflow()
     QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
     auto* tree = viewer.findChild<QTreeWidget*>("signatureTreeWidget");
     QCOMPARE(tree->topLevelItemCount(), 2);
-    QVERIFY(tree->topLevelItem(0)->text(0).contains("Valid / Untrusted"));
+    for (int index = 0; index < tree->topLevelItemCount(); ++index)
+    {
+        const auto* row = tree->topLevelItem(index);
+        const QString status = index == 0 ? QString("Warnings - review required / Untrusted") : QString("Valid / Untrusted");
+        QVERIFY2(row->text(0).contains(status), qPrintable(row->text(0)));
+        QCOMPARE(row->child(0)->text(0), QString("Cryptographic signature: Valid"));
+        QCOMPARE(row->child(1)->text(0), QString("Certificate trust: Untrusted"));
+    }
     controller->closeDocument();
 
     // Malformed /V remains a readable document with a visible unknown/invalid result.
@@ -3933,6 +3944,15 @@ private:
     QTimer m_timer;
 };
 
+class SecurityUrlCapture : public QObject
+{
+    Q_OBJECT
+public:
+    QList<QUrl> urls;
+public slots:
+    void capture(const QUrl& url) { urls.push_back(url); }
+};
+
 QAbstractButton* boxButton(QMessageBox* box, const QString& textPart)
 {
     for (QAbstractButton* button : box->buttons())
@@ -3987,6 +4007,58 @@ QString writeEncryptedFixture(const QString& path, const QString& userPassword, 
 }
 
 } // namespace
+
+void ViewerContextMenuTest::untrustedActionDialogs()
+{
+    pdfviewer::PDFViewerMainWindow viewer;
+    viewer.show();
+    auto* controller = viewer.getProgramController();
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    SecurityUrlCapture capture;
+    const QStringList schemes = {"http", "https", "mailto", "file", "search-ms", "javascript"};
+    for (const QString& scheme : schemes) QDesktopServices::setUrlHandler(scheme, &capture, "capture");
+    auto cleanup = qScopeGuard([&]() { for (const QString& scheme : schemes) QDesktopServices::unsetUrlHandler(scheme); });
+    bool questionsArePlainText = true;
+    bool questionsDefaultToNo = true;
+    MessageBoxAnswerer answerer([&](QMessageBox* box) -> QAbstractButton*
+    {
+        if (box->standardButtons().testFlag(QMessageBox::Yes))
+        {
+            questionsArePlainText &= box->textFormat() == Qt::PlainText;
+            questionsDefaultToNo &= box->defaultButton() == box->button(QMessageBox::No);
+            return box->button(QMessageBox::Yes);
+        }
+        return box->button(QMessageBox::Ok);
+    });
+    const auto trigger = [&](const QByteArray& data)
+    {
+        pdf::PDFParser parser(data, nullptr, pdf::PDFParser::None);
+        const auto action = pdf::PDFAction::parse(&controller->getDocument()->getStorage(), parser.getObject());
+        QVERIFY(action);
+        controller->onActionTriggered(action.get());
+    };
+    const QList<QByteArray> allowed = {"https://example.invalid/path", "http://example.invalid/path", "mailto:user@example.invalid"};
+    const QList<QByteArray> denied = {"file:///C:/Windows/notepad.exe", "file://invalid.example/share/file", "search-ms:query", "javascript:alert"};
+    for (const QByteArray& uri : allowed)
+    {
+        const qsizetype before = capture.urls.size();
+        trigger("<< /S /URI /URI (" + uri + ") >>");
+        QCOMPARE(capture.urls.size(), before + 1);
+    }
+    for (const QByteArray& uri : denied)
+    {
+        const qsizetype before = capture.urls.size();
+        trigger("<< /S /URI /URI (" + uri + ") >>");
+        QCOMPARE(capture.urls.size(), before);
+    }
+    QVERIFY(questionsArePlainText);
+    QVERIFY(questionsDefaultToNo);
+    trigger("<< /S /GoTo /D (<b>untrusted</b>) >>");
+    QVERIFY(answerer.texts.back().contains(QStringLiteral("&lt;b&gt;untrusted&lt;/b&gt;")));
+}
+
+
 
 void ViewerContextMenuTest::mergePdfsEntriesAreAvailable()
 {

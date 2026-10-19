@@ -9,7 +9,9 @@ from pypdf.generic import (
     NameObject,
 )
 
-from familypdf_office_export.extract import extract_document
+from familypdf_office_export.extract import extract_document, _extract_images
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 
 def _write_text_and_table_pdf(path: Path) -> None:
@@ -90,6 +92,17 @@ class ExtractTest(unittest.TestCase):
         self.assertTrue(
             any("OCR" in warning for warning in extracted.pages[0].warnings)
         )
+
+
+class ImageBudgetTest(unittest.TestCase):
+    def test_rejects_oversized_render_before_allocating(self):
+        for width, height in [(50000, 50000), (float("inf"), 100), (-1, 100)]:
+            render = Mock(side_effect=AssertionError("Rendering must not start"))
+            page = SimpleNamespace(images=[{}], width=width, height=height, to_image=render)
+            images, warnings = _extract_images(page, 1, [], 1)
+            self.assertEqual(images, [])
+            self.assertTrue(warnings)
+            render.assert_not_called()
 
 
 if __name__ == "__main__":

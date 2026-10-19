@@ -170,7 +170,8 @@ PDFSignatureHandler* PDFSignatureHandler::createHandler(const PDFFormFieldSignat
     }
     else if (subfilter == "adbe.pkcs7.sha1")
     {
-        return new PDFSignatureHandler_adbe_pkcs7_sha1(signatureField, sourceData, parameters);
+        // This subfilter hashes the document with SHA-1 even when SignerInfo uses a stronger digest.
+        return nullptr;
     }
     else if (subfilter == "adbe.x509.rsa_sha1")
     {
@@ -386,7 +387,7 @@ void PDFSignatureVerificationResult::addHashAlgorithm(const QString& algorithm)
 
 void PDFSignatureVerificationResult::validate()
 {
-    if (isCertificateValid() && isSignatureValid())
+    if (isCertificateValid() && isSignatureValid() && !hasWarning())
     {
         m_flags.setFlag(OK);
     }
@@ -511,12 +512,12 @@ STACK_OF(X509)* PDFPublicKeySignatureHandler::getCertificates(PKCS7* pkcs7)
 
     if (PKCS7_type_is_signed(pkcs7))
     {
-        return pkcs7->d.sign->cert;
+        return pkcs7->d.sign ? pkcs7->d.sign->cert : nullptr;
     }
 
     if (PKCS7_type_is_signedAndEnveloped(pkcs7))
     {
-        return pkcs7->d.signed_and_enveloped->cert;
+        return pkcs7->d.signed_and_enveloped ? pkcs7->d.signed_and_enveloped->cert : nullptr;
     }
 
     return nullptr;
@@ -575,7 +576,7 @@ void PDFPublicKeySignatureHandler::verifyCertificate(PDFSignatureVerificationRes
                     break;
                 }
 
-                unsigned long flags = X509_V_FLAG_TRUSTED_FIRST;
+                unsigned long flags = X509_V_FLAG_TRUSTED_FIRST | X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL;
                 if (m_parameters.ignoreExpirationDate)
                 {
                     flags |= X509_V_FLAG_NO_CHECK_TIME;
@@ -590,6 +591,14 @@ void PDFPublicKeySignatureHandler::verifyCertificate(PDFSignatureVerificationRes
                     {
                         case X509_V_OK:
                             // Strange, this should not occur... when X509_verify_cert fails
+                            break;
+
+                        case X509_V_ERR_UNABLE_TO_GET_CRL:
+                            result.addCertificateUnableToGetCRLWarning();
+                            break;
+
+                        case X509_V_ERR_CRL_HAS_EXPIRED:
+                            result.addCertificateCRLValidityTimeExpiredWarning();
                             break;
 
                         case X509_V_ERR_CERT_HAS_EXPIRED:
@@ -652,7 +661,7 @@ void PDFPublicKeySignatureHandler::verifyCertificate(PDFSignatureVerificationRes
         result.addInvalidCertificateError();
     }
 
-    if (!result.hasCertificateError())
+    if (!result.hasCertificateError() && !result.hasCertificateWarning())
     {
         result.setFlag(PDFSignatureVerificationResult::Certificate_OK, true);
     }
@@ -666,8 +675,16 @@ BIO* PDFPublicKeySignatureHandler::getSignedDataBuffer(pdf::PDFSignatureVerifica
 
     PDFInteger size = 0;
     const PDFSignature::ByteRanges& byteRanges = signature.getByteRanges();
+    PDFInteger previousEnd = 0;
     for (const PDFSignature::ByteRange& byteRange : byteRanges)
     {
+        if (byteRange.offset < previousEnd || byteRange.size < 0 || byteRange.offset > sourceData.size() ||
+            byteRange.size > sourceData.size() - byteRange.offset || byteRange.size > sourceData.size() - size)
+        {
+            result.addSignatureDataCoveredBySignatureMissingError();
+            return nullptr;
+        }
+        previousEnd = byteRange.offset + byteRange.size;
         size += byteRange.size;
     }
 
@@ -698,7 +715,7 @@ BIO* PDFPublicKeySignatureHandler::getSignedDataBuffer(pdf::PDFSignatureVerifica
             return nullptr;
         }
 
-        const int length = endOffset - startOffset;
+        const qsizetype length = endOffset - startOffset;
         outputBuffer.append(sourceData.constData() + startOffset, length);
         bytesCoveredBySignature.addInterval(startOffset, endOffset - 1);
     }
@@ -1163,6 +1180,14 @@ void PDFSignatureHandler_ETSI_base::verifyCertificateCAdES(PDFSignatureVerificat
                             // Strange, this should not occur... when X509_verify_cert fails
                             break;
 
+                        case X509_V_ERR_UNABLE_TO_GET_CRL:
+                            result.addCertificateUnableToGetCRLWarning();
+                            break;
+
+                        case X509_V_ERR_CRL_HAS_EXPIRED:
+                            result.addCertificateCRLValidityTimeExpiredWarning();
+                            break;
+
                         case X509_V_ERR_CERT_HAS_EXPIRED:
                             result.addCertificateExpiredError();
                             break;
@@ -1233,7 +1258,7 @@ void PDFSignatureHandler_ETSI_base::verifyCertificateCAdES(PDFSignatureVerificat
         result.addInvalidCertificateError();
     }
 
-    if (!result.hasCertificateError())
+    if (!result.hasCertificateError() && !result.hasCertificateWarning())
     {
         result.setFlag(PDFSignatureVerificationResult::Certificate_OK, true);
     }
@@ -1371,7 +1396,7 @@ void PDFSignatureHandler_adbe_pkcs7_rsa_sha1::verifyRSACertificate(PDFSignatureV
 
         if (!result.hasCertificateError())
         {
-            unsigned long flags = X509_V_FLAG_TRUSTED_FIRST;
+            unsigned long flags = X509_V_FLAG_TRUSTED_FIRST | X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL;
             if (m_parameters.ignoreExpirationDate)
             {
                 flags |= X509_V_FLAG_NO_CHECK_TIME;
@@ -1388,6 +1413,12 @@ void PDFSignatureHandler_adbe_pkcs7_rsa_sha1::verifyRSACertificate(PDFSignatureV
                         // Strange, this should not occur... when X509_verify_cert fails
                         break;
 
+                    case X509_V_ERR_UNABLE_TO_GET_CRL:
+                        result.addCertificateUnableToGetCRLWarning();
+                        break;
+                    case X509_V_ERR_CRL_HAS_EXPIRED:
+                        result.addCertificateCRLValidityTimeExpiredWarning();
+                        break;
                     case X509_V_ERR_CERT_HAS_EXPIRED:
                         result.addCertificateExpiredError();
                         break;
@@ -1444,7 +1475,7 @@ void PDFSignatureHandler_adbe_pkcs7_rsa_sha1::verifyRSACertificate(PDFSignatureV
         result.addInvalidCertificateError();
     }
 
-    if (!result.hasCertificateError())
+    if (!result.hasCertificateError() && !result.hasCertificateWarning())
     {
         result.setFlag(PDFSignatureVerificationResult::Certificate_OK, true);
     }
@@ -1495,6 +1526,12 @@ void PDFSignatureHandler_adbe_pkcs7_rsa_sha1::verifyRSASignature(PDFSignatureVer
                 return;
             }
 
+            const EVP_MD* algorithm = EVP_get_digestbynid(algorithmNID);
+            if (!algorithm || EVP_MD_size(algorithm) < 28 || algorithmNID == NID_md5_sha1)
+            {
+                result.addSignatureDigestFailureError();
+                return;
+            }
             const unsigned char* digest = convertByteArrayToUcharPtr(digestBuffer);
             const unsigned int digestLength = digestBuffer.length();
 
@@ -1632,6 +1669,16 @@ void PDFPublicKeySignatureHandler::addHashAlgorithmFromSignerInfoStack(STACK_OF(
             std::array<char, 64> buffer = { };
             OBJ_obj2txt(buffer.data(), int(buffer.size() - 1), signerInfoValue->digest_alg->algorithm, 0);
             result.addHashAlgorithm(QString::fromLatin1(buffer.data()));
+            const int nid = OBJ_obj2nid(signerInfoValue->digest_alg->algorithm);
+            const EVP_MD* digest = EVP_get_digestbynid(nid);
+            if (!digest || EVP_MD_size(digest) < 28 || nid == NID_md5_sha1)
+            {
+                result.addSignatureDigestFailureError();
+            }
+        }
+        else
+        {
+            result.addSignatureDigestFailureError();
         }
     }
 }
@@ -1687,6 +1734,20 @@ void PDFPublicKeySignatureHandler::addSignatureDateFromSignerInfoStack(STACK_OF(
 
 void pdf::PDFPublicKeySignatureHandler::addTrustedCertificates(X509_STORE* store) const
 {
+    X509_VERIFY_PARAM_set_auth_level(X509_STORE_get0_param(store), 2);
+    X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+    if (m_parameters.dss)
+    {
+        for (const QByteArray& crlData : m_parameters.dss->getMasterItem()->CRL)
+        {
+            const unsigned char* pointer = convertByteArrayToUcharPtr(crlData);
+            if (X509_CRL* crl = d2i_X509_CRL(nullptr, &pointer, crlData.size()))
+            {
+                X509_STORE_add_crl(store, crl);
+                X509_CRL_free(crl);
+            }
+        }
+    }
     if (m_parameters.store)
     {
         const PDFCertificateEntries& certificates = m_parameters.store->getCertificates();

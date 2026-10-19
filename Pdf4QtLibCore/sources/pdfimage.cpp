@@ -1120,6 +1120,7 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
             imageData.errors.clear();
 
             opj_image_t* jpegImage = nullptr;
+            bool decoded = false;
 
             // Setup the decoder
             if (opj_setup_decoder(codec, &decompressParameters))
@@ -1134,7 +1135,7 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
                         {
                             if (opj_end_decompress(codec, opjStream))
                             {
-
+                                decoded = true;
                             }
                         }
                     }
@@ -1150,8 +1151,9 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
             opjStream = nullptr;
             codec = nullptr;
 
-            // If we have a valid image, then adjust it
-            if (jpegImage)
+            std::unique_ptr<opj_image_t, decltype(&opj_image_destroy)> imageGuard(jpegImage, &opj_image_destroy);
+            // A parsed header is not a successfully decoded image.
+            if (jpegImage && decoded && jpegImage->numcomps > 0 && jpegImage->comps)
             {
                 // This image type can have color space defined in the data (definition of color space in PDF
                 // is only optional). So, if we doesn't have a color space, then we must determine it from the data.
@@ -1190,12 +1192,14 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
                 std::vector<OPJ_UINT32> ordinaryComponents;
                 std::vector<OPJ_UINT32> alphaComponents;
 
-                bool valid = true;
+                bool valid = bool(image.m_colorSpace);
                 const OPJ_UINT32 componentCount = jpegImage->numcomps;
                 ordinaryComponents.reserve(componentCount);
                 for (OPJ_UINT32 i = 0; i < componentCount; ++i)
                 {
-                    if (jpegImage->comps[0].w != jpegImage->comps[i].w ||
+                    if (!jpegImage->comps[i].data || jpegImage->comps[i].w == 0 || jpegImage->comps[i].h == 0 ||
+                        jpegImage->comps[i].prec == 0 || jpegImage->comps[i].prec > 31 ||
+                        jpegImage->comps[0].w != jpegImage->comps[i].w ||
                         jpegImage->comps[0].h != jpegImage->comps[i].h ||
                         jpegImage->comps[0].prec != jpegImage->comps[i].prec ||
                         jpegImage->comps[0].sgnd != jpegImage->comps[i].sgnd)
@@ -1273,19 +1277,27 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
                     unsigned int bitsPerComponent = 8;
                     unsigned int width = w;
                     unsigned int height = h;
-                    unsigned int stride = w * components;
+                    const quint64 pixelCount = quint64(w) * h;
+                    const quint64 stride64 = quint64(w) * components;
+                    constexpr quint64 maxImageBytes = 512 * 1024 * 1024;
+                    if (components == 0 || stride64 > std::numeric_limits<unsigned int>::max() ||
+                        pixelCount > maxImageBytes / components)
+                    {
+                        throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("JPEG 2000 image is too large."));
+                    }
+                    unsigned int stride = static_cast<unsigned int>(stride64);
 
-                    QByteArray imageDataBuffer(components * width * height, 0);
+                    QByteArray imageDataBuffer(qsizetype(pixelCount * components), 0);
                     for (unsigned int row = 0; row < h; ++row)
                     {
                         for (unsigned int col = 0; col < w; ++col)
                         {
                             for (unsigned int componentIndex = 0; componentIndex < components; ++ componentIndex)
                             {
-                                int index = stride * row + col * components + componentIndex;
+                                qsizetype index = qsizetype(stride) * row + qsizetype(col) * components + componentIndex;
                                 Q_ASSERT(index < imageDataBuffer.size());
 
-                                imageDataBuffer[index] = transformValue(jpegImage->comps[ordinaryComponents[componentIndex]].data[w * row + col]);
+                                imageDataBuffer[index] = transformValue(jpegImage->comps[ordinaryComponents[componentIndex]].data[qsizetype(w) * row + col]);
                             }
                         }
                     }
@@ -1298,16 +1310,16 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
                     if (hasAlphaChannel && (sMaskInData == 1 || sMaskInData == 2))
                     {
                         const int alphaStride = w;
-                        QByteArray alphaDataBuffer(width * height, 0);
+                        QByteArray alphaDataBuffer(qsizetype(pixelCount), 0);
                         const OPJ_UINT32 alphaComponentIndex = alphaComponents.front();
                         for (unsigned int row = 0; row < h; ++row)
                         {
                             for (unsigned int col = 0; col < w; ++col)
                             {
-                                int index = alphaStride * row + col;
+                                qsizetype index = qsizetype(alphaStride) * row + col;
                                 Q_ASSERT(index < alphaDataBuffer.size());
 
-                                alphaDataBuffer[index] = transformValue(jpegImage->comps[alphaComponentIndex].data[w * row + col]);
+                                alphaDataBuffer[index] = transformValue(jpegImage->comps[alphaComponentIndex].data[qsizetype(w) * row + col]);
                             }
                         }
 
@@ -1325,8 +1337,6 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
                     // Easiest way is to just add errors to the error list
                     imageData.errors.push_back(PDFRenderError(RenderErrorType::Error, PDFTranslationContext::tr("Incompatible color components for JPEG 2000 image.")));
                 }
-
-                opj_image_destroy(jpegImage);
 
                 if (valid)
                 {
@@ -1397,7 +1407,7 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
     else if (colorSpace || isSoftMask)
     {
         // We treat data as binary maybe compressed stream (for example by Flate/LZW method), but data can also be not compressed.
-        const unsigned int components = static_cast<unsigned int>(colorSpace->getColorComponentCount());
+        const unsigned int components = colorSpace ? static_cast<unsigned int>(colorSpace->getColorComponentCount()) : 1;
         const unsigned int bitsPerComponent = static_cast<unsigned int>(loader.readIntegerFromDictionary(dictionary, "BitsPerComponent", 8));
         const unsigned int width = static_cast<unsigned int>(loader.readIntegerFromDictionary(dictionary, "Width", 0));
         const unsigned int height = static_cast<unsigned int>(loader.readIntegerFromDictionary(dictionary, "Height", 0));
@@ -1413,7 +1423,12 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
         }
 
         // Calculate stride
-        const unsigned int stride = (components * bitsPerComponent * width + 7) / 8;
+        const quint64 stride64 = (quint64(components) * bitsPerComponent * width + 7) / 8;
+        if (stride64 > std::numeric_limits<unsigned int>::max())
+        {
+            throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("Invalid image row size."));
+        }
+        const unsigned int stride = static_cast<unsigned int>(stride64);
 
         QByteArray imageDataBuffer = document->getDecodedStream(stream);
         image.m_imageData = PDFImageData(components, bitsPerComponent, width, height, stride, maskingType, qMove(imageDataBuffer), qMove(mask), qMove(decode), qMove(matte));

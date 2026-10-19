@@ -97,6 +97,11 @@ int PDFToolSeparate::execute(const PDFToolOptions& options)
             pdf::PDFDocumentBuilder documentBuilder(&document);
             documentBuilder.flattenPageTree();
             std::vector<pdf::PDFObjectReference> pageReferences = documentBuilder.getPages();
+            if (pageIndex < 0 || quint64(pageIndex) >= pageReferences.size())
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Page index is outside the document."), options.outputCodec);
+                return ErrorInvalidArguments;
+            }
             std::vector<pdf::PDFObjectReference> singlePageRef = { pageReferences[pageIndex] };
             documentBuilder.setPages(singlePageRef);
             documentBuilder.removeOutline();

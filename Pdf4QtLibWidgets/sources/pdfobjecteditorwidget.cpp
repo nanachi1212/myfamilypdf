@@ -730,7 +730,7 @@ void PDFObjectEditorMappedTextBrowserAdapter::setValue(PDFObject object)
     QString text = loader.readTextString(object, QString());
     if (text != m_textBrowser->toPlainText())
     {
-        m_textBrowser->setText(text);
+        m_textBrowser->setPlainText(text);
     }
 }
 

@@ -124,8 +124,8 @@ int PDFToolInkCoverageApplication::execute(const PDFToolOptions& options)
     formatter.writeTableHeaderColumn("page-no", PDFToolTranslationContext::tr("Page No."), Qt::AlignLeft);
     for (const pdf::PDFInkCoverageCalculator::InkCoverageChannelInfo& info : headerCoverage)
     {
-        formatter.writeTableHeaderColumn(QString("%1-ratio").arg(QString::fromLatin1(info.name)), PDFToolTranslationContext::tr("%1 Ratio [%]").arg(info.textName), Qt::AlignLeft);
-        formatter.writeTableHeaderColumn(QString("%1-area").arg(QString::fromLatin1(info.name)), PDFToolTranslationContext::tr("%1 Covered [mm^2]").arg(info.textName), Qt::AlignLeft);
+        formatter.writeTableHeaderColumn(QString("%1-ratio").arg(QStringLiteral("ink-") + QString::fromLatin1(info.name.toHex())), PDFToolTranslationContext::tr("%1 Ratio [%]").arg(info.textName), Qt::AlignLeft);
+        formatter.writeTableHeaderColumn(QString("%1-area").arg(QStringLiteral("ink-") + QString::fromLatin1(info.name.toHex())), PDFToolTranslationContext::tr("%1 Covered [mm^2]").arg(info.textName), Qt::AlignLeft);
     }
     formatter.endTableHeaderRow();
 
@@ -149,14 +149,14 @@ int PDFToolInkCoverageApplication::execute(const PDFToolOptions& options)
 
             if (channelInfo)
             {
-                formatter.writeTableColumn(QString("%1-ratio").arg(QString::fromLatin1(info.name)), locale.toString(channelInfo->ratio * 100.0, 'f', 2), Qt::AlignRight);
-                formatter.writeTableColumn(QString("%1-area").arg(QString::fromLatin1(info.name)), locale.toString(channelInfo->coveredArea, 'f', 2), Qt::AlignRight);
+                formatter.writeTableColumn(QString("%1-ratio").arg(QStringLiteral("ink-") + QString::fromLatin1(info.name.toHex())), locale.toString(channelInfo->ratio * 100.0, 'f', 2), Qt::AlignRight);
+                formatter.writeTableColumn(QString("%1-area").arg(QStringLiteral("ink-") + QString::fromLatin1(info.name.toHex())), locale.toString(channelInfo->coveredArea, 'f', 2), Qt::AlignRight);
                 sumChannelInfo->coveredArea += channelInfo->coveredArea;
             }
             else
             {
-                formatter.writeTableColumn(QString("%1-ratio").arg(QString::fromLatin1(info.name)), QString(), Qt::AlignRight);
-                formatter.writeTableColumn(QString("%1-area").arg(QString::fromLatin1(info.name)), QString(), Qt::AlignRight);
+                formatter.writeTableColumn(QString("%1-ratio").arg(QStringLiteral("ink-") + QString::fromLatin1(info.name.toHex())), QString(), Qt::AlignRight);
+                formatter.writeTableColumn(QString("%1-area").arg(QStringLiteral("ink-") + QString::fromLatin1(info.name.toHex())), QString(), Qt::AlignRight);
             }
         }
 
@@ -170,8 +170,8 @@ int PDFToolInkCoverageApplication::execute(const PDFToolOptions& options)
     for (const auto& info : headerCoverage)
     {
         const pdf::PDFInkCoverageCalculator::InkCoverageChannelInfo* channelInfo = pdf::PDFInkCoverageCalculator::findCoverageInfoByName(headerCoverage, info.name);
-        formatter.writeTableColumn(QString("%1-ratio").arg(QString::fromLatin1(info.name)), QString(), Qt::AlignRight);
-        formatter.writeTableColumn(QString("%1-area").arg(QString::fromLatin1(info.name)), locale.toString(channelInfo->coveredArea, 'f', 2), Qt::AlignRight);
+        formatter.writeTableColumn(QString("%1-ratio").arg(QStringLiteral("ink-") + QString::fromLatin1(info.name.toHex())), QString(), Qt::AlignRight);
+        formatter.writeTableColumn(QString("%1-area").arg(QStringLiteral("ink-") + QString::fromLatin1(info.name.toHex())), locale.toString(channelInfo->coveredArea, 'f', 2), Qt::AlignRight);
     }
 
     formatter.endTableRow();

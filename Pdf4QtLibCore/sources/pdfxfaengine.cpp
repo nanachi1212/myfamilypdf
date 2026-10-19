@@ -33,6 +33,8 @@
 #include <QImageReader>
 #include <QTextDocument>
 #include <QTextBlock>
+#include <QTextImageFormat>
+#include <QTextCursor>
 #include <QFontDatabase>
 #include <QAbstractTextDocumentLayout>
 #include <QtMath>
@@ -11755,6 +11757,10 @@ void PDFXFAEngineImpl::updateResources(const PDFObject& resources)
                     for (size_t i = 0; i < size; ++i)
                     {
                         const PDFDictionary* fontDictionary = m_document->getDictionaryFromObject(fontsDictionary->getValue(i));
+                        if (!fontDictionary)
+                        {
+                            continue;
+                        }
                         FontDescriptor descriptor = PDFFont::readFontDescriptor(m_document->getObject(fontDictionary->get("FontDescriptor")), m_document);
 
                         if (const QByteArray* data = descriptor.getEmbeddedFontData())
@@ -12268,7 +12274,23 @@ void PDFXFAEngineImpl::drawUiTextEdit(const xfa::XFA_textEdit* textEdit,
 
             QString html = value.value.toString();
 
-            QTextDocument document;
+            // A non-null placeholder also prevents Qt's image handler from falling
+            // back to QImage::load on the original document-supplied path.
+            class TextDocumentWithoutExternalResources final : public QTextDocument
+            {
+            protected:
+                QVariant loadResource(int type, const QUrl&) override
+                {
+                    if (type == QTextDocument::ImageResource)
+                    {
+                        QImage placeholder(1, 1, QImage::Format_ARGB32_Premultiplied);
+                        placeholder.fill(Qt::transparent);
+                        return placeholder;
+                    }
+                    return QString();
+                }
+            };
+            TextDocumentWithoutExternalResources document;
             document.setDocumentMargin(0);
             document.setUseDesignMetrics(true);
             document.setDefaultFont(painter->font());
@@ -12278,6 +12300,27 @@ void PDFXFAEngineImpl::drawUiTextEdit(const xfa::XFA_textEdit* textEdit,
             textOption.setWrapMode(isMultiline ? QTextOption::WrapAtWordBoundaryOrAnywhere : QTextOption::ManualWrap);
             document.setDefaultTextOption(textOption);
             document.setHtml(html);
+            // Qt probes @2x filenames before loadResource when drawing on HiDPI
+            // devices. Never leave an untrusted filesystem name in an image format.
+            struct ImageRun { int position; int length; QTextImageFormat format; };
+            std::vector<ImageRun> imageFormats;
+            for (QTextBlock imageBlock = document.begin(); imageBlock.isValid(); imageBlock = imageBlock.next())
+            {
+                for (auto it = imageBlock.begin(); !it.atEnd(); ++it)
+                {
+                    const QTextFragment fragment = it.fragment();
+                    if (fragment.isValid() && fragment.charFormat().isImageFormat())
+                        imageFormats.push_back({fragment.position(), fragment.length(), fragment.charFormat().toImageFormat()});
+                }
+            }
+            for (auto& entry : imageFormats)
+            {
+                entry.format.setName(QStringLiteral("qrc:/familypdf/blocked-xfa-image"));
+                QTextCursor cursor(&document);
+                cursor.setPosition(entry.position);
+                cursor.setPosition(entry.position + entry.length, QTextCursor::KeepAnchor);
+                cursor.setCharFormat(entry.format);
+            }
 
             QTextBlock block = document.firstBlock();
             while (block.isValid())

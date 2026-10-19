@@ -3,6 +3,8 @@
 // Copyright (c) 2018-2026 Jakub Melka and Contributors
 
 #include "pdfsecurityhandler.h"
+#include "pdfparser.h"
+#include "pdfexception.h"
 
 #include <QtTest>
 
@@ -20,6 +22,8 @@ private slots:
     void aesV3RejectsTruncatedCiphertext();
     void aesV3RejectsInvalidPadding();
     void emptyOwnerPasswordDoesNotGrantAccess();
+    void invalidEncryptionLengthsAreRejected();
+    void cryptFilterLengthsAndUnits();
 };
 
 static PDFSecurityHandlerPointer createAes256Handler()
@@ -105,6 +109,52 @@ void SecurityHandlerTest::emptyOwnerPasswordDoesNotGrantAccess()
         const auto userPassword = [](bool* ok) { *ok = true; return QStringLiteral("family-pdf-user"); };
         QVERIFY(reader->authenticate(userPassword, true) == PDFSecurityHandler::AuthorizationResult::OwnerAuthorized);
     }
+}
+
+void SecurityHandlerTest::invalidEncryptionLengthsAreRejected()
+{
+    for (const qint64 length : {qint64(-8), qint64(0), qint64(7), qint64(39), qint64(41), qint64(136), qint64(4294967336LL)})
+    {
+        const QByteArray entries = " /O <" + QByteArray(64, '0') + "> /U <" + QByteArray(64, '0') + "> /P -4 >>";
+        const QByteArray input = "<< /Filter /Standard /V 2 /R 3 /Length " + QByteArray::number(length) + entries;
+        PDFParser parser(input, nullptr, PDFParser::None);
+        const PDFObject dictionary = parser.getObject();
+        QVERIFY_EXCEPTION_THROWN(PDFSecurityHandler::createSecurityHandler(dictionary, QByteArray("id")), PDFException);
+    }
+    for (const int length : {40, 128})
+    {
+        const QByteArray input = "<< /Filter /Standard /V 2 /R 3 /Length " + QByteArray::number(length) +
+                                " /O <" + QByteArray(64, '0') + "> /U <" + QByteArray(64, '0') + "> /P -4 >>";
+        PDFParser parser(input, nullptr, PDFParser::None);
+        QVERIFY(!PDFSecurityHandler::createSecurityHandler(parser.getObject(), QByteArray("id")).isNull());
+    }
+}
+
+class CryptFilterProbe : public PDFSecurityHandler
+{
+public:
+    using PDFSecurityHandler::parseCryptFilter;
+};
+
+void SecurityHandlerTest::cryptFilterLengthsAndUnits()
+{
+    const auto parse = [](const QByteArray& name, qint64 length, bool publicKey)
+    {
+        const QByteArray input = "<< /CFM /" + name + " /Length " + QByteArray::number(length) + " >>";
+        PDFParser parser(input, nullptr, PDFParser::None);
+        return CryptFilterProbe::parseCryptFilter(256, parser.getObject(), publicKey);
+    };
+    for (const qint64 bad : {qint64(-5), qint64(0), qint64(4), qint64(17), qint64(2147483647), qint64(4294967312LL)})
+        QVERIFY_EXCEPTION_THROWN(parse("V2", bad, false), PDFException);
+    QCOMPARE(parse("V2", 5, false).keyLength, 5);
+    QCOMPARE(parse("V2", 16, false).keyLength, 16);
+    QCOMPARE(parse("V2", 40, true).keyLength, 5);
+    QCOMPARE(parse("AESV2", 128, true).keyLength, 16);
+    QCOMPARE(parse("AESV3", 256, true).keyLength, 32);
+    QCOMPARE(parse("AESV3", 32, false).keyLength, 32);
+    QVERIFY_EXCEPTION_THROWN(parse("AESV3", 16, false), PDFException);
+    QVERIFY_EXCEPTION_THROWN(parse("AESV2", 32, false), PDFException);
+    QVERIFY_EXCEPTION_THROWN(parse("V2", 41, true), PDFException);
 }
 
 QTEST_MAIN(SecurityHandlerTest)

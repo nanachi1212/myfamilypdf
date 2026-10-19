@@ -263,7 +263,7 @@ PDFPatternPtr PDFPattern::createShadingPattern(const PDFDictionary* colorSpaceDi
             QTransform domainToTargetTransform = loader.readMatrixFromDictionary(shadingDictionary, "Matrix", QTransform());
 
             size_t colorComponentCount = colorSpace->getColorComponentCount();
-            if (functions.size() > 1 && colorComponentCount != functions.size())
+            if (functions.empty() || (functions.size() > 1 && colorComponentCount != functions.size()))
             {
                 throw PDFException(PDFTranslationContext::tr("Invalid axial shading pattern color functions. Expected %1 functions, but %2 provided.").arg(int(colorComponentCount)).arg(int(functions.size())));
             }
@@ -305,7 +305,7 @@ PDFPatternPtr PDFPattern::createShadingPattern(const PDFDictionary* colorSpaceDi
             }
 
             size_t colorComponentCount = colorSpace->getColorComponentCount();
-            if (functions.size() > 1 && colorComponentCount != functions.size())
+            if (functions.empty() || (functions.size() > 1 && colorComponentCount != functions.size()))
             {
                 throw PDFException(PDFTranslationContext::tr("Invalid axial shading pattern color functions. Expected %1 functions, but %2 provided.").arg(int(colorComponentCount)).arg(int(functions.size())));
             }
@@ -351,7 +351,7 @@ PDFPatternPtr PDFPattern::createShadingPattern(const PDFDictionary* colorSpaceDi
             }
 
             size_t colorComponentCount = colorSpace->getColorComponentCount();
-            if (functions.size() > 1 && colorComponentCount != functions.size())
+            if (functions.empty() || (functions.size() > 1 && colorComponentCount != functions.size()))
             {
                 throw PDFException(PDFTranslationContext::tr("Invalid radial shading pattern color functions. Expected %1 functions, but %2 provided.").arg(int(colorComponentCount)).arg(int(functions.size())));
             }

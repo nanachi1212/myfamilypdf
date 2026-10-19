@@ -57,7 +57,9 @@ def write_xlsx(
                 table_start_row = output_row
                 for row in table.rows:
                     for column_index, value in enumerate(row, start=1):
-                        worksheet.cell(output_row, column_index, value)
+                        cell = worksheet.cell(output_row, column_index, value)
+                        if isinstance(value, str):
+                            cell.data_type = "s"
                     output_row += 1
 
                 for merge in table.merges:
@@ -76,7 +78,8 @@ def write_xlsx(
         else:
             fallback_pages.append(page.number)
             for row_index, block in enumerate(page.blocks, start=1):
-                worksheet.cell(row_index, 1, block.text)
+                cell = worksheet.cell(row_index, 1, block.text)
+                cell.data_type = "s"
 
         worksheet.freeze_panes = "A1"
         _fit_columns(worksheet)

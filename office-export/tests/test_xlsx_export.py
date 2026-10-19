@@ -16,6 +16,23 @@ from familypdf_office_export.xlsx_writer import write_xlsx
 
 
 class XlsxExportTest(unittest.TestCase):
+    def test_document_strings_are_never_formulas(self) -> None:
+        values = ['=1+2', '=HYPERLINK("https://invalid.example", "click")', '+1', '-1', '@name', '一般文字']
+        document = ExtractedDocument(pages=[
+            ExtractedPage(number=1, tables=[ExtractedTable(rows=[values, [2, 120]])]),
+            ExtractedPage(number=2, blocks=[TextBlock(runs=[TextRun(value)]) for value in values]),
+        ])
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "literal.xlsx"
+            write_xlsx(document, output)
+            workbook = load_workbook(output, data_only=False)
+            for index, value in enumerate(values, start=1):
+                for cell in [workbook["Page 1"].cell(1, index), workbook["Page 2"].cell(index, 1)]:
+                    self.assertEqual(cell.value, value)
+                    self.assertEqual(cell.data_type, "s")
+            self.assertEqual(workbook["Page 1"].cell(2, 1).data_type, "n")
+            workbook.close()
+
     def test_writes_tables_merges_and_line_fallback(self) -> None:
         document = ExtractedDocument(
             pages=[

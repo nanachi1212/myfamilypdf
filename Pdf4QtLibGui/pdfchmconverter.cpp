@@ -24,6 +24,9 @@
 #include <QAbstractTextDocumentLayout>
 #include <QPalette>
 #include <QTextDocument>
+#include <QTextBlock>
+#include <QTextImageFormat>
+#include <QTextCursor>
 #include <QUrl>
 
 #include <array>
@@ -233,7 +236,7 @@ bool LzxDecoder::readLengths(quint8* lengths, int first, int last)
 bool LzxDecoder::decode(const QByteArray& input, qsizetype outputLength, QByteArray* output)
 {
     static const int positionSlots[] = { 30, 32, 34, 36, 38, 42, 50 };
-    if (m_windowBits < 15 || m_windowBits > 21)
+    if (m_windowBits < 15 || m_windowBits > 21 || outputLength < 0 || outputLength > 64 * 1024 * 1024)
     {
         return false;
     }
@@ -509,10 +512,26 @@ protected:
                 {
                     return PDFChmConverter::decodeText(data, m_languageId);
                 }
-                return data;
+                if (type == QTextDocument::ImageResource)
+                {
+                    const QImage image = QImage::fromData(data);
+                    if (!image.isNull()) return image;
+                    // Invalid archive bytes must not fall back to the original filesystem URL.
+                }
+                else
+                {
+                    return data;
+                }
             }
         }
-        return QVariant();  // Missing or remote resources are left out
+        // Null resources allow Qt's image handler to load the original filesystem path.
+        if (type == QTextDocument::ImageResource)
+        {
+            QImage placeholder(1, 1, QImage::Format_ARGB32_Premultiplied);
+            placeholder.fill(Qt::transparent);
+            return placeholder;
+        }
+        return QString();
     }
 
 private:
@@ -605,7 +624,7 @@ bool PDFChmArchive::open(const QString& fileName, QString* errorMessage)
         {
             quint64 nameLength = 0;
             Entry entry;
-            if (!readEncodedInteger(directory, position, end, nameLength) || position + qsizetype(nameLength) > end)
+            if (!readEncodedInteger(directory, position, end, nameLength) || position > end || nameLength > quint64(end - position))
             {
                 break;
             }
@@ -706,7 +725,7 @@ bool PDFChmArchive::initializeCompressedSection()
     m_uncompressedLength = readLE64(resetTable, 16);
     m_compressedLength = readLE64(resetTable, 24);
     m_blockLength = readLE64(resetTable, 32);
-    if (m_blockLength == 0 || resetInterval < m_blockLength || qsizetype(tableOffset) + qsizetype(blockCount) * 8 > resetTable.size())
+    if (m_blockLength == 0 || resetInterval > 64 * 1024 * 1024 || resetInterval < m_blockLength || qsizetype(tableOffset) + qsizetype(blockCount) * 8 > resetTable.size())
     {
         return false;
     }
@@ -729,8 +748,12 @@ const QByteArray* PDFChmArchive::decodedInterval(quint64 interval)
         return &it->second;
     }
 
+    if (m_blocksPerReset == 0 || interval > quint64(m_resetTable.size()) / m_blocksPerReset)
+    {
+        return nullptr;
+    }
     const quint64 firstBlock = interval * m_blocksPerReset;
-    if (firstBlock >= m_resetTable.size())
+    if (firstBlock >= m_resetTable.size() || m_blockLength == 0 || firstBlock > m_uncompressedLength / m_blockLength)
     {
         return nullptr;
     }
@@ -761,6 +784,11 @@ const QByteArray* PDFChmArchive::decodedInterval(quint64 interval)
 
 QByteArray PDFChmArchive::readCompressed(quint64 offset, quint64 length)
 {
+    if (m_blockLength == 0 || m_blocksPerReset == 0 || m_blocksPerReset > (64 * 1024 * 1024) / m_blockLength ||
+        length > 64 * 1024 * 1024 || offset > m_uncompressedLength || length > m_uncompressedLength - offset)
+    {
+        return QByteArray();
+    }
     const quint64 intervalLength = m_blocksPerReset * m_blockLength;
     QByteArray result;
     quint64 position = offset;
@@ -1021,6 +1049,30 @@ QString PDFChmConverter::convertToPdf(const QString& chmFileName, const QString&
             ChmTextDocument document(&archive, QFileInfo(pages[i]).path(), languageId);
             document.setPageSize(pageSize);
             document.setHtml(html);
+            // Resolve archive images in memory, then replace their original names
+            // before Qt's HiDPI renderer can probe those names on the filesystem.
+            struct ImageRun { int position; int length; QTextImageFormat format; };
+            std::vector<ImageRun> imageFormats;
+            for (QTextBlock block = document.begin(); block.isValid(); block = block.next())
+            {
+                for (auto it = block.begin(); !it.atEnd(); ++it)
+                {
+                    const QTextFragment fragment = it.fragment();
+                    if (fragment.isValid() && fragment.charFormat().isImageFormat())
+                        imageFormats.push_back({fragment.position(), fragment.length(), fragment.charFormat().toImageFormat()});
+                }
+            }
+            for (auto& entry : imageFormats)
+            {
+                const QVariant resource = document.resource(QTextDocument::ImageResource, QUrl(entry.format.name()));
+                const QUrl safeName(QStringLiteral("qrc:/familypdf/chm-image-%1").arg(entry.position));
+                document.addResource(QTextDocument::ImageResource, safeName, resource);
+                entry.format.setName(safeName.toString());
+                QTextCursor cursor(&document);
+                cursor.setPosition(entry.position);
+                cursor.setPosition(entry.position + entry.length, QTextCursor::KeepAnchor);
+                cursor.setCharFormat(entry.format);
+            }
 
             firstPage.emplace(pages[i].toLower(), pageCount);
             const int documentPages = std::max(document.pageCount(), 1);
