@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Morandi palette: mist blue, sage, dusty rose, oat gold, warm ivory. -->
+    <color name="bg">#F6F1E7</color>
+    <color name="card">#FFFCF6</color>
+    <color name="text">#3D424C</color>
+    <color name="subtext">#767C87</color>
+    <color name="accent">#5E7A92</color>
+    <color name="on_accent">#FFFFFF</color>
+    <color name="danger">#A86F74</color>
+    <color name="divider">#E6DFD2</color>
+    <color name="ripple">#335E7A92</color>
+    <color name="panel_bg">#F7FBF8F2</color>
+    <color name="panel_stroke">#1F3D424C</color>
+    <color name="scrim">#29000000</color>
+    <color name="head_rim">#93A8BC</color>
+    <color name="launcher_bg">#A9BBCC</color>
+    <color name="mist">#8FA6BA</color>
+    <color name="sage">#9DAE9A</color>
+    <color name="rose">#C29EA1</color>
+    <color name="oat">#C8B086</color>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon: white silhouette of the spiky-haired head. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M19,72 L10,58 L17,54 L7,41 L19,38 L12,22 L27,26 L27,8 L40,19 L50,3 L58,18 L72,7 L72,23 L89,17 L82,32 L95,37 L84,47 L92,57 L81,72 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M22,65 a28,24 0 1,0 56,0 a28,24 0 1,0 -56,0 Z" />
+</vector>

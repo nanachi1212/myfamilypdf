@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#1F2227</color>
+    <color name="card">#2A2E35</color>
+    <color name="text">#ECE7DF</color>
+    <color name="subtext">#A6ABB4</color>
+    <color name="accent">#A3B8CB</color>
+    <color name="on_accent">#1D232B</color>
+    <color name="danger">#D6A4A8</color>
+    <color name="divider">#3A3F47</color>
+    <color name="ripple">#33A3B8CB</color>
+    <color name="panel_bg">#F22A2E35</color>
+    <color name="panel_stroke">#33ECE7DF</color>
+    <color name="scrim">#47000000</color>
+</resources>

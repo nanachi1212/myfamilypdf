@@ -1,0 +1,167 @@
+name: GojoDock Android
+
+# Builds the floating-head shortcut app in GojoDock/ and smoke-tests it on an
+# emulator shaped like a Galaxy S23 Ultra. Unrelated to the FamilyPDF build.
+on:
+  push:
+    paths:
+      - 'GojoDock/**'
+      - '.github/workflows/gojodock-android.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: GojoDock
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Cache Gradle
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gojodock-gradle-${{ hashFiles('GojoDock/**/*.gradle.kts', 'GojoDock/gradle/wrapper/gradle-wrapper.properties') }}
+
+      - name: Build debug APK and run lint
+        run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug lintDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: GojoDock-apk
+          path: GojoDock/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: GojoDock-lint
+          path: GojoDock/app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Smoke test on an S23 Ultra-sized emulator
+        run: |
+          set -euo pipefail
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          AVDM="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          ADB="$ANDROID_HOME/platform-tools/adb"
+          IMG="system-images;android-35;google_apis;x86_64"
+          PKG=com.nanachi.gojodock
+          mkdir -p smoke
+
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" --install emulator platform-tools "$IMG" > smoke/sdkmanager.log
+          echo no | "$AVDM" create avd -n s23u -k "$IMG" --force
+          # Galaxy S23 Ultra at its default FHD+ resolution: 1080 x 2316, 450 dpi.
+          CFG="$HOME/.android/avd/s23u.avd/config.ini"
+          sed -i '/^hw.lcd.width/d;/^hw.lcd.height/d;/^hw.lcd.density/d;/^hw.keyboard/d' "$CFG"
+          printf 'hw.lcd.width=1080\nhw.lcd.height=2316\nhw.lcd.density=450\nhw.keyboard=no\n' >> "$CFG"
+
+          "$ANDROID_HOME/emulator/emulator" -avd s23u -no-window -no-audio -no-boot-anim -no-snapshot \
+            -gpu swiftshader_indirect -camera-back none -camera-front none > smoke/emulator.log 2>&1 &
+          "$ADB" wait-for-device
+          for i in $(seq 1 120); do
+            [ "$("$ADB" shell getprop sys.boot_completed | tr -d '\r')" = "1" ] && break
+            sleep 5
+          done
+          "$ADB" shell wm size
+          "$ADB" shell wm density
+          "$ADB" shell settings put global window_animation_scale 0
+          "$ADB" shell input keyevent KEYCODE_WAKEUP
+          "$ADB" shell wm dismiss-keyguard || true
+
+          shot() { "$ADB" exec-out screencap -p > "smoke/$1.png"; }
+          windows() {
+            echo "--- $1"
+            "$ADB" shell dumpsys window windows | grep -E 'Window #[0-9]+ Window\{.*GojoDock|frame=\[|mFrame=' \
+              | grep -A2 'GojoDock' | head -20 || true
+          }
+
+          "$ADB" install -r app/build/outputs/apk/debug/app-debug.apk
+          "$ADB" shell appops set $PKG SYSTEM_ALERT_WINDOW allow
+          "$ADB" shell pm grant $PKG android.permission.POST_NOTIFICATIONS
+          "$ADB" logcat -c
+
+          # Opening the app shows the settings and starts the head.
+          "$ADB" shell am start -W -n $PKG/.MainActivity
+          sleep 6
+          shot 01-settings
+          "$ADB" shell input keyevent KEYCODE_HOME
+          sleep 6
+          shot 02-home-tucked
+          windows "head tucked at the right edge"
+
+          # Head defaults: 44 dp at 450 dpi = 124 px, right edge, 58% down, 40% tucked away.
+          "$ADB" shell input tap 1050 1405
+          sleep 2
+          shot 03-panel-open
+          windows "panel open"
+          "$ADB" shell input keyevent KEYCODE_BACK
+          sleep 2
+          shot 04-panel-closed-by-back
+
+          # Drag the head to the left side; it should snap to the left edge.
+          "$ADB" shell input swipe 1050 1405 400 900 800
+          sleep 1
+          shot 05-dragged-left
+          windows "after dragging left"
+          sleep 4
+
+          # Open the panel on the left and launch the first shortcut.
+          "$ADB" shell input tap 30 900
+          sleep 2
+          shot 06-panel-left
+          windows "panel on the left"
+          "$ADB" shell input tap 290 830
+          sleep 4
+          shot 07-after-launch
+
+          # Landscape: the head must stay on screen.
+          "$ADB" shell settings put system accelerometer_rotation 0
+          "$ADB" shell settings put system user_rotation 1
+          sleep 5
+          shot 08-landscape
+          windows "landscape"
+
+          "$ADB" logcat -d > smoke/logcat.txt
+          "$ADB" logcat -d -b crash > smoke/crash.txt || true
+          echo "--- crash buffer"
+          cat smoke/crash.txt
+          echo "--- app log"
+          grep -E 'GojoDock|AndroidRuntime' smoke/logcat.txt | tail -40 || true
+          if grep -q "$PKG" smoke/crash.txt; then
+            echo "::error::GojoDock crashed during the smoke test"
+            exit 1
+          fi
+          "$ADB" shell pidof $PKG || { echo "::error::GojoDock is not running after the smoke test"; exit 1; }
+
+      - name: Upload smoke test screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: GojoDock-smoke
+          path: GojoDock/smoke/
+          if-no-files-found: ignore
