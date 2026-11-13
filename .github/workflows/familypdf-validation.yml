@@ -57,6 +57,17 @@ jobs:
             -PdfFile .\build\test-artifacts\viewer-smoke.pdf `
             -OutputDirectory .\build\test-artifacts\viewer-process
 
+      - name: Capture matched workspaces with native Windows fonts
+        if: success()
+        shell: powershell
+        env:
+          QT_QPA_PLATFORM: windows
+          FAMILYPDF_TEST_ARTIFACT_DIR: ${{ github.workspace }}\build\test-artifacts\native-comparison
+        run: |
+          New-Item -ItemType Directory -Path $env:FAMILYPDF_TEST_ARTIFACT_DIR -Force | Out-Null
+          & .\build\phase0-upstream-release\usr\bin\UnitTestsViewer.exe workspaceComparisonScreenshots
+          if ($LASTEXITCODE -ne 0) { throw "Native workspace capture failed: $LASTEXITCODE" }
+
       - name: Save toolchain cache after build or test failure
         if: always()
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
