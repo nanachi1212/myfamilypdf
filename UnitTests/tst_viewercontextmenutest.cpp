@@ -200,6 +200,9 @@ private slots:
     void init();
     void cleanup();
     void menuActionsOperateOnTheDocument();
+    void workspaceComparisonScreenshots_data() { searchExperience_data(); }
+    void workspaceComparisonScreenshots();
+
     void bookmarkUsesClickedPage_data();
     void bookmarkUsesClickedPage();
     void emptyDocumentCannotBeBookmarked();
@@ -365,6 +368,48 @@ void ViewerContextMenuTest::init()
 void ViewerContextMenuTest::cleanup()
 {
     m_window.reset();
+}
+
+void ViewerContextMenuTest::workspaceComparisonScreenshots()
+{
+    QFETCH(bool, editor);
+    m_window.reset();
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope,
+                       QCoreApplication::organizationName(), QCoreApplication::applicationName());
+    settings.clear();
+    pdf::PDFApplicationTranslator translator;
+    translator.setLanguage(pdf::PDFApplicationTranslator::E_LANGUAGE_CHINESE_TRADITIONAL);
+    translator.installTranslator();
+    std::unique_ptr<QMainWindow> window;
+    pdfviewer::PDFProgramController* controller = nullptr;
+    if (editor)
+    {
+        auto* instance = new pdfviewer::PDFEditorMainWindow();
+        controller = instance->getProgramController();
+        window.reset(instance);
+    }
+    else
+    {
+        auto* instance = new pdfviewer::PDFViewerMainWindow();
+        controller = instance->getProgramController();
+        window.reset(instance);
+    }
+    window->resize(1100, 900);
+    window->show();
+    controller->closeDocument();
+    QTRY_VERIFY(!controller->getDocument());
+    QApplication::processEvents();
+    const QString prefix = editor ? QStringLiteral("compare-editor-") : QStringLiteral("compare-reader-");
+    saveImage(window->grab(), prefix + QStringLiteral("home.png"));
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY_WITH_TIMEOUT(controller->getDocument(), 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!controller->getIsBusy(), 15000);
+    auto* fit = window->findChild<QAction*>(QStringLiteral("actionFitWidth"));
+    QVERIFY(fit);
+    fit->trigger();
+    QTRY_VERIFY_WITH_TIMEOUT(!controller->getPdfWidget()->getDrawWidget()->getCurrentPages().empty(), 15000);
+    QApplication::processEvents();
+    saveImage(window->grab(), prefix + QStringLiteral("document.png"));
 }
 
 void ViewerContextMenuTest::searchExperience_data()
