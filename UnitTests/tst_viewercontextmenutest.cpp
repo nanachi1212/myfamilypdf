@@ -425,6 +425,7 @@ void ViewerContextMenuTest::quietWorkspaceLifecycle()
     QVERIFY(toolbar);
     QVERIFY(!home->isVisible());
     QVERIFY(toolbar->isVisible());
+    saveImage(window->grab(), editor ? "editor-quiet-document.png" : "viewer-quiet-document.png");
     for (const char* name : {"actionGoToDocumentStart", "actionGoToDocumentEnd", "actionMagnifier", "actionFitHeight"})
     {
         auto* action = window->findChild<QAction*>(QString::fromLatin1(name));
@@ -443,11 +444,20 @@ void ViewerContextMenuTest::quietWorkspaceLifecycle()
     QTRY_VERIFY(!controller->getDocument());
     QVERIFY(home->isVisible());
     QVERIFY(!toolbar->isVisible());
+    saveImage(window->grab(), editor ? "editor-quiet-home.png" : "viewer-quiet-home.png");
     controller->openDocument(m_pdfPath);
     QTRY_VERIFY(controller->getDocument());
     QTRY_VERIFY(!controller->getIsBusy());
     QVERIFY(!home->isVisible());
     QVERIFY(toolbar->isVisible());
+    toolbar->hide();
+    controller->closeDocument();
+    QTRY_VERIFY(!controller->getDocument());
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_VERIFY(!controller->getIsBusy());
+    QVERIFY(!toolbar->isVisible()); // Close/reopen preserves the explicit hidden choice.
+    toolbar->show();
 }
 
 void ViewerContextMenuTest::searchExperience_data()
