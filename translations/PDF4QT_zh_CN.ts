@@ -15877,4 +15877,11 @@ Pages (leave blank for all; example: 1-3,5):</source><translation>将使用最�
     <message><source>This split would produce a single file. Choose different settings.</source><translation>这样拆分只会产生一个文件，请改用其他设置。</translation></message>
     <message><source>New file starts at each top-level bookmark</source><translation>在每个顶层书签开始新文件</translation></message>
 </context>
+<context>
+    <name>PDFDocumentWorkspace</name>
+    <message>
+        <source>Open PDF</source>
+        <translation>打开 PDF</translation>
+    </message>
+</context>
 </TS>

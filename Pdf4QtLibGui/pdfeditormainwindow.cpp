@@ -49,6 +49,7 @@
 #include "pdfwidgetutils.h"
 #include "pdfactioncombobox.h"
 #include "pdfsessionmanager.h"
+#include "pdfdocumentworkspace.h"
 #include "pdfwidgetannotation.h"
 
 #include <QPainter>
@@ -137,6 +138,7 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     ui->mainToolBar->setWindowTitle(tr("Standard"));
 
     m_documentTabBar->setDocumentMode(true);
+    m_documentTabBar->setAutoHide(true);
     m_documentTabBar->setTabsClosable(true);
     m_documentTabBar->setUsesScrollButtons(true);
     m_documentTabBar->setExpanding(false);
@@ -289,17 +291,13 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
 
     // Page control
     ui->mainToolBar->addSeparator();
-    ui->mainToolBar->addAction(ui->actionGoToDocumentStart);
     ui->mainToolBar->addAction(ui->actionGoToPreviousPage);
     ui->mainToolBar->addWidget(m_pageNumberSpinBox);
     ui->mainToolBar->addWidget(m_pageNumberLabel);
     ui->mainToolBar->addAction(ui->actionGoToNextPage);
-    ui->mainToolBar->addAction(ui->actionGoToDocumentEnd);
 
     // Zoom
     ui->mainToolBar->addSeparator();
-    ui->mainToolBar->addAction(ui->actionZoom_In);
-    ui->mainToolBar->addAction(ui->actionZoom_Out);
 
     m_pageZoomSpinBox = new QDoubleSpinBox(this);
     m_pageZoomSpinBox->setObjectName("pageZoomSpinBox");
@@ -313,21 +311,12 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     ui->mainToolBar->addWidget(m_pageZoomSpinBox);
 
     // Fit page, width, height
-    ui->mainToolBar->addAction(ui->actionFitPage);
     ui->mainToolBar->addAction(ui->actionFitWidth);
-    ui->mainToolBar->addAction(ui->actionFitHeight);
     ui->mainToolBar->addSeparator();
 
     // Tools
     ui->mainToolBar->addAction(ui->actionSelectText);
-    ui->mainToolBar->addAction(ui->actionSelectTable);
     ui->mainToolBar->addAction(ui->actionCreateTextHighlight);
-    ui->mainToolBar->addAction(ui->actionCreateTextUnderline);
-    ui->mainToolBar->addAction(ui->actionCreateTextStrikeout);
-    ui->mainToolBar->addAction(ui->actionCreateTextSquiggly);
-    ui->mainToolBar->addAction(ui->actionMagnifier);
-    ui->mainToolBar->addAction(ui->actionScreenshot);
-    ui->mainToolBar->addAction(ui->actionExtractImage);
     ui->mainToolBar->addSeparator();
 
     QAction* ocrAction = ui->menuTools->addAction(tr("Create Searchable PDF with OCR..."));
@@ -370,13 +359,12 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     connect(reversePageOrderAction, &QAction::triggered, m_programController, [this]() { m_programController->reversePageOrder(getSelectedPages()); });
 
     // Special tools
-    QToolButton* insertStickyNoteButton = m_actionManager->createToolButtonForActionGroup(PDFActionManager::CreateStickyNoteGroup, ui->mainToolBar);
-    ui->mainToolBar->addWidget(insertStickyNoteButton);
-    ui->mainToolBar->addSeparator();
+    // Annotation variants remain available in the existing Tools menu.
 
     m_programController->initialize(PDFProgramController::AllFeatures, this, this, m_actionManager, m_progress);
-    setCentralWidget(m_programController->getPdfWidget());
-    setFocusProxy(m_programController->getPdfWidget());
+    m_workspace = new PDFDocumentWorkspace(m_programController->getPdfWidget(), ui->actionOpen, this);
+    setCentralWidget(m_workspace);
+    setFocusProxy(m_workspace);
     m_programController->getPdfWidget()->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_programController->getPdfWidget(), &QWidget::customContextMenuRequested, this, &PDFEditorMainWindow::onPdfContextMenuRequested);
 
@@ -449,6 +437,8 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     menuBar()->setCornerWidget(actionComboBox);
 
     m_programController->finishInitialization();
+    m_documentToolbarVisible = !ui->mainToolBar->isHidden();
+    ui->mainToolBar->setVisible(m_programController->getDocument() && m_documentToolbarVisible);
     updateDeveloperMenu();
 
     if (pdf::PDFToolManager* toolManager = m_programController->getToolManager())
@@ -810,6 +800,18 @@ void PDFEditorMainWindow::setStatusBarMessage(QString message, int time)
 
 void PDFEditorMainWindow::setDocument(const pdf::PDFModifiedDocument& document)
 {
+    if (m_workspace)
+    {
+        const bool available = document.getDocument() != nullptr;
+        if (m_workspace->hasDocument() != available)
+        {
+            if (!available)
+                m_documentToolbarVisible = !ui->mainToolBar->isHidden();
+            ui->mainToolBar->setVisible(available && m_documentToolbarVisible);
+        }
+        m_workspace->setDocumentAvailable(available);
+    }
+
     if (m_sidebarWidget)
     {
         m_sidebarWidget->setDocument(document, *m_programController->getSignatures());
@@ -879,7 +881,12 @@ void PDFEditorMainWindow::closeEvent(QCloseEvent* event)
 
         if (!m_programController->isFactorySettingsBeingRestored())
         {
+            // Persist the user's document layout, not the temporary empty state.
+            if (!m_workspace->hasDocument())
+                ui->mainToolBar->setVisible(m_documentToolbarVisible);
             m_programController->writeSettings();
+            if (!m_workspace->hasDocument())
+                ui->mainToolBar->hide();
         }
 
         m_programController->closeDocument();

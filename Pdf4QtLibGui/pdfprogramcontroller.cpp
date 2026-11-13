@@ -3417,6 +3417,9 @@ void PDFProgramController::loadPlugins()
             QToolBar* toolBar = m_mainWindow->addToolBar(tr(plugin.first.name.toUtf8().constData()));
             toolBar->setObjectName(QString("Plugin_Toolbar_%1").arg(plugin.first.name));
             m_mainWindowInterface->adjustToolbar(toolBar);
+            // Secondary editing features live in their menus until explicitly requested.
+            // QMainWindow's toolbar context menu can reveal them; saved layouts still win.
+            toolBar->hide();
             QMenu* menu = m_mainWindowInterface->addToolMenu(plugin.second->getPluginMenuName());
             for (QAction* action : actions)
             {

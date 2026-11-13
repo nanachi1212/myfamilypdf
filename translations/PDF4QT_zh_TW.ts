@@ -20652,4 +20652,11 @@ Do you want to perform this action?</source>
         <translation>選擇色彩設定檔目錄</translation>
     </message>
 </context>
+<context>
+    <name>PDFDocumentWorkspace</name>
+    <message>
+        <source>Open PDF</source>
+        <translation>開啟 PDF</translation>
+    </message>
+</context>
 </TS>
