@@ -2,6 +2,8 @@
 // Copyright (c) 2026 FamilyPDF contributors
 
 #include "pdfviewermainwindow.h"
+#include "pdfdocumentworkspace.h"
+#include <QToolBar>
 #include "pdfeditormainwindow.h"
 #include "pdfdrawwidget.h"
 #include "pdfdrawspacecontroller.h"
@@ -200,6 +202,9 @@ private slots:
     void init();
     void cleanup();
     void menuActionsOperateOnTheDocument();
+    void quietWorkspaceActionAndTransitions();
+    void quietWorkspaceLifecycle_data() { searchExperience_data(); }
+    void quietWorkspaceLifecycle();
     void bookmarkUsesClickedPage_data();
     void bookmarkUsesClickedPage();
     void emptyDocumentCannotBeBookmarked();
@@ -365,6 +370,76 @@ void ViewerContextMenuTest::init()
 void ViewerContextMenuTest::cleanup()
 {
     m_window.reset();
+}
+
+void ViewerContextMenuTest::quietWorkspaceActionAndTransitions()
+{
+    QAction open(nullptr);
+    open.setText(QStringLiteral("Open"));
+    auto* document = new QWidget();
+    pdfviewer::PDFDocumentWorkspace workspace(document, &open);
+    workspace.show();
+    auto* button = workspace.findChild<QPushButton*>(QStringLiteral("openPdfButton"));
+    QVERIFY(button);
+    QCOMPARE(workspace.findChildren<QPushButton*>().size(), 1);
+    QVERIFY(button->isVisible());
+    QVERIFY(!document->isVisible());
+    QSignalSpy triggered(&open, &QAction::triggered);
+    QTest::mouseClick(button, Qt::LeftButton);
+    QCOMPARE(triggered.count(), 1);
+    // Triggering Open alone does not claim that a document was loaded.
+    QVERIFY(button->isVisible());
+    open.setEnabled(false);
+    QVERIFY(!button->isEnabled());
+    open.setEnabled(true);
+    QVERIFY(button->isEnabled());
+    QCOMPARE(button->text(), QCoreApplication::translate("PDFDocumentWorkspace", "Open PDF"));
+    workspace.setDocumentAvailable(true);
+    QVERIFY(document->isVisible());
+    QVERIFY(!button->isVisible());
+    workspace.setDocumentAvailable(false);
+    QVERIFY(button->isVisible());
+    workspace.setDocumentAvailable(false);
+    QVERIFY(button->isVisible());
+}
+
+void ViewerContextMenuTest::quietWorkspaceLifecycle()
+{
+    QFETCH(bool, editor);
+    std::unique_ptr<pdfviewer::PDFEditorMainWindow> editorWindow;
+    QMainWindow* window = m_window.get();
+    auto* controller = m_window->getProgramController();
+    if (editor)
+    {
+        editorWindow = std::make_unique<pdfviewer::PDFEditorMainWindow>();
+        window = editorWindow.get();
+        controller = editorWindow->getProgramController();
+        window->show();
+        controller->openDocument(m_pdfPath);
+        QTRY_VERIFY(controller->getDocument());
+        QTRY_VERIFY(!controller->getIsBusy());
+    }
+    auto* home = window->findChild<QWidget*>(QStringLiteral("documentHome"));
+    auto* toolbar = window->findChild<QToolBar*>(QStringLiteral("mainToolBar"));
+    QVERIFY(home);
+    QVERIFY(toolbar);
+    QVERIFY(!home->isVisible());
+    QVERIFY(toolbar->isVisible());
+    for (const char* name : {"actionGoToDocumentStart", "actionGoToDocumentEnd", "actionMagnifier", "actionFitHeight"})
+    {
+        auto* action = window->findChild<QAction*>(QString::fromLatin1(name));
+        QVERIFY(action); // Removed from toolbar, not from the app.
+        QVERIFY(!toolbar->actions().contains(action));
+    }
+    controller->closeDocument();
+    QTRY_VERIFY(!controller->getDocument());
+    QVERIFY(home->isVisible());
+    QVERIFY(!toolbar->isVisible());
+    controller->openDocument(m_pdfPath);
+    QTRY_VERIFY(controller->getDocument());
+    QTRY_VERIFY(!controller->getIsBusy());
+    QVERIFY(!home->isVisible());
+    QVERIFY(toolbar->isVisible());
 }
 
 void ViewerContextMenuTest::searchExperience_data()

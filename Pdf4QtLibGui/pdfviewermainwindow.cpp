@@ -49,6 +49,7 @@
 #include "pdfwidgetutils.h"
 #include "pdfactioncombobox.h"
 #include "pdfsessionmanager.h"
+#include "pdfdocumentworkspace.h"
 
 #include <QPainter>
 #include <QSettings>
@@ -134,6 +135,7 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     ui->mainToolBar->setWindowTitle(tr("Standard"));
 
     m_documentTabBar->setDocumentMode(true);
+    m_documentTabBar->setAutoHide(true);
     m_documentTabBar->setTabsClosable(true);
     m_documentTabBar->setUsesScrollButtons(true);
     m_documentTabBar->setExpanding(false);
@@ -234,17 +236,13 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
 
     // Page control
     ui->mainToolBar->addSeparator();
-    ui->mainToolBar->addAction(ui->actionGoToDocumentStart);
     ui->mainToolBar->addAction(ui->actionGoToPreviousPage);
     ui->mainToolBar->addWidget(m_pageNumberSpinBox);
     ui->mainToolBar->addWidget(m_pageNumberLabel);
     ui->mainToolBar->addAction(ui->actionGoToNextPage);
-    ui->mainToolBar->addAction(ui->actionGoToDocumentEnd);
 
     // Zoom
     ui->mainToolBar->addSeparator();
-    ui->mainToolBar->addAction(ui->actionZoom_In);
-    ui->mainToolBar->addAction(ui->actionZoom_Out);
 
     m_pageZoomSpinBox = new QDoubleSpinBox(this);
     m_pageZoomSpinBox->setMinimum(pdf::PDFDrawWidgetProxy::getMinZoom() * 100);
@@ -257,15 +255,11 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     ui->mainToolBar->addWidget(m_pageZoomSpinBox);
 
     // Fit page, width, height
-    ui->mainToolBar->addAction(ui->actionFitPage);
     ui->mainToolBar->addAction(ui->actionFitWidth);
-    ui->mainToolBar->addAction(ui->actionFitHeight);
     ui->mainToolBar->addSeparator();
 
     // Tools
     ui->mainToolBar->addAction(ui->actionSelectText);
-    ui->mainToolBar->addAction(ui->actionSelectTable);
-    ui->mainToolBar->addAction(ui->actionMagnifier);
     ui->mainToolBar->addSeparator();
 
     // Special tools
@@ -286,8 +280,10 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     pdfWidget->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(pdfWidget, &QWidget::customContextMenuRequested, this, &PDFViewerMainWindow::onPdfContextMenuRequested);
 
-    setCentralWidget(pdfWidget);
-    setFocusProxy(pdfWidget);
+    m_workspace = new PDFDocumentWorkspace(pdfWidget, ui->actionOpen, this);
+    setCentralWidget(m_workspace);
+    setFocusProxy(m_workspace);
+    ui->mainToolBar->hide();
 
     m_sidebarWidget = new PDFSidebarWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), m_programController->getCertificateStore(), m_programController->getBookmarkManager(), m_programController->getSettings(), false, this);
     m_sidebarDockWidget = new QDockWidget(tr("&Sidebar"), this);
@@ -317,6 +313,7 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     PDFActionComboBox* actionComboBox = new PDFActionComboBox(this);
     menuBar()->setCornerWidget(actionComboBox);
     m_programController->finishInitialization();
+    ui->mainToolBar->setVisible(m_programController->getDocument() != nullptr);
 
     if (pdf::PDFToolManager* toolManager = m_programController->getToolManager())
     {
@@ -619,6 +616,12 @@ void PDFViewerMainWindow::setStatusBarMessage(QString message, int time)
 
 void PDFViewerMainWindow::setDocument(const pdf::PDFModifiedDocument& document)
 {
+    if (m_workspace)
+    {
+        m_workspace->setDocumentAvailable(bool(document));
+        ui->mainToolBar->setVisible(bool(document));
+    }
+
     if (m_sidebarWidget)
     {
         m_sidebarWidget->setDocument(document, *m_programController->getSignatures());
