@@ -365,7 +365,6 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     m_workspace = new PDFDocumentWorkspace(m_programController->getPdfWidget(), ui->actionOpen, this);
     setCentralWidget(m_workspace);
     setFocusProxy(m_workspace);
-    ui->mainToolBar->hide();
     m_programController->getPdfWidget()->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_programController->getPdfWidget(), &QWidget::customContextMenuRequested, this, &PDFEditorMainWindow::onPdfContextMenuRequested);
 
@@ -438,7 +437,8 @@ PDFEditorMainWindow::PDFEditorMainWindow(QWidget* parent) :
     menuBar()->setCornerWidget(actionComboBox);
 
     m_programController->finishInitialization();
-    ui->mainToolBar->setVisible(m_programController->getDocument() != nullptr);
+    m_documentToolbarVisible = !ui->mainToolBar->isHidden();
+    ui->mainToolBar->setVisible(m_programController->getDocument() && m_documentToolbarVisible);
     updateDeveloperMenu();
 
     if (pdf::PDFToolManager* toolManager = m_programController->getToolManager())
@@ -802,8 +802,14 @@ void PDFEditorMainWindow::setDocument(const pdf::PDFModifiedDocument& document)
 {
     if (m_workspace)
     {
-        m_workspace->setDocumentAvailable(bool(document));
-        ui->mainToolBar->setVisible(bool(document));
+        const bool available = document.getDocument() != nullptr;
+        if (m_workspace->hasDocument() != available)
+        {
+            if (!available)
+                m_documentToolbarVisible = !ui->mainToolBar->isHidden();
+            ui->mainToolBar->setVisible(available && m_documentToolbarVisible);
+        }
+        m_workspace->setDocumentAvailable(available);
     }
 
     if (m_sidebarWidget)
@@ -875,7 +881,12 @@ void PDFEditorMainWindow::closeEvent(QCloseEvent* event)
 
         if (!m_programController->isFactorySettingsBeingRestored())
         {
+            // Persist the user's document layout, not the temporary empty state.
+            if (!m_workspace->hasDocument())
+                ui->mainToolBar->setVisible(m_documentToolbarVisible);
             m_programController->writeSettings();
+            if (!m_workspace->hasDocument())
+                ui->mainToolBar->hide();
         }
 
         m_programController->closeDocument();

@@ -283,7 +283,6 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     m_workspace = new PDFDocumentWorkspace(pdfWidget, ui->actionOpen, this);
     setCentralWidget(m_workspace);
     setFocusProxy(m_workspace);
-    ui->mainToolBar->hide();
 
     m_sidebarWidget = new PDFSidebarWidget(m_programController->getPdfWidget()->getDrawWidgetProxy(), m_programController->getCertificateStore(), m_programController->getBookmarkManager(), m_programController->getSettings(), false, this);
     m_sidebarDockWidget = new QDockWidget(tr("&Sidebar"), this);
@@ -313,7 +312,8 @@ PDFViewerMainWindow::PDFViewerMainWindow(QWidget* parent) :
     PDFActionComboBox* actionComboBox = new PDFActionComboBox(this);
     menuBar()->setCornerWidget(actionComboBox);
     m_programController->finishInitialization();
-    ui->mainToolBar->setVisible(m_programController->getDocument() != nullptr);
+    m_documentToolbarVisible = !ui->mainToolBar->isHidden();
+    ui->mainToolBar->setVisible(m_programController->getDocument() && m_documentToolbarVisible);
 
     if (pdf::PDFToolManager* toolManager = m_programController->getToolManager())
     {
@@ -618,8 +618,14 @@ void PDFViewerMainWindow::setDocument(const pdf::PDFModifiedDocument& document)
 {
     if (m_workspace)
     {
-        m_workspace->setDocumentAvailable(bool(document));
-        ui->mainToolBar->setVisible(bool(document));
+        const bool available = document.getDocument() != nullptr;
+        if (m_workspace->hasDocument() != available)
+        {
+            if (!available)
+                m_documentToolbarVisible = !ui->mainToolBar->isHidden();
+            ui->mainToolBar->setVisible(available && m_documentToolbarVisible);
+        }
+        m_workspace->setDocumentAvailable(available);
     }
 
     if (m_sidebarWidget)
@@ -669,7 +675,12 @@ void PDFViewerMainWindow::closeEvent(QCloseEvent* event)
     {
         if (!m_programController->isFactorySettingsBeingRestored())
         {
+            // Persist the user's document layout, not the temporary empty state.
+            if (!m_workspace->hasDocument())
+                ui->mainToolBar->setVisible(m_documentToolbarVisible);
             m_programController->writeSettings();
+            if (!m_workspace->hasDocument())
+                ui->mainToolBar->hide();
         }
 
         m_programController->closeDocument();

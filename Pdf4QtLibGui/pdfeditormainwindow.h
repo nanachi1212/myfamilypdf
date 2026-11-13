@@ -132,6 +132,7 @@ private:
     QDoubleSpinBox* m_pageZoomSpinBox;
     QTabBar* m_documentTabBar;
     PDFDocumentWorkspace* m_workspace = nullptr;
+    bool m_documentToolbarVisible = true;
     bool m_isLoadingUI;
     pdf::PDFProgress* m_progress;
     PDFWinTaskBarProgress* m_progressTaskbarIndicator;

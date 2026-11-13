@@ -56,6 +56,8 @@ public:
         setFocusProxy(m_openButton);
     }
 
+    bool hasDocument() const { return m_stack->currentIndex() == 1; }
+
     void setDocumentAvailable(bool available)
     {
         const int index = available ? 1 : 0;

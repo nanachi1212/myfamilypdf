@@ -431,6 +431,14 @@ void ViewerContextMenuTest::quietWorkspaceLifecycle()
         QVERIFY(action); // Removed from toolbar, not from the app.
         QVERIFY(!toolbar->actions().contains(action));
     }
+    toolbar->hide();
+    const pdf::PDFModifiedDocument refresh(controller->getDocument(), nullptr);
+    if (editor)
+        editorWindow->setDocument(refresh);
+    else
+        m_window->setDocument(refresh);
+    QVERIFY(!toolbar->isVisible()); // Updating a document respects the user's choice.
+    toolbar->show();
     controller->closeDocument();
     QTRY_VERIFY(!controller->getDocument());
     QVERIFY(home->isVisible());
